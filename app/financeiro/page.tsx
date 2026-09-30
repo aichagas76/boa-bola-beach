@@ -3,16 +3,20 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
+import { Trash2, Edit2 } from 'lucide-react'
 
 type Movimentacao = {
   id: string
   tipo: 'Entrada' | 'Saída'
-  categoria: string
-  subcategoria: string | null
+  categoria_id: string
   data: string
   descricao: string | null
   valor: number
   forma_pagamento: string
+  categorias_financeiro: {
+    categoria: string
+    subcategoria: string | null
+  }
 }
 
 export default function Financeiro() {
@@ -29,11 +33,27 @@ export default function Financeiro() {
 
     const { data } = await supabase
       .from('movimentacoes')
-      .select('*')
+      .select('*, categorias_financeiro(categoria, subcategoria)')
       .order('data', { ascending: false })
 
     setMovimentacoes(data ?? [])
     setLoading(false)
+  }
+
+  async function deletar(id: string) {
+    if (!confirm('Excluir esta movimentação?')) return
+
+    const { error } = await supabase
+      .from('movimentacoes')
+      .delete()
+      .eq('id', id)
+
+    if (error) {
+      alert('Erro ao excluir: ' + error.message)
+      return
+    }
+
+    carregar()
   }
 
   useEffect(() => {
@@ -127,6 +147,7 @@ export default function Financeiro() {
               <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Descrição</th>
               <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Valor</th>
               <th className="hidden md:table-cell text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Forma Pagamento</th>
+              <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Ações</th>
             </tr>
           </thead>
           <tbody>
@@ -148,13 +169,21 @@ export default function Financeiro() {
                     {m.tipo}
                   </span>
                 </td>
-                <td className="px-4 py-3 text-gray-600">{m.categoria}</td>
-                <td className="hidden md:table-cell px-4 py-3 text-gray-600">{m.subcategoria || '-'}</td>
+                <td className="px-4 py-3 text-gray-600">{m.categorias_financeiro?.categoria || '-'}</td>
+                <td className="hidden md:table-cell px-4 py-3 text-gray-600">{m.categorias_financeiro?.subcategoria || '-'}</td>
                 <td className="px-4 py-3 text-gray-600">{m.descricao || '-'}</td>
                 <td className={`px-4 py-3 font-medium ${m.tipo === 'Entrada' ? 'text-green-600' : 'text-red-600'}`}>
                   {m.tipo === 'Entrada' ? '+' : '-'} R$ {m.valor.toFixed(2).replace('.', ',')}
                 </td>
                 <td className="hidden md:table-cell px-4 py-3 text-gray-600">{m.forma_pagamento}</td>
+                <td className="px-4 py-3 flex gap-2">
+                  <Link href={`/financeiro/${m.id}/editar`} className="text-blue-600 hover:text-blue-800">
+                    <Edit2 size={16} />
+                  </Link>
+                  <button onClick={() => deletar(m.id)} className="text-red-600 hover:text-red-800">
+                    <Trash2 size={16} />
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>
