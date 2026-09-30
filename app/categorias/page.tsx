@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { Trash2 } from 'lucide-react'
+import { Trash2, Edit2, Check, X } from 'lucide-react'
 
 type CategoriaFinanceiro = {
   id: string
@@ -13,22 +13,26 @@ type CategoriaFinanceiro = {
 
 export default function Categorias() {
   const [tipo, setTipo] = useState<'Entrada' | 'Saída'>('Entrada')
-  const [todasCategorias, setTodasCategorias] = useState<CategoriaFinanceiro[]>([])
+  const [dados, setDados] = useState<CategoriaFinanceiro[]>([])
+  const [loading, setLoading] = useState(true)
+
   const [categoriaSelecionada, setCategoriaSelecionada] = useState<string>('')
   const [novaCategoria, setNovaCategoria] = useState('')
   const [novaSubcategoria, setNovaSubcategoria] = useState('')
-  const [loading, setLoading] = useState(true)
-  const [adicionandoCategoria, setAdicionandoCategoria] = useState(false)
-  const [adicionandoSubcategoria, setAdicionandoSubcategoria] = useState(false)
+
+  const [editandoId, setEditandoId] = useState<string>('')
+  const [editandoValor, setEditandoValor] = useState('')
 
   async function carregar() {
     setLoading(true)
     const { data } = await supabase
       .from('categorias_financeiro')
       .select('*')
-      .order('tipo, categoria, subcategoria')
+      .order('tipo')
+      .order('categoria')
+      .order('subcategoria')
 
-    setTodasCategorias(data ?? [])
+    setDados(data ?? [])
     setLoading(false)
   }
 
@@ -37,109 +41,96 @@ export default function Categorias() {
   }, [])
 
   const categoriasFiltradas = Array.from(new Set(
-    todasCategorias
-      .filter(c => c.tipo === tipo && c.categoria)
-      .map(c => c.categoria)
+    dados
+      .filter(d => d.tipo === tipo && d.categoria && !d.subcategoria)
+      .map(d => d.categoria)
   ))
 
-  const subcategoriasFiltradas = todasCategorias.filter(c =>
-    c.tipo === tipo &&
-    c.categoria === categoriaSelecionada &&
-    c.subcategoria
+  const subcategoriasFiltradas = dados.filter(d =>
+    d.tipo === tipo &&
+    d.categoria === categoriaSelecionada &&
+    d.subcategoria
   )
 
   async function adicionarCategoria() {
     if (!novaCategoria.trim()) return
 
-    setAdicionandoCategoria(true)
+    const { error } = await supabase
+      .from('categorias_financeiro')
+      .insert({
+        tipo,
+        categoria: novaCategoria,
+        subcategoria: null,
+      })
 
-    try {
-      const { error } = await supabase
-        .from('categorias_financeiro')
-        .insert([{
-          tipo,
-          categoria: novaCategoria,
-          subcategoria: null,
-        }])
-
-      if (error) {
-        alert('Erro ao adicionar categoria: ' + error.message)
-        setAdicionandoCategoria(false)
-        return
-      }
-
-      await carregar()
-      setNovaCategoria('')
-      setAdicionandoCategoria(false)
-    } catch (err) {
-      alert('Erro: ' + (err as Error).message)
-      setAdicionandoCategoria(false)
+    if (error) {
+      alert('Erro: ' + error.message)
+      return
     }
+
+    setNovaCategoria('')
+    carregar()
   }
 
   async function adicionarSubcategoria() {
     if (!novaSubcategoria.trim() || !categoriaSelecionada) return
 
-    setAdicionandoSubcategoria(true)
+    const { error } = await supabase
+      .from('categorias_financeiro')
+      .insert({
+        tipo,
+        categoria: categoriaSelecionada,
+        subcategoria: novaSubcategoria,
+      })
 
-    try {
-      const { error } = await supabase
-        .from('categorias_financeiro')
-        .insert([{
-          tipo,
-          categoria: categoriaSelecionada,
-          subcategoria: novaSubcategoria,
-        }])
-
-      if (error) {
-        alert('Erro ao adicionar subcategoria: ' + error.message)
-        setAdicionandoSubcategoria(false)
-        return
-      }
-
-      await carregar()
-      setNovaSubcategoria('')
-      setAdicionandoSubcategoria(false)
-    } catch (err) {
-      alert('Erro: ' + (err as Error).message)
-      setAdicionandoSubcategoria(false)
+    if (error) {
+      alert('Erro: ' + error.message)
+      return
     }
+
+    setNovaSubcategoria('')
+    carregar()
   }
 
-  async function deletarCategoria(categoria: string) {
-    if (!confirm(`Excluir categoria "${categoria}" e todas suas subcategorias?`)) return
+  async function editarItem(id: string, novoValor: string) {
+    if (!novoValor.trim()) return
+
+    const item = dados.find(d => d.id === id)
+    if (!item) return
+
+    const { error } = await supabase
+      .from('categorias_financeiro')
+      .update(
+        item.subcategoria
+          ? { subcategoria: novoValor }
+          : { categoria: novoValor }
+      )
+      .eq('id', id)
+
+    if (error) {
+      alert('Erro: ' + error.message)
+      return
+    }
+
+    setEditandoId('')
+    setEditandoValor('')
+    carregar()
+  }
+
+  async function deletarItem(id: string) {
+    if (!confirm('Excluir?')) return
 
     const { error } = await supabase
       .from('categorias_financeiro')
       .delete()
-      .eq('tipo', tipo)
-      .eq('categoria', categoria)
+      .eq('id', id)
 
     if (error) {
-      alert('Erro ao excluir: ' + error.message)
+      alert('Erro: ' + error.message)
       return
     }
 
-    setTodasCategorias(todasCategorias.filter(c => !(c.tipo === tipo && c.categoria === categoria)))
-    if (categoriaSelecionada === categoria) setCategoriaSelecionada('')
-  }
-
-  async function deletarSubcategoria(subcategoria: string) {
-    if (!confirm(`Excluir subcategoria "${subcategoria}"?`)) return
-
-    const { error } = await supabase
-      .from('categorias_financeiro')
-      .delete()
-      .eq('tipo', tipo)
-      .eq('categoria', categoriaSelecionada)
-      .eq('subcategoria', subcategoria)
-
-    if (error) {
-      alert('Erro ao excluir: ' + error.message)
-      return
-    }
-
-    setTodasCategorias(todasCategorias.filter(c => !(c.tipo === tipo && c.categoria === categoriaSelecionada && c.subcategoria === subcategoria)))
+    carregar()
   }
 
   return (
@@ -147,7 +138,7 @@ export default function Categorias() {
       <h1 className="text-3xl font-bold text-gray-900 mb-8">Categorias</h1>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* SEÇÃO 1: TIPO */}
+        {/* COLUNA 1: TIPO */}
         <div className="bg-white border border-gray-200 rounded-xl p-6">
           <div className="text-sm font-semibold text-gray-900 mb-4">Tipo</div>
           <div className="space-y-2">
@@ -180,7 +171,7 @@ export default function Categorias() {
           </div>
         </div>
 
-        {/* SEÇÃO 2: CATEGORIAS */}
+        {/* COLUNA 2: CATEGORIAS */}
         <div className="bg-white border border-gray-200 rounded-xl p-6">
           <div className="text-sm font-semibold text-gray-900 mb-4">Categorias</div>
 
@@ -190,30 +181,68 @@ export default function Categorias() {
             <>
               <div className="space-y-2 mb-4 max-h-96 overflow-y-auto">
                 {categoriasFiltradas.length === 0 ? (
-                  <div className="text-xs text-gray-400 py-4">Nenhuma categoria</div>
+                  <div className="text-xs text-gray-400 py-4">Nenhuma</div>
                 ) : (
-                  categoriasFiltradas.map(cat => (
-                    <div
-                      key={cat}
-                      className={`flex items-center justify-between px-3 py-2 rounded-lg cursor-pointer transition-colors ${
-                        categoriaSelecionada === cat
-                          ? 'bg-[#7DC421] bg-opacity-20 border border-[#7DC421]'
-                          : 'bg-gray-50 hover:bg-gray-100'
-                      }`}
-                      onClick={() => setCategoriaSelecionada(cat)}
-                    >
-                      <span className="text-sm font-medium text-gray-900">{cat}</span>
-                      <button
-                        onClick={e => {
-                          e.stopPropagation()
-                          deletarCategoria(cat)
-                        }}
-                        className="text-red-600 hover:text-red-800 transition-colors"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  ))
+                  categoriasFiltradas.map(cat => {
+                    const item = dados.find(d => d.tipo === tipo && d.categoria === cat && !d.subcategoria)
+                    if (!item) return null
+
+                    return (
+                      <div key={item.id} className="flex items-center gap-2">
+                        {editandoId === item.id ? (
+                          <>
+                            <input
+                              type="text"
+                              value={editandoValor}
+                              onChange={e => setEditandoValor(e.target.value)}
+                              className="flex-1 border border-gray-200 rounded px-2 py-1 text-xs"
+                              autoFocus
+                            />
+                            <button
+                              onClick={() => editarItem(item.id, editandoValor)}
+                              className="text-green-600 hover:text-green-800"
+                            >
+                              <Check size={16} />
+                            </button>
+                            <button
+                              onClick={() => setEditandoId('')}
+                              className="text-gray-600 hover:text-gray-800"
+                            >
+                              <X size={16} />
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <span
+                              onClick={() => setCategoriaSelecionada(cat)}
+                              className={`flex-1 px-3 py-2 rounded-lg cursor-pointer text-sm font-medium transition-colors ${
+                                categoriaSelecionada === cat
+                                  ? 'bg-[#7DC421] bg-opacity-20 border border-[#7DC421]'
+                                  : 'bg-gray-50 hover:bg-gray-100'
+                              }`}
+                            >
+                              {cat}
+                            </span>
+                            <button
+                              onClick={() => {
+                                setEditandoId(item.id)
+                                setEditandoValor(cat)
+                              }}
+                              className="text-blue-600 hover:text-blue-800"
+                            >
+                              <Edit2 size={16} />
+                            </button>
+                            <button
+                              onClick={() => deletarItem(item.id)}
+                              className="text-red-600 hover:text-red-800"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    )
+                  })
                 )}
               </div>
 
@@ -222,14 +251,13 @@ export default function Categorias() {
                   type="text"
                   value={novaCategoria}
                   onChange={e => setNovaCategoria(e.target.value)}
-                  placeholder="Nova categoria"
+                  placeholder="Nova"
                   className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-xs"
                   onKeyPress={e => e.key === 'Enter' && adicionarCategoria()}
                 />
                 <button
                   onClick={adicionarCategoria}
-                  disabled={adicionandoCategoria}
-                  className="px-3 py-2 text-xs bg-[#7DC421] text-white rounded-lg hover:bg-[#6ab01a] disabled:opacity-50"
+                  className="px-3 py-2 text-xs bg-[#7DC421] text-white rounded-lg hover:bg-[#6ab01a]"
                 >
                   +
                 </button>
@@ -238,7 +266,7 @@ export default function Categorias() {
           )}
         </div>
 
-        {/* SEÇÃO 3: SUBCATEGORIAS */}
+        {/* COLUNA 3: SUBCATEGORIAS */}
         <div className="bg-white border border-gray-200 rounded-xl p-6">
           <div className="text-sm font-semibold text-gray-900 mb-4">Subcategorias</div>
 
@@ -248,20 +276,54 @@ export default function Categorias() {
             <>
               <div className="space-y-2 mb-4 max-h-96 overflow-y-auto">
                 {subcategoriasFiltradas.length === 0 ? (
-                  <div className="text-xs text-gray-400 py-4">Nenhuma subcategoria</div>
+                  <div className="text-xs text-gray-400 py-4">Nenhuma</div>
                 ) : (
                   subcategoriasFiltradas.map(sub => (
-                    <div
-                      key={sub.id}
-                      className="flex items-center justify-between px-3 py-2 rounded-lg bg-gray-50 hover:bg-gray-100"
-                    >
-                      <span className="text-sm text-gray-900">{sub.subcategoria}</span>
-                      <button
-                        onClick={() => deletarSubcategoria(sub.subcategoria!)}
-                        className="text-red-600 hover:text-red-800 transition-colors"
-                      >
-                        <Trash2 size={16} />
-                      </button>
+                    <div key={sub.id} className="flex items-center gap-2">
+                      {editandoId === sub.id ? (
+                        <>
+                          <input
+                            type="text"
+                            value={editandoValor}
+                            onChange={e => setEditandoValor(e.target.value)}
+                            className="flex-1 border border-gray-200 rounded px-2 py-1 text-xs"
+                            autoFocus
+                          />
+                          <button
+                            onClick={() => editarItem(sub.id, editandoValor)}
+                            className="text-green-600 hover:text-green-800"
+                          >
+                            <Check size={16} />
+                          </button>
+                          <button
+                            onClick={() => setEditandoId('')}
+                            className="text-gray-600 hover:text-gray-800"
+                          >
+                            <X size={16} />
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <span className="flex-1 px-3 py-2 rounded-lg bg-gray-50 text-sm text-gray-900">
+                            {sub.subcategoria}
+                          </span>
+                          <button
+                            onClick={() => {
+                              setEditandoId(sub.id)
+                              setEditandoValor(sub.subcategoria || '')
+                            }}
+                            className="text-blue-600 hover:text-blue-800"
+                          >
+                            <Edit2 size={16} />
+                          </button>
+                          <button
+                            onClick={() => deletarItem(sub.id)}
+                            className="text-red-600 hover:text-red-800"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </>
+                      )}
                     </div>
                   ))
                 )}
@@ -272,14 +334,13 @@ export default function Categorias() {
                   type="text"
                   value={novaSubcategoria}
                   onChange={e => setNovaSubcategoria(e.target.value)}
-                  placeholder="Nova subcategoria"
+                  placeholder="Nova"
                   className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-xs"
                   onKeyPress={e => e.key === 'Enter' && adicionarSubcategoria()}
                 />
                 <button
                   onClick={adicionarSubcategoria}
-                  disabled={adicionandoSubcategoria}
-                  className="px-3 py-2 text-xs bg-[#7DC421] text-white rounded-lg hover:bg-[#6ab01a] disabled:opacity-50"
+                  className="px-3 py-2 text-xs bg-[#7DC421] text-white rounded-lg hover:bg-[#6ab01a]"
                 >
                   +
                 </button>
