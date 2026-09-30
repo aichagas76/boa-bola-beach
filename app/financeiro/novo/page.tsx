@@ -4,17 +4,17 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 
-type Categoria = {
+type CategoriaFinanceiro = {
   id: string
   tipo: 'Entrada' | 'Saída'
-  nome: string
-  subcategorias?: string[]
+  categoria: string
+  subcategoria: string | null
 }
 
 export default function NovoFinanceiro() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
-  const [categorias, setCategorias] = useState<Categoria[]>([])
+  const [todasCategorias, setTodasCategorias] = useState<CategoriaFinanceiro[]>([])
 
   const [form, setForm] = useState({
     tipo: 'Entrada' as 'Entrada' | 'Saída',
@@ -29,16 +29,27 @@ export default function NovoFinanceiro() {
   useEffect(() => {
     async function carregar() {
       const { data } = await supabase
-        .from('categorias')
+        .from('categorias_financeiro')
         .select('*')
-        .order('tipo, nome')
+        .order('tipo, categoria, subcategoria')
 
-      setCategorias(data ?? [])
+      setTodasCategorias(data ?? [])
     }
     carregar()
   }, [])
 
-  const categoriasDoTipo = categorias.filter(c => c.tipo === form.tipo)
+  const categoriasDoTipo = [...new Set(
+    todasCategorias
+      .filter(c => c.tipo === form.tipo)
+      .map(c => c.categoria)
+  )]
+
+  const subcategoriasDA = form.categoria
+    ? todasCategorias
+      .filter(c => c.tipo === form.tipo && c.categoria === form.categoria)
+      .map(c => c.subcategoria)
+      .filter((s, i, arr) => s && arr.indexOf(s) === i)
+    : []
 
   async function salvar() {
     if (!form.categoria || !form.valor) {
@@ -98,21 +109,25 @@ export default function NovoFinanceiro() {
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"
             >
               <option value="">Selecionar</option>
-              {categoriasDoTipo.map(c => (
-                <option key={c.id} value={c.nome}>{c.nome}</option>
+              {categoriasDoTipo.map(cat => (
+                <option key={cat} value={cat}>{cat}</option>
               ))}
             </select>
           </div>
 
           <div>
             <label className="text-xs text-gray-500 block mb-1">Subcategoria (opcional)</label>
-            <input
-              type="text"
+            <select
               value={form.subcategoria}
               onChange={e => setForm({ ...form, subcategoria: e.target.value })}
-              placeholder="Digite a subcategoria"
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
-            />
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"
+              disabled={!form.categoria}
+            >
+              <option value="">Nenhuma</option>
+              {subcategoriasDA.map(sub => (
+                <option key={sub} value={sub || ''}>{sub || 'Nenhuma'}</option>
+              ))}
+            </select>
           </div>
 
           <div>
