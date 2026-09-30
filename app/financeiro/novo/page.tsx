@@ -54,6 +54,11 @@ export default function NovoFinanceiro() {
     : []
 
   async function salvar() {
+    if (!form.tipo) {
+      alert('Selecione o tipo (Entrada/Saída)')
+      return
+    }
+
     if (!form.categoria_id || !form.valor) {
       alert('Preencha categoria e valor')
       return
@@ -64,6 +69,7 @@ export default function NovoFinanceiro() {
     const { error } = await supabase
       .from('movimentacoes')
       .insert({
+        tipo: form.tipo,
         categoria_id: form.categoria_id,
         data: form.data,
         descricao: form.descricao || null,
