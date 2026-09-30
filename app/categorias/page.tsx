@@ -53,31 +53,28 @@ export default function Categorias() {
 
     setAdicionandoCategoria(true)
 
-    console.log('Adicionando categoria:', { tipo, categoria: novaCategoria })
+    try {
+      const { error } = await supabase
+        .from('categorias_financeiro')
+        .insert([{
+          tipo,
+          categoria: novaCategoria,
+          subcategoria: null,
+        }])
 
-    const { data, error } = await supabase
-      .from('categorias_financeiro')
-      .insert({
-        tipo,
-        categoria: novaCategoria,
-        subcategoria: null,
-      })
-      .select()
-      .single()
+      if (error) {
+        alert('Erro ao adicionar categoria: ' + error.message)
+        setAdicionandoCategoria(false)
+        return
+      }
 
-    console.log('Resposta:', { data, error })
-
-    if (error) {
-      alert('Erro ao adicionar categoria: ' + error.message)
-      console.error('Erro completo:', error)
+      await carregar()
+      setNovaCategoria('')
       setAdicionandoCategoria(false)
-      return
+    } catch (err) {
+      alert('Erro: ' + (err as Error).message)
+      setAdicionandoCategoria(false)
     }
-
-    setTodasCategorias([...todasCategorias, data])
-    setNovaCategoria('')
-    setAdicionandoCategoria(false)
-    alert('Categoria adicionada com sucesso!')
   }
 
   async function adicionarSubcategoria() {
@@ -85,31 +82,28 @@ export default function Categorias() {
 
     setAdicionandoSubcategoria(true)
 
-    console.log('Adicionando subcategoria:', { tipo, categoria: categoriaSelecionada, subcategoria: novaSubcategoria })
+    try {
+      const { error } = await supabase
+        .from('categorias_financeiro')
+        .insert([{
+          tipo,
+          categoria: categoriaSelecionada,
+          subcategoria: novaSubcategoria,
+        }])
 
-    const { data, error } = await supabase
-      .from('categorias_financeiro')
-      .insert({
-        tipo,
-        categoria: categoriaSelecionada,
-        subcategoria: novaSubcategoria,
-      })
-      .select()
-      .single()
+      if (error) {
+        alert('Erro ao adicionar subcategoria: ' + error.message)
+        setAdicionandoSubcategoria(false)
+        return
+      }
 
-    console.log('Resposta:', { data, error })
-
-    if (error) {
-      alert('Erro ao adicionar subcategoria: ' + error.message)
-      console.error('Erro completo:', error)
+      await carregar()
+      setNovaSubcategoria('')
       setAdicionandoSubcategoria(false)
-      return
+    } catch (err) {
+      alert('Erro: ' + (err as Error).message)
+      setAdicionandoSubcategoria(false)
     }
-
-    setTodasCategorias([...todasCategorias, data])
-    setNovaSubcategoria('')
-    setAdicionandoSubcategoria(false)
-    alert('Subcategoria adicionada com sucesso!')
   }
 
   async function deletarCategoria(categoria: string) {
