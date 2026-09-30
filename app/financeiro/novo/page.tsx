@@ -18,8 +18,7 @@ export default function NovoFinanceiro() {
 
   const [form, setForm] = useState({
     tipo: 'Entrada' as 'Entrada' | 'Saída',
-    categoria: '',
-    subcategoria: '',
+    categoria_id: '',
     data: new Date().toISOString().split('T')[0],
     descricao: '',
     valor: '',
@@ -38,21 +37,24 @@ export default function NovoFinanceiro() {
     carregar()
   }, [])
 
-  const categoriasDoTipo = [...new Set(
+  const categoriasUnicas = Array.from(new Map(
     todasCategorias
       .filter(c => c.tipo === form.tipo)
-      .map(c => c.categoria)
-  )]
+      .filter(c => !c.subcategoria)
+      .map(c => [c.categoria, c])
+  ).values())
 
-  const subcategoriasDA = form.categoria
-    ? todasCategorias
-      .filter(c => c.tipo === form.tipo && c.categoria === form.categoria)
-      .map(c => c.subcategoria)
-      .filter((s, i, arr) => s && arr.indexOf(s) === i)
+  const categoriaSelecionada = todasCategorias.find(c => c.id === form.categoria_id)
+  const subcategoriasDA = categoriaSelecionada
+    ? todasCategorias.filter(c =>
+        c.tipo === form.tipo &&
+        c.categoria === categoriaSelecionada.categoria &&
+        c.subcategoria
+      )
     : []
 
   async function salvar() {
-    if (!form.categoria || !form.valor) {
+    if (!form.categoria_id || !form.valor) {
       alert('Preencha categoria e valor')
       return
     }
@@ -62,12 +64,10 @@ export default function NovoFinanceiro() {
     const { error } = await supabase
       .from('movimentacoes')
       .insert({
-        tipo: form.tipo,
-        categoria: form.categoria,
-        subcategoria: form.subcategoria || null,
+        categoria_id: form.categoria_id,
         data: form.data,
         descricao: form.descricao || null,
-        valor: parseFloat(form.valor),
+        valor: parseFloat(form.valor.replace(',', '.')),
         forma_pagamento: form.forma_pagamento,
       })
 
@@ -93,7 +93,7 @@ export default function NovoFinanceiro() {
             <label className="text-xs text-gray-500 block mb-1">Tipo</label>
             <select
               value={form.tipo}
-              onChange={e => setForm({ ...form, tipo: e.target.value as 'Entrada' | 'Saída', categoria: '', subcategoria: '' })}
+              onChange={e => setForm({ ...form, tipo: e.target.value as 'Entrada' | 'Saída', categoria_id: '' })}
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"
             >
               <option value="Entrada">Entrada</option>
@@ -104,13 +104,13 @@ export default function NovoFinanceiro() {
           <div>
             <label className="text-xs text-gray-500 block mb-1">Categoria</label>
             <select
-              value={form.categoria}
-              onChange={e => setForm({ ...form, categoria: e.target.value, subcategoria: '' })}
+              value={form.categoria_id}
+              onChange={e => setForm({ ...form, categoria_id: e.target.value })}
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"
             >
               <option value="">Selecionar</option>
-              {categoriasDoTipo.map(cat => (
-                <option key={cat} value={cat}>{cat}</option>
+              {categoriasUnicas.map(cat => (
+                <option key={cat.id} value={cat.id}>{cat.categoria}</option>
               ))}
             </select>
           </div>
@@ -118,14 +118,14 @@ export default function NovoFinanceiro() {
           <div>
             <label className="text-xs text-gray-500 block mb-1">Subcategoria (opcional)</label>
             <select
-              value={form.subcategoria}
-              onChange={e => setForm({ ...form, subcategoria: e.target.value })}
+              value={form.categoria_id && subcategoriasDA.some(s => s.id === form.categoria_id) ? form.categoria_id : ''}
+              onChange={e => e.target.value && setForm({ ...form, categoria_id: e.target.value })}
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"
-              disabled={!form.categoria}
+              disabled={subcategoriasDA.length === 0}
             >
               <option value="">Nenhuma</option>
               {subcategoriasDA.map(sub => (
-                <option key={sub} value={sub || ''}>{sub || 'Nenhuma'}</option>
+                <option key={sub.id} value={sub.id}>{sub.subcategoria}</option>
               ))}
             </select>
           </div>
