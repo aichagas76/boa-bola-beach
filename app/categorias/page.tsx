@@ -53,6 +53,8 @@ export default function Categorias() {
 
     setAdicionandoCategoria(true)
 
+    console.log('Adicionando categoria:', { tipo, categoria: novaCategoria })
+
     const { data, error } = await supabase
       .from('categorias_financeiro')
       .insert({
@@ -63,8 +65,11 @@ export default function Categorias() {
       .select()
       .single()
 
+    console.log('Resposta:', { data, error })
+
     if (error) {
-      alert('Erro ao adicionar: ' + error.message)
+      alert('Erro ao adicionar categoria: ' + error.message)
+      console.error('Erro completo:', error)
       setAdicionandoCategoria(false)
       return
     }
@@ -72,12 +77,15 @@ export default function Categorias() {
     setTodasCategorias([...todasCategorias, data])
     setNovaCategoria('')
     setAdicionandoCategoria(false)
+    alert('Categoria adicionada com sucesso!')
   }
 
   async function adicionarSubcategoria() {
     if (!novaSubcategoria.trim() || !categoriaSelecionada) return
 
     setAdicionandoSubcategoria(true)
+
+    console.log('Adicionando subcategoria:', { tipo, categoria: categoriaSelecionada, subcategoria: novaSubcategoria })
 
     const { data, error } = await supabase
       .from('categorias_financeiro')
@@ -89,8 +97,11 @@ export default function Categorias() {
       .select()
       .single()
 
+    console.log('Resposta:', { data, error })
+
     if (error) {
-      alert('Erro ao adicionar: ' + error.message)
+      alert('Erro ao adicionar subcategoria: ' + error.message)
+      console.error('Erro completo:', error)
       setAdicionandoSubcategoria(false)
       return
     }
@@ -98,6 +109,7 @@ export default function Categorias() {
     setTodasCategorias([...todasCategorias, data])
     setNovaSubcategoria('')
     setAdicionandoSubcategoria(false)
+    alert('Subcategoria adicionada com sucesso!')
   }
 
   async function deletarCategoria(categoria: string) {
