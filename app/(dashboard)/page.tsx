@@ -72,7 +72,7 @@ export default function Dashboard() {
     <div>
       <h1 className="text-3xl font-bold text-gray-900 mb-8">Dashboard</h1>
 
-      <div className="grid grid-cols-3 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         {cards.map(card => (
           <Link key={card.label} href={card.href}>
             <div className="bg-white border border-[#7DC421] rounded-xl p-6 hover:shadow-lg transition-all cursor-pointer group">
