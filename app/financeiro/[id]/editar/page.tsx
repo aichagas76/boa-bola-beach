@@ -31,26 +31,46 @@ export default function EditarFinanceiro() {
 
   useEffect(() => {
     async function carregarDados() {
-      const [{ data: mov }, { data: cats }] = await Promise.all([
-        supabase.from('movimentacoes').select('*').eq('id', id).single(),
-        supabase.from('categorias_financeiro').select('*').order('tipo').order('categoria').order('subcategoria'),
-      ])
+      try {
+        const [{ data: mov, error: errMov }, { data: cats, error: errCats }] = await Promise.all([
+          supabase.from('movimentacoes').select('*').eq('id', id).single(),
+          supabase.from('categorias_financeiro').select('*').order('tipo').order('categoria').order('subcategoria'),
+        ])
 
-      if (mov) {
-        setForm({
-          tipo: mov.tipo,
-          categoria_id: mov.categoria_id,
-          data: mov.data,
-          descricao: mov.descricao || '',
-          valor: mov.valor.toString(),
-          forma_pagamento: mov.forma_pagamento,
-        })
+        if (errMov) {
+          alert('Erro ao carregar movimentação: ' + errMov.message)
+          setCarregando(false)
+          return
+        }
+
+        if (errCats) {
+          alert('Erro ao carregar categorias: ' + errCats.message)
+          setCarregando(false)
+          return
+        }
+
+        if (mov) {
+          setForm({
+            tipo: mov.tipo,
+            categoria_id: mov.categoria_id,
+            data: mov.data,
+            descricao: mov.descricao || '',
+            valor: mov.valor.toString(),
+            forma_pagamento: mov.forma_pagamento,
+          })
+        }
+
+        setTodasCategorias(cats ?? [])
+        setCarregando(false)
+      } catch (err) {
+        alert('Erro: ' + (err as Error).message)
+        setCarregando(false)
       }
-
-      setTodasCategorias(cats ?? [])
-      setCarregando(false)
     }
-    carregarDados()
+
+    if (id) {
+      carregarDados()
+    }
   }, [id])
 
   const categoriasUnicas = Array.from(new Map(
