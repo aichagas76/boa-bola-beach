@@ -3,13 +3,15 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, Users, CreditCard, AlertCircle, Settings, Menu, X } from 'lucide-react'
+import { LayoutDashboard, Users, CreditCard, AlertCircle, Settings, Menu, X, TrendingUp, Tags } from 'lucide-react'
 
 const navItems = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/alunos', label: 'Alunos', icon: Users },
   { href: '/pagamentos', label: 'Pagamentos', icon: CreditCard },
   { href: '/atraso', label: 'Em atraso', icon: AlertCircle },
+  { href: '/financeiro', label: 'Financeiro', icon: TrendingUp },
+  { href: '/categorias', label: 'Categorias', icon: Tags },
 ]
 
 export default function Sidebar() {
