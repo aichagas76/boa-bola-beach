@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
+import { MessageCircle } from 'lucide-react'
 
 type Aluno = {
   id: string
@@ -69,6 +70,11 @@ export default function Alunos() {
     return '-'
   }
 
+  function formatarWhatsApp(celular: string) {
+    const numeros = celular.replace(/\D/g, '')
+    return `55${numeros}`
+  }
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
@@ -130,7 +136,17 @@ export default function Alunos() {
             {filtrados.map((aluno, i) => (
               <tr key={aluno.id} className={`border-b border-gray-100 hover:bg-gray-50 ${i === filtrados.length - 1 ? 'border-0' : ''}`}>
                 <td className="px-4 py-3 font-medium text-gray-900">{aluno.nome}</td>
-                <td className="px-4 py-3 text-gray-600">{aluno.celular}</td>
+                <td className="px-4 py-3 text-gray-600">
+                  <a
+                    href={`https://wa.me/${formatarWhatsApp(aluno.celular)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 text-gray-600 hover:text-green-600 transition-colors"
+                  >
+                    {aluno.celular}
+                    <MessageCircle size={16} className="text-green-600" />
+                  </a>
+                </td>
                 <td className="px-4 py-3 text-gray-600">
                   {aluno.data_vencimento ? new Date(aluno.data_vencimento + 'T00:00:00').toLocaleDateString('pt-BR') : '-'}
                 </td>
