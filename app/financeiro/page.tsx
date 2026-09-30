@@ -47,11 +47,13 @@ export default function Financeiro() {
     return matchTipo && matchPeriodo
   })
 
+  const entradasTotal = filtrados.filter(m => m.tipo === 'Entrada').reduce((acc, m) => acc + m.valor, 0)
+  const saidasTotal = filtrados.filter(m => m.tipo === 'Saída').reduce((acc, m) => acc + m.valor, 0)
   const totais = {
-    entradas: filtrados.filter(m => m.tipo === 'Entrada').reduce((acc, m) => acc + m.valor, 0),
-    saidas: filtrados.filter(m => m.tipo === 'Saída').reduce((acc, m) => acc + m.valor, 0),
+    entradas: entradasTotal,
+    saidas: saidasTotal,
+    saldo: entradasTotal - saidasTotal,
   }
-  totais.saldo = totais.entradas - totais.saidas
 
   return (
     <div>
