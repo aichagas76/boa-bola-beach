@@ -20,6 +20,7 @@ export default function Alunos() {
   const [busca, setBusca] = useState('')
   const [filtro, setFiltro] = useState('Todos')
   const [loading, setLoading] = useState(true)
+  const [sortConfig, setSortConfig] = useState<{ column: 'nome' | 'data_vencimento' | 'valor_total', direction: 'asc' | 'desc' }>({ column: 'nome', direction: 'asc' })
 
   async function carregar() {
     setLoading(true)
@@ -46,13 +47,13 @@ export default function Alunos() {
 
   useEffect(() => { carregar() }, [])
 
-  const filtrados = alunos.filter(a => {
+  const filtrados = sortAlunos(alunos.filter(a => {
     const matchBusca = a.nome?.toLowerCase().includes(busca.toLowerCase()) ||
       a.cpf?.includes(busca) ||
       a.celular?.includes(busca)
     const matchFiltro = filtro === 'Todos' || a.status === filtro
     return matchBusca && matchFiltro
-  })
+  }))
 
   const contadores = {
     Todos: alunos.length,
@@ -72,6 +73,29 @@ export default function Alunos() {
   function formatarWhatsApp(celular: string) {
     const numeros = celular.replace(/\D/g, '')
     return `55${numeros}`
+  }
+
+  function handleSort(column: 'nome' | 'data_vencimento' | 'valor_total') {
+    setSortConfig(prev => ({
+      column,
+      direction: prev.column === column && prev.direction === 'asc' ? 'desc' : 'asc'
+    }))
+  }
+
+  function sortAlunos(lista: Aluno[]) {
+    return [...lista].sort((a, b) => {
+      let aVal: any = a[sortConfig.column]
+      let bVal: any = b[sortConfig.column]
+
+      if (sortConfig.column === 'nome') {
+        aVal = (aVal || '').toLowerCase()
+        bVal = (bVal || '').toLowerCase()
+      }
+
+      if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1
+      if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1
+      return 0
+    })
   }
 
   return (
@@ -116,11 +140,26 @@ export default function Alunos() {
         <table className="w-full text-sm min-w-full">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200">
-              <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Nome</th>
+              <th
+                onClick={() => handleSort('nome')}
+                className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide cursor-pointer hover:bg-gray-100 transition-colors"
+              >
+                Nome {sortConfig.column === 'nome' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+              </th>
               <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Celular</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Vencimento</th>
+              <th
+                onClick={() => handleSort('data_vencimento')}
+                className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide cursor-pointer hover:bg-gray-100 transition-colors"
+              >
+                Vencimento {sortConfig.column === 'data_vencimento' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+              </th>
               <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Modalidade</th>
-              <th className="hidden md:table-cell text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Valor</th>
+              <th
+                onClick={() => handleSort('valor_total')}
+                className="hidden md:table-cell text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide cursor-pointer hover:bg-gray-100 transition-colors"
+              >
+                Valor {sortConfig.column === 'valor_total' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+              </th>
               <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Status</th>
               <th className="px-4 py-3"></th>
             </tr>
