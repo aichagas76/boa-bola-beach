@@ -33,7 +33,7 @@ export default function EditarFinanceiro() {
     async function carregarDados() {
       const [{ data: mov }, { data: cats }] = await Promise.all([
         supabase.from('movimentacoes').select('*').eq('id', id).single(),
-        supabase.from('categorias_financeiro').select('*').order('tipo, categoria, subcategoria'),
+        supabase.from('categorias_financeiro').select('*').order('tipo').order('categoria').order('subcategoria'),
       ])
 
       if (mov) {
