@@ -1,25 +1,17 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter, useParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
+import { useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-
-type CategoriaFinanceiro = {
-  id: string
-  tipo: 'Entrada' | 'Saída'
-  categoria: string
-  subcategoria: string | null
-}
 
 export default function EditarFinanceiro() {
   const router = useRouter()
   const params = useParams()
-  const id = params.id as string
+  const id = params?.id as string
 
-  const [loading, setLoading] = useState(false)
   const [carregando, setCarregando] = useState(true)
-  const [todasCategorias, setTodasCategorias] = useState<CategoriaFinanceiro[]>([])
-
+  const [salvando, setSalvando] = useState(false)
   const [form, setForm] = useState({
     tipo: 'Entrada' as 'Entrada' | 'Saída',
     categoria_id: '',
@@ -28,26 +20,22 @@ export default function EditarFinanceiro() {
     valor: '',
     forma_pagamento: 'Pix',
   })
+  const [categorias, setCategorias] = useState<any[]>([])
 
   useEffect(() => {
-    async function carregarDados() {
+    if (!id) return
+
+    async function carregar() {
       try {
-        const [{ data: mov, error: errMov }, { data: cats, error: errCats }] = await Promise.all([
-          supabase.from('movimentacoes').select('*').eq('id', id).single(),
-          supabase.from('categorias_financeiro').select('*').order('tipo').order('categoria').order('subcategoria'),
-        ])
+        const { data: mov } = await supabase
+          .from('movimentacoes')
+          .select('*')
+          .eq('id', id)
+          .single()
 
-        if (errMov) {
-          alert('Erro ao carregar movimentação: ' + errMov.message)
-          setCarregando(false)
-          return
-        }
-
-        if (errCats) {
-          alert('Erro ao carregar categorias: ' + errCats.message)
-          setCarregando(false)
-          return
-        }
+        const { data: cats } = await supabase
+          .from('categorias_financeiro')
+          .select('*')
 
         if (mov) {
           setForm({
@@ -60,47 +48,22 @@ export default function EditarFinanceiro() {
           })
         }
 
-        setTodasCategorias(cats ?? [])
-        setCarregando(false)
+        setCategorias(cats || [])
       } catch (err) {
-        alert('Erro: ' + (err as Error).message)
+        console.error('Erro ao carregar:', err)
+        alert('Erro ao carregar dados')
+      } finally {
         setCarregando(false)
       }
     }
 
-    if (id) {
-      carregarDados()
-    }
+    carregar()
   }, [id])
 
-  const categoriasUnicas = Array.from(new Map(
-    todasCategorias
-      .filter(c => c.tipo === form.tipo)
-      .filter(c => !c.subcategoria)
-      .map(c => [c.categoria, c])
-  ).values())
-
-  const categoriaSelecionada = todasCategorias.find(c => c.id === form.categoria_id)
-  const subcategoriasDA = categoriaSelecionada
-    ? todasCategorias.filter(c =>
-        c.tipo === form.tipo &&
-        c.categoria === categoriaSelecionada.categoria &&
-        c.subcategoria
-      )
-    : []
-
   async function salvar() {
-    if (!form.tipo) {
-      alert('Selecione o tipo (Entrada/Saída)')
-      return
-    }
+    if (!id) return
 
-    if (!form.categoria_id || !form.valor) {
-      alert('Preencha categoria e valor')
-      return
-    }
-
-    setLoading(true)
+    setSalvando(true)
 
     const { error } = await supabase
       .from('movimentacoes')
@@ -116,16 +79,19 @@ export default function EditarFinanceiro() {
 
     if (error) {
       alert('Erro ao salvar: ' + error.message)
-      setLoading(false)
+      setSalvando(false)
       return
     }
 
     router.push('/financeiro')
   }
 
-  if (carregando) {
-    return <div className="text-center py-8">Carregando...</div>
+  if (!id || carregando) {
+    return <div className="text-center py-8 text-gray-400">Carregando...</div>
   }
+
+  const categoriasUnicas = Array.from(new Set(categorias.filter(c => c.tipo === form.tipo && !c.subcategoria).map(c => c.categoria)))
+  const subcategorias = categorias.filter(c => c.tipo === form.tipo && c.categoria === categorias.find(cat => cat.id === form.categoria_id)?.categoria && c.subcategoria)
 
   return (
     <div className="max-w-2xl">
@@ -156,22 +122,23 @@ export default function EditarFinanceiro() {
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"
             >
               <option value="">Selecionar</option>
-              {categoriasUnicas.map(cat => (
-                <option key={cat.id} value={cat.id}>{cat.categoria}</option>
-              ))}
+              {categoriasUnicas.map(cat => {
+                const obj = categorias.find(c => c.categoria === cat && !c.subcategoria)
+                return <option key={cat} value={obj?.id}>{cat}</option>
+              })}
             </select>
           </div>
 
           <div>
             <label className="text-xs text-gray-500 block mb-1">Subcategoria (opcional)</label>
             <select
-              value={form.categoria_id && subcategoriasDA.some(s => s.id === form.categoria_id) ? form.categoria_id : ''}
-              onChange={e => e.target.value && setForm({ ...form, categoria_id: e.target.value })}
+              value={form.categoria_id}
+              onChange={e => setForm({ ...form, categoria_id: e.target.value })}
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"
-              disabled={subcategoriasDA.length === 0}
+              disabled={subcategorias.length === 0}
             >
               <option value="">Nenhuma</option>
-              {subcategoriasDA.map(sub => (
+              {subcategorias.map(sub => (
                 <option key={sub.id} value={sub.id}>{sub.subcategoria}</option>
               ))}
             </select>
@@ -235,10 +202,10 @@ export default function EditarFinanceiro() {
         </button>
         <button
           onClick={salvar}
-          disabled={loading}
+          disabled={salvando}
           className="px-4 py-2 text-sm bg-[#7DC421] text-white rounded-lg hover:bg-[#6ab01a] disabled:opacity-50"
         >
-          {loading ? 'Salvando...' : 'Salvar'}
+          {salvando ? 'Salvando...' : 'Salvar'}
         </button>
       </div>
     </div>
