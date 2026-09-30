@@ -66,16 +66,18 @@ export default function NovoFinanceiro() {
 
     setLoading(true)
 
+    const dadosInsertion = {
+      tipo: String(form.tipo),
+      categoria_id: form.categoria_id,
+      data: form.data,
+      descricao: form.descricao || null,
+      valor: parseFloat(form.valor.replace(',', '.')),
+      forma_pagamento: form.forma_pagamento,
+    }
+
     const { error } = await supabase
       .from('movimentacoes')
-      .insert({
-        tipo: form.tipo,
-        categoria_id: form.categoria_id,
-        data: form.data,
-        descricao: form.descricao || null,
-        valor: parseFloat(form.valor.replace(',', '.')),
-        forma_pagamento: form.forma_pagamento,
-      })
+      .insert(dadosInsertion)
 
     if (error) {
       alert('Erro ao salvar: ' + error.message)
