@@ -156,7 +156,7 @@ export default function Alunos() {
               <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Modalidade</th>
               <th
                 onClick={() => handleSort('valor_total')}
-                className="hidden md:table-cell text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide cursor-pointer hover:bg-gray-100 transition-colors"
+                className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide cursor-pointer hover:bg-gray-100 transition-colors"
               >
                 Valor {sortConfig.column === 'valor_total' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
               </th>
@@ -186,7 +186,7 @@ export default function Alunos() {
                   {aluno.data_vencimento ? new Date(aluno.data_vencimento + 'T00:00:00').toLocaleDateString('pt-BR') : '-'}
                 </td>
                 <td className="px-4 py-3 text-lg">{iconeModalidade(aluno.modalidades)}</td>
-                <td className="hidden md:table-cell px-4 py-3 text-gray-600">
+                <td className="px-4 py-3 text-gray-600">
                   {aluno.valor_total > 0 ? `R$ ${aluno.valor_total.toFixed(2).replace('.', ',')}` : '-'}
                 </td>
                 <td className="px-4 py-3">
