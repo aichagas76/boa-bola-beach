@@ -18,6 +18,8 @@ type Aluno = {
   ultimo_pagamento: string | null
   pago_mes: number
   parcial_mes: number
+  asaas_customer_id: string | null
+  link_pagamento: string | null
 }
 
 type Matricula = {
@@ -57,8 +59,14 @@ export default function Alunos() {
 
     const { data: alunosData } = await supabase
       .from('alunos')
-      .select('id, nome, celular, cpf, status, data_vencimento')
+      .select('id, nome, celular, cpf, status, data_vencimento, asaas_customer_id')
       .order('nome')
+
+    const { data: pagamentosLinkData } = await supabase
+      .from('pagamentos')
+      .select('aluno_id, link_pagamento')
+      .not('link_pagamento', 'is', null)
+      .order('data_vencimento', { ascending: false })
 
     const { data: matriculasData } = await supabase
       .from('matriculas')
@@ -91,6 +99,13 @@ export default function Alunos() {
       }
     }
 
+    const linkPorAluno: Record<string, string> = {}
+    for (const p of (pagamentosLinkData ?? [])) {
+      if (p.aluno_id && !linkPorAluno[p.aluno_id]) {
+        linkPorAluno[p.aluno_id] = p.link_pagamento
+      }
+    }
+
     const alunos = (alunosData ?? []).map(a => {
       const mats = (matriculasData ?? []).filter(m => m.aluno_id === a.id)
       const valor_total = mats.reduce((acc, m) => acc + (m.valor ?? 0), 0)
@@ -101,6 +116,8 @@ export default function Alunos() {
         ultimo_pagamento: ultimoPorAluno[a.id] ?? null,
         pago_mes: pagoMesPorAluno[a.id] ?? 0,
         parcial_mes: parcialMesPorAluno[a.id] ?? 0,
+        asaas_customer_id: a.asaas_customer_id ?? null,
+        link_pagamento: linkPorAluno[a.id] ?? null,
       }
     })
 
@@ -369,16 +386,18 @@ export default function Alunos() {
                 Valor {sortConfig.column === 'valor_total' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
               </th>
               <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Parcial</th>
+              <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">ID Asaas</th>
+              <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Link</th>
               <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Status</th>
               <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Ações</th>
             </tr>
           </thead>
           <tbody>
             {loading && (
-              <tr><td colSpan={10} className="text-center py-8 text-gray-400">Carregando...</td></tr>
+              <tr><td colSpan={12} className="text-center py-8 text-gray-400">Carregando...</td></tr>
             )}
             {!loading && filtrados.length === 0 && (
-              <tr><td colSpan={10} className="text-center py-8 text-gray-400">Nenhum aluno encontrado.</td></tr>
+              <tr><td colSpan={12} className="text-center py-8 text-gray-400">Nenhum aluno encontrado.</td></tr>
             )}
             {filtrados.map((aluno, i) => (
               <tr key={aluno.id} className={`border-b border-gray-100 hover:bg-gray-50 ${i === filtrados.length - 1 ? 'border-0' : ''}`}>
@@ -405,6 +424,16 @@ export default function Alunos() {
                 <td className="px-4 py-3 text-xs font-medium">
                   {aluno.parcial_mes > 0 ? (
                     <span className="text-yellow-600">R$ {aluno.parcial_mes.toFixed(2).replace('.', ',')}</span>
+                  ) : (
+                    <span className="text-gray-400">-</span>
+                  )}
+                </td>
+                <td className="px-4 py-3 text-gray-500 text-xs font-mono">
+                  {aluno.asaas_customer_id ?? '-'}
+                </td>
+                <td className="px-4 py-3 text-xs">
+                  {aluno.link_pagamento ? (
+                    <a href={aluno.link_pagamento} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">🔗 Pagar</a>
                   ) : (
                     <span className="text-gray-400">-</span>
                   )}
