@@ -228,6 +228,7 @@ export default function Financeiro() {
               <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Descrição</th>
               <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Professor</th>
               <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Aluno</th>
+              <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Competência</th>
               <th
                 onClick={() => alternarOrdenacao('status')}
                 className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide cursor-pointer hover:bg-gray-100"
@@ -252,10 +253,10 @@ export default function Financeiro() {
           </thead>
           <tbody>
             {loading && (
-              <tr><td colSpan={12} className="text-center py-8 text-gray-400">Carregando...</td></tr>
+              <tr><td colSpan={13} className="text-center py-8 text-gray-400">Carregando...</td></tr>
             )}
             {!loading && filtrados.length === 0 && (
-              <tr><td colSpan={12} className="text-center py-8 text-gray-400">Nenhuma movimentação encontrada.</td></tr>
+              <tr><td colSpan={13} className="text-center py-8 text-gray-400">Nenhuma movimentação encontrada.</td></tr>
             )}
             {filtrados.map((m, i) => (
               <tr key={m.id} className={`border-b border-gray-100 hover:bg-gray-50 ${i === filtrados.length - 1 ? 'border-0' : ''}`}>
@@ -274,6 +275,9 @@ export default function Financeiro() {
                 <td className="px-4 py-3 text-gray-600">{m.descricao || '-'}</td>
                 <td className="px-4 py-3 text-gray-600">{m.professores?.nome ?? '-'}</td>
                 <td className="px-4 py-3 text-gray-600">{m.alunos?.nome ?? '-'}</td>
+                <td className="px-4 py-3 text-gray-600">
+                  {m.data_vencimento ? new Date(m.data_vencimento + 'T00:00:00').toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' }) : '-'}
+                </td>
                 <td className="px-4 py-3">
                   {m.status && (
                     <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${
