@@ -4,6 +4,26 @@ import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 
+function validarCPF(cpf: string) {
+  const nums = cpf.replace(/\D/g, '')
+  if (nums.length !== 11) return false
+  if (/^(\d)\1+$/.test(nums)) return false
+
+  let soma = 0
+  for (let i = 0; i < 9; i++) soma += parseInt(nums[i]) * (10 - i)
+  let resto = (soma * 10) % 11
+  if (resto === 10 || resto === 11) resto = 0
+  if (resto !== parseInt(nums[9])) return false
+
+  soma = 0
+  for (let i = 0; i < 10; i++) soma += parseInt(nums[i]) * (11 - i)
+  resto = (soma * 10) % 11
+  if (resto === 10 || resto === 11) resto = 0
+  if (resto !== parseInt(nums[10])) return false
+
+  return true
+}
+
 export default function EditarAluno() {
   const router = useRouter()
   const params = useParams()
@@ -11,6 +31,7 @@ export default function EditarAluno() {
 
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [cpfValido, setCpfValido] = useState<boolean | null>(null)
 
   const [form, setForm] = useState({
     nome: '',
@@ -101,6 +122,7 @@ export default function EditarAluno() {
 
   async function salvar() {
     if (!form.nome) return alert('Informe o nome do aluno')
+    if (form.cpf && !validarCPF(form.cpf)) return alert('CPF inválido')
     setSaving(true)
 
     await supabase.from('alunos').update(form).eq('id', id)
@@ -161,7 +183,17 @@ export default function EditarAluno() {
           <div>
             <label className="text-xs text-gray-500 block mb-1">CPF</label>
             <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" placeholder="000.000.000-00"
-              value={form.cpf} onChange={e => setForm({ ...form, cpf: mascaraCPF(e.target.value) })} />
+              value={form.cpf} onChange={e => {
+                const masked = mascaraCPF(e.target.value)
+                setForm({ ...form, cpf: masked })
+                if (masked.replace(/\D/g, '').length === 11) {
+                  setCpfValido(validarCPF(masked))
+                } else {
+                  setCpfValido(null)
+                }
+              }} />
+            {cpfValido === true && <p className="text-xs text-green-600 mt-1">✓ CPF válido</p>}
+            {cpfValido === false && <p className="text-xs text-red-600 mt-1">✗ CPF inválido</p>}
           </div>
           <div>
             <label className="text-xs text-gray-500 block mb-1">Sexo</label>
