@@ -126,6 +126,20 @@ export default function NovoAluno() {
       }
     }
 
+    try {
+      const asaasRes = await fetch('/api/asaas/criar-cliente', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nome: form.nome, celular: form.celular, cpf: form.cpf, aluno_id: aluno.id })
+      })
+      const asaasData = await asaasRes.json()
+      if (asaasData.id) {
+        await supabase.from('alunos').update({ asaas_customer_id: asaasData.id }).eq('id', aluno.id)
+      }
+    } catch (e) {
+      console.error('Erro Asaas:', e)
+    }
+
     await registrarLog('Cadastrou aluno', 'alunos', aluno.id, form.nome)
     router.push('/alunos')
   }
