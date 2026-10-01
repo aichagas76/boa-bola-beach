@@ -3,6 +3,9 @@ import { NextRequest, NextResponse } from 'next/server'
 export async function POST(req: NextRequest) {
   const body = await req.json()
 
+  console.log('ASAAS_API_KEY length:', process.env.ASAAS_API_KEY?.length)
+  console.log('ASAAS_API_KEY starts with:', process.env.ASAAS_API_KEY?.substring(0, 10))
+
   const response = await fetch('https://api.asaas.com/v3/customers', {
     method: 'POST',
     headers: {
