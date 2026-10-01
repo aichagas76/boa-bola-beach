@@ -24,6 +24,7 @@ const cadastrosItems: SubItem[] = [
   { href: '/categorias', label: 'Categorias', icon: Tags },
   { href: '/pessoas', label: 'Fornecedores/Clientes', icon: Users },
   { href: '/contas', label: 'Contas', icon: Banknote },
+  { href: '/professores', label: 'Professores', icon: Users },
 ]
 
 export default function Sidebar() {
