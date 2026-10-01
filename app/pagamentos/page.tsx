@@ -22,7 +22,7 @@ type Movimentacao = {
 
 export default function Pagamentos() {
   const [alunos, setAlunos] = useState<Aluno[]>([])
-  const [periodo, setPeriodo] = useState('semana') // 'dia' | 'semana' | 'mes'
+  const [periodo, setPeriodo] = useState('semana')
   const [movimentacoes, setMovimentacoes] = useState<Movimentacao[]>([])
   const [loading, setLoading] = useState(false)
   const [baixandoId, setBaixandoId] = useState<string | null>(null)
@@ -30,17 +30,11 @@ export default function Pagamentos() {
   function obterDatasFiltro(periodo: string) {
     const hoje = new Date()
     hoje.setHours(0, 0, 0, 0)
-    let dataInicio: Date
+    let dataInicio = new Date(hoje)
 
-    if (periodo === 'dia') {
-      dataInicio = new Date(hoje)
-    } else if (periodo === 'semana') {
-      dataInicio = new Date(hoje)
-      dataInicio.setDate(dataInicio.getDate() - 7)
-    } else { // mes
-      dataInicio = new Date(hoje)
-      dataInicio.setDate(1)
-    }
+    if (periodo === 'semana') dataInicio.setDate(dataInicio.getDate() - 7)
+    else if (periodo === 'mes') dataInicio.setDate(1)
+
     return dataInicio.toISOString().split('T')[0]
   }
 
@@ -51,45 +45,39 @@ export default function Pagamentos() {
   }, [])
 
   useEffect(() => {
-    (async () => {
-      try {
-        alert('useEffect started!')
-        setLoading(true)
-        const dataInicio = obterDatasFiltro(periodo)
-
-        const { data, error } = await supabase
-          .from('movimentacoes')
-          .select('*')
-
-        if (error) {
-          console.error('Query error:', error)
-          setLoading(false)
-          return
-        }
-
-        console.log('Total items:', data?.length)
-        console.log('Sample:', data?.[0])
-
-        let filtrados = (data ?? [])
-          .filter(m => {
-            console.log('Item:', { tipo: m.tipo, status: m.status, data_vencimento: m.data_vencimento })
-            return m.tipo === 'Entrada' && m.status !== 'Recebido'
-          })
-          .filter(m => {
-            const dataVenc = new Date(m.data_vencimento)
-            const dataInicioDt = new Date(dataInicio)
-            return dataVenc >= dataInicioDt
-          })
-
-        console.log('Final count:', filtrados.length)
-        setMovimentacoes(filtrados)
-        setLoading(false)
-      } catch (err) {
-        console.error('Catch:', err)
-        setLoading(false)
-      }
-    })()
+    loadPayments()
   }, [periodo])
+
+  async function loadPayments() {
+    setLoading(true)
+    const dataInicio = obterDatasFiltro(periodo)
+
+    const { data, error } = await supabase
+      .from('movimentacoes')
+      .select('*')
+
+    if (error || !data) {
+      setMovimentacoes([])
+      setLoading(false)
+      return
+    }
+
+    const filtered = data
+      .filter(m => m.tipo === 'Entrada')
+      .filter(m => m.status !== 'Recebido')
+      .filter(m => {
+        const dataVenc = new Date(m.data_vencimento || '')
+        const dataInicioDt = new Date(dataInicio)
+        return dataVenc >= dataInicioDt
+      })
+      .sort((a, b) =>
+        new Date(b.data_vencimento || '').getTime() -
+        new Date(a.data_vencimento || '').getTime()
+      )
+
+    setMovimentacoes(filtered)
+    setLoading(false)
+  }
 
   async function darBaixa(mov: Movimentacao) {
     setBaixandoId(mov.id)
@@ -100,8 +88,6 @@ export default function Pagamentos() {
       .eq('id', mov.id)
     if (error) { alert('Erro: ' + error.message); setBaixandoId(null); return }
     await registrarLog('Baixa pagamento', 'movimentacoes', mov.id, 'Pagamento')
-
-    // Reload página para atualizar
     setTimeout(() => window.location.reload(), 800)
   }
 
@@ -110,7 +96,7 @@ export default function Pagamentos() {
     .reduce((acc, m) => acc + (m.valor ?? 0), 0)
 
   const totalPendente = movimentacoes
-    .filter(m => m.status === 'Não recebido')
+    .filter(m => m.status !== 'Recebido')
     .reduce((acc, m) => acc + (m.valor ?? 0), 0)
 
   const ultimoPagamento = movimentacoes
@@ -118,8 +104,7 @@ export default function Pagamentos() {
     .sort((a, b) => (b.data_pagamento ?? '').localeCompare(a.data_pagamento ?? ''))[0]
 
   function corStatus(status: string) {
-    if (status === 'Recebido') return 'bg-green-50 text-green-700'
-    return 'bg-yellow-50 text-yellow-700'
+    return status === 'Recebido' ? 'bg-green-50 text-green-700' : 'bg-yellow-50 text-yellow-700'
   }
 
   function formatarCompetencia(dataVencimento: string | null) {
