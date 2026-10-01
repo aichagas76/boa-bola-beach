@@ -2,62 +2,85 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { registrarLog } from '@/lib/log'
 
-type Pagamento = {
+type Aluno = { id: string; nome: string }
+
+type Movimentacao = {
   id: string
-  aluno_id: string
-  aluno_nome: string
   valor: number
   status: string
-  data_vencimento: string
+  data_vencimento: string | null
   data_pagamento: string | null
-  competencia: string
+  forma_pagamento: string | null
+  descricao: string | null
+  categorias_financeiro: { categoria: string; subcategoria: string | null } | null
 }
 
 export default function Pagamentos() {
-  const [pagamentos, setPagamentos] = useState<Pagamento[]>([])
-  const [loading, setLoading] = useState(true)
-  const [filtroStatus, setFiltroStatus] = useState('Todos')
-  const [filtroMes, setFiltroMes] = useState('')
+  const [alunos, setAlunos] = useState<Aluno[]>([])
+  const [alunoSelecionado, setAlunoSelecionado] = useState('')
+  const [movimentacoes, setMovimentacoes] = useState<Movimentacao[]>([])
+  const [loading, setLoading] = useState(false)
+  const [baixandoId, setBaixandoId] = useState<string | null>(null)
 
-  async function carregar() {
+  useEffect(() => {
+    supabase.from('alunos').select('id, nome').order('nome').then(({ data }) => {
+      setAlunos(data ?? [])
+    })
+  }, [])
+
+  useEffect(() => {
+    if (!alunoSelecionado) { setMovimentacoes([]); return }
     setLoading(true)
-
-    const { data } = await supabase
-      .from('pagamentos')
-      .select('*, alunos(nome)')
+    supabase
+      .from('movimentacoes')
+      .select('*, categorias_financeiro(categoria, subcategoria)')
+      .eq('aluno_ref_id', alunoSelecionado)
+      .eq('tipo', 'Entrada')
       .order('data_vencimento', { ascending: false })
+      .then(({ data }) => {
+        setMovimentacoes(data ?? [])
+        setLoading(false)
+      })
+  }, [alunoSelecionado])
 
-    const lista = (data ?? []).map((p: any) => ({
-      ...p,
-      aluno_nome: p.alunos?.nome ?? '-',
-    }))
-
-    setPagamentos(lista)
-    setLoading(false)
+  async function darBaixa(mov: Movimentacao) {
+    setBaixandoId(mov.id)
+    const hoje = new Date().toLocaleDateString('en-CA')
+    const { error } = await supabase
+      .from('movimentacoes')
+      .update({ status: 'Recebido', data_pagamento: hoje })
+      .eq('id', mov.id)
+    if (error) { alert('Erro: ' + error.message); setBaixandoId(null); return }
+    const alunoNome = alunos.find(a => a.id === alunoSelecionado)?.nome ?? alunoSelecionado
+    await registrarLog('Baixa pagamento', 'movimentacoes', mov.id, alunoNome)
+    setMovimentacoes(prev => prev.map(m =>
+      m.id === mov.id ? { ...m, status: 'Recebido', data_pagamento: hoje } : m
+    ))
+    setBaixandoId(null)
   }
 
-  useEffect(() => { carregar() }, [])
+  const totalPago = movimentacoes
+    .filter(m => m.status === 'Recebido')
+    .reduce((acc, m) => acc + (m.valor ?? 0), 0)
 
-  const mesesDisponiveis = [...new Set(pagamentos.map(p => p.competencia).filter(Boolean))].sort().reverse()
+  const totalPendente = movimentacoes
+    .filter(m => m.status === 'Não recebido')
+    .reduce((acc, m) => acc + (m.valor ?? 0), 0)
 
-  const filtrados = pagamentos.filter(p => {
-    const matchStatus = filtroStatus === 'Todos' || p.status === filtroStatus
-    const matchMes = !filtroMes || p.competencia === filtroMes
-    return matchStatus && matchMes
-  })
-
-  const contadores = {
-    Todos: pagamentos.length,
-    Pendente: pagamentos.filter(p => p.status === 'Pendente').length,
-    Pago: pagamentos.filter(p => p.status === 'Pago').length,
-    Atrasado: pagamentos.filter(p => p.status === 'Atrasado').length,
-  }
+  const ultimoPagamento = movimentacoes
+    .filter(m => m.status === 'Recebido' && m.data_pagamento)
+    .sort((a, b) => (b.data_pagamento ?? '').localeCompare(a.data_pagamento ?? ''))[0]
 
   function corStatus(status: string) {
-    if (status === 'Pago') return 'bg-green-50 text-green-700'
-    if (status === 'Atrasado') return 'bg-red-50 text-red-700'
+    if (status === 'Recebido') return 'bg-green-50 text-green-700'
     return 'bg-yellow-50 text-yellow-700'
+  }
+
+  function formatarCompetencia(dataVencimento: string | null) {
+    if (!dataVencimento) return '-'
+    return new Date(dataVencimento + 'T00:00:00').toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' })
   }
 
   return (
@@ -66,79 +89,109 @@ export default function Pagamentos() {
         <h1 className="text-xl font-medium text-gray-900">Pagamentos</h1>
       </div>
 
-      <div className="flex flex-wrap gap-3 mb-4">
-        <div className="flex gap-2">
-          {(['Todos', 'Pendente', 'Pago', 'Atrasado'] as const).map(f => (
-            <button
-              key={f}
-              onClick={() => setFiltroStatus(f)}
-              className={`px-4 py-1.5 rounded-full text-xs font-medium border transition-colors ${
-                filtroStatus === f
-                  ? 'bg-blue-50 text-blue-700 border-blue-200'
-                  : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
-              }`}
-            >
-              {f} ({contadores[f as keyof typeof contadores] ?? 0})
-            </button>
+      <div className="bg-white border border-gray-200 rounded-xl p-4 mb-4">
+        <label className="text-xs text-gray-500 block mb-1">Aluno</label>
+        <select
+          value={alunoSelecionado}
+          onChange={e => setAlunoSelecionado(e.target.value)}
+          className="w-full max-w-xs border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"
+        >
+          <option value="">Selecione um aluno...</option>
+          {alunos.map(a => (
+            <option key={a.id} value={a.id}>{a.nome}</option>
           ))}
+        </select>
+      </div>
+
+      {!alunoSelecionado && (
+        <div className="text-center py-16 text-gray-400 text-sm">
+          Selecione um aluno para ver o histórico
         </div>
+      )}
 
-        {mesesDisponiveis.length > 0 && (
-          <select
-            value={filtroMes}
-            onChange={e => setFiltroMes(e.target.value)}
-            className="border border-gray-200 rounded-lg px-3 py-1.5 text-xs bg-white text-gray-600"
-          >
-            <option value="">Todos os meses</option>
-            {mesesDisponiveis.map(m => (
-              <option key={m} value={m}>{m}</option>
-            ))}
-          </select>
-        )}
-      </div>
+      {alunoSelecionado && (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <div className="bg-white border border-gray-200 rounded-xl p-4">
+              <div className="text-xs text-gray-500 mb-1">Total pago</div>
+              <div className="text-lg font-semibold text-green-700">
+                R$ {totalPago.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </div>
+            </div>
+            <div className="bg-white border border-gray-200 rounded-xl p-4">
+              <div className="text-xs text-gray-500 mb-1">Total pendente</div>
+              <div className="text-lg font-semibold text-yellow-700">
+                R$ {totalPendente.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </div>
+            </div>
+            <div className="bg-white border border-gray-200 rounded-xl p-4">
+              <div className="text-xs text-gray-500 mb-1">Último pagamento</div>
+              <div className="text-lg font-semibold text-gray-700">
+                {ultimoPagamento?.data_pagamento
+                  ? new Date(ultimoPagamento.data_pagamento + 'T00:00:00').toLocaleDateString('pt-BR')
+                  : '-'}
+              </div>
+            </div>
+          </div>
 
-      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="bg-gray-50 border-b border-gray-200">
-              <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Aluno</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Competência</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Vencimento</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Valor</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Pagamento</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading && (
-              <tr><td colSpan={6} className="text-center py-8 text-gray-400">Carregando...</td></tr>
-            )}
-            {!loading && filtrados.length === 0 && (
-              <tr><td colSpan={6} className="text-center py-8 text-gray-400">Nenhum pagamento encontrado.</td></tr>
-            )}
-            {filtrados.map((p, i) => (
-              <tr key={p.id} className={`border-b border-gray-100 hover:bg-gray-50 ${i === filtrados.length - 1 ? 'border-0' : ''}`}>
-                <td className="px-4 py-3 font-medium text-gray-900">{p.aluno_nome}</td>
-                <td className="px-4 py-3 text-gray-600">{p.competencia || '-'}</td>
-                <td className="px-4 py-3 text-gray-600">
-                  {p.data_vencimento ? new Date(p.data_vencimento + 'T00:00:00').toLocaleDateString('pt-BR') : '-'}
-                </td>
-                <td className="px-4 py-3 text-gray-600">
-                  R$ {p.valor?.toFixed(2).replace('.', ',')}
-                </td>
-                <td className="px-4 py-3 text-gray-600">
-                  {p.data_pagamento ? new Date(p.data_pagamento + 'T00:00:00').toLocaleDateString('pt-BR') : '-'}
-                </td>
-                <td className="px-4 py-3">
-                  <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${corStatus(p.status)}`}>
-                    {p.status}
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+          <div className="bg-white border border-gray-200 rounded-xl overflow-hidden overflow-x-auto">
+            <table className="w-full text-sm min-w-full">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-200">
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Competência</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Categoria</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Valor</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Status</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Data Pagamento</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Forma Pagamento</th>
+                  <th className="px-4 py-3"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading && (
+                  <tr><td colSpan={7} className="text-center py-8 text-gray-400">Carregando...</td></tr>
+                )}
+                {!loading && movimentacoes.length === 0 && (
+                  <tr><td colSpan={7} className="text-center py-8 text-gray-400">Nenhum pagamento encontrado.</td></tr>
+                )}
+                {movimentacoes.map((m, i) => (
+                  <tr key={m.id} className={`border-b border-gray-100 hover:bg-gray-50 ${i === movimentacoes.length - 1 ? 'border-0' : ''}`}>
+                    <td className="px-4 py-3 text-gray-600 text-xs">{formatarCompetencia(m.data_vencimento)}</td>
+                    <td className="px-4 py-3 text-gray-600 text-xs">
+                      {m.categorias_financeiro?.subcategoria || m.categorias_financeiro?.categoria || '-'}
+                    </td>
+                    <td className="px-4 py-3 text-gray-800 font-medium text-xs">
+                      R$ {m.valor?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) ?? '0,00'}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${corStatus(m.status)}`}>
+                        {m.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-gray-600 text-xs">
+                      {m.data_pagamento
+                        ? new Date(m.data_pagamento + 'T00:00:00').toLocaleDateString('pt-BR')
+                        : '-'}
+                    </td>
+                    <td className="px-4 py-3 text-gray-600 text-xs">{m.forma_pagamento || '-'}</td>
+                    <td className="px-4 py-3">
+                      {m.status === 'Não recebido' && (
+                        <button
+                          onClick={() => darBaixa(m)}
+                          disabled={baixandoId === m.id}
+                          className="px-3 py-1 text-xs bg-[#7DC421] text-white rounded-lg hover:bg-[#6ab01a] disabled:opacity-50"
+                        >
+                          {baixandoId === m.id ? '...' : 'Dar baixa'}
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
     </div>
   )
 }
