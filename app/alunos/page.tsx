@@ -40,6 +40,13 @@ export default function Alunos() {
     data_pagamento: new Date().toLocaleDateString('en-CA'),
   })
   const [salvandoPgto, setSalvandoPgto] = useState(false)
+  const [valorParcial, setValorParcial] = useState('')
+
+  function mascaraValor(v: string) {
+    v = v.replace(/\D/g, '')
+    if (!v) return ''
+    return (parseInt(v) / 100).toFixed(2).replace('.', ',')
+  }
 
   async function carregar() {
     setLoading(true)
@@ -88,9 +95,12 @@ export default function Alunos() {
       .select('id, tipo, valor, professor_nome, professor_id')
       .eq('aluno_id', aluno.id)
 
-    setMatriculasModal(data ?? [])
+    const mats = data ?? []
+    setMatriculasModal(mats)
     setAlunoModal(aluno)
-    setFormPgto({ forma_pagamento: 'Pix', data_pagamento: new Date().toISOString().split('T')[0] })
+    setFormPgto({ forma_pagamento: 'Pix', data_pagamento: new Date().toLocaleDateString('en-CA') })
+    const total = mats.reduce((acc, m) => acc + (m.valor ?? 0), 0)
+    setValorParcial((total).toFixed(2).replace('.', ','))
     setModalAberto(true)
   }
 
@@ -119,49 +129,63 @@ export default function Alunos() {
     const catClubinhoId = catClubinho?.[0]?.id ?? null
     const catAulaId = catAula?.[0]?.id ?? null
 
-    for (const mat of matriculasModal) {
-      // Resolve professor_id a partir do professor_nome da matrícula
-      let professor_id: string | null = null
-      if (mat.professor_nome) {
-        const { data: prof } = await supabase
-          .from('professores')
-          .select('id')
-          .eq('nome', mat.professor_nome)
-          .limit(1)
-        professor_id = prof?.[0]?.id ?? null
-      }
+    const totalMats = matriculasModal.reduce((acc, m) => acc + (m.valor ?? 0), 0)
+    const valorPago = parseFloat(valorParcial.replace(',', '.')) || 0
+    const isParcial = valorPago < totalMats
 
-      const isClubinho = mat.tipo === 'Clubinho'
-      const categoria_id = isClubinho ? catClubinhoId : catAulaId
-      const descricao = isClubinho
-        ? `Mensalidade Clubinho - ${alunoModal.nome}`
-        : `Mensalidade Aula - ${alunoModal.nome}${mat.professor_nome ? ' - Prof. ' + mat.professor_nome : ''}`
-
-      const payload = {
+    if (isParcial) {
+      // Pagamento parcial — um único lançamento com o valor digitado
+      const { error } = await supabase.from('movimentacoes').insert({
         tipo: 'Entrada',
-        descricao,
-        valor: mat.valor,
+        descricao: `Pagamento parcial - ${alunoModal.nome}`,
+        valor: valorPago,
         forma_pagamento: formPgto.forma_pagamento,
         data_pagamento: formPgto.data_pagamento,
         data_vencimento: alunoModal.data_vencimento || null,
         data: formPgto.data_pagamento,
         status: 'Recebido',
         aluno_ref_id: alunoModal.id,
-        professor_id,
+        professor_id: null,
         origem: 'Manual',
-        categoria_id,
-      }
+        categoria_id: catClubinhoId ?? catAulaId,
+      })
+      if (error) { alert('Erro ao lançar: ' + error.message); setSalvandoPgto(false); return }
+    } else {
+      // Pagamento total — lançamento por matrícula
+      for (const mat of matriculasModal) {
+        let professor_id: string | null = null
+        if (mat.professor_nome) {
+          const { data: prof } = await supabase
+            .from('professores').select('id').eq('nome', mat.professor_nome).limit(1)
+          professor_id = prof?.[0]?.id ?? null
+        }
 
-      const { error } = await supabase.from('movimentacoes').insert(payload)
-      if (error) {
-        alert('Erro ao lançar: ' + error.message)
-        setSalvandoPgto(false)
-        return
+        const isClubinho = mat.tipo === 'Clubinho'
+        const categoria_id = isClubinho ? catClubinhoId : catAulaId
+        const descricao = isClubinho
+          ? `Mensalidade Clubinho - ${alunoModal.nome}`
+          : `Mensalidade Aula - ${alunoModal.nome}${mat.professor_nome ? ' - Prof. ' + mat.professor_nome : ''}`
+
+        const { error } = await supabase.from('movimentacoes').insert({
+          tipo: 'Entrada',
+          descricao,
+          valor: mat.valor,
+          forma_pagamento: formPgto.forma_pagamento,
+          data_pagamento: formPgto.data_pagamento,
+          data_vencimento: alunoModal.data_vencimento || null,
+          data: formPgto.data_pagamento,
+          status: 'Recebido',
+          aluno_ref_id: alunoModal.id,
+          professor_id,
+          origem: 'Manual',
+          categoria_id,
+        })
+        if (error) { alert('Erro ao lançar: ' + error.message); setSalvandoPgto(false); return }
       }
     }
 
-    // Avança data_vencimento +1 mês
-    if (alunoModal.data_vencimento) {
+    // Avança data_vencimento +1 mês apenas no pagamento total
+    if (!isParcial && alunoModal.data_vencimento) {
       const venc = new Date(alunoModal.data_vencimento + 'T00:00:00')
       venc.setMonth(venc.getMonth() + 1)
       const novaData = venc.toISOString().split('T')[0]
@@ -375,6 +399,58 @@ export default function Alunos() {
                   </div>
                 )}
               </div>
+
+              {/* Valor a pagar */}
+              {matriculasModal.length > 0 && (() => {
+                const total = matriculasModal.reduce((acc, m) => acc + m.valor, 0)
+                const pago = parseFloat(valorParcial.replace(',', '.')) || 0
+                const restante = total - pago
+                return (
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-1">Valor a pagar</label>
+                    <input
+                      type="text"
+                      value={valorParcial}
+                      onChange={e => setValorParcial(mascaraValor(e.target.value))}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                      placeholder="0,00"
+                    />
+                    {pago > 0 && pago < total && (
+                      <p className="text-xs text-yellow-600 mt-1">
+                        Pagamento parcial — R$ {restante.toFixed(2).replace('.', ',')} restante
+                      </p>
+                    )}
+                    {pago >= total && (
+                      <p className="text-xs text-green-600 mt-1">✓ Pagamento total</p>
+                    )}
+                  </div>
+                )
+              })()}
+
+              {/* Valor a pagar */}
+              {matriculasModal.length > 0 && (
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Valor a pagar</label>
+                  <input
+                    type="text"
+                    value={valorParcial}
+                    onChange={e => setValorParcial(mascaraValor(e.target.value))}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                    placeholder="0,00"
+                  />
+                  {(() => {
+                    const total = matriculasModal.reduce((acc, m) => acc + m.valor, 0)
+                    const pago = parseFloat(valorParcial.replace(',', '.')) || 0
+                    if (pago > 0 && pago < total) {
+                      return <p className="text-xs text-yellow-600 mt-1">Pagamento parcial — R$ {(total - pago).toFixed(2).replace('.', ',')} restante</p>
+                    }
+                    if (pago >= total) {
+                      return <p className="text-xs text-green-600 mt-1">✓ Pagamento total</p>
+                    }
+                    return null
+                  })()}
+                </div>
+              )}
 
               {/* Forma de pagamento */}
               <div>
