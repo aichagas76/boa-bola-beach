@@ -66,6 +66,8 @@ export default function Pagamentos() {
   }, [periodo])
 
   async function darBaixa(mov: Movimentacao) {
+    console.log('darBaixa chamado para:', mov.id)
+    alert('Marcando como recebido...')
     setBaixandoId(mov.id)
     const hoje = new Date().toLocaleDateString('en-CA')
     const { error } = await supabase
