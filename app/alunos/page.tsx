@@ -37,7 +37,7 @@ export default function Alunos() {
   const [matriculasModal, setMatriculasModal] = useState<Matricula[]>([])
   const [formPgto, setFormPgto] = useState({
     forma_pagamento: 'Pix',
-    data_pagamento: new Date().toISOString().split('T')[0],
+    data_pagamento: new Date().toLocaleDateString('en-CA'),
   })
   const [salvandoPgto, setSalvandoPgto] = useState(false)
 
@@ -109,7 +109,6 @@ export default function Alunos() {
       .eq('categoria', 'Clubinho')
       .eq('tipo', 'Entrada')
       .limit(1)
-
     const { data: catAula } = await supabase
       .from('categorias_financeiro')
       .select('id')
@@ -122,7 +121,7 @@ export default function Alunos() {
 
     for (const mat of matriculasModal) {
       const categoria_id = mat.tipo === 'Clubinho' ? catClubinhoId : catAulaId
-      await supabase.from('movimentacoes').insert({
+      const payload = {
         tipo: 'Entrada',
         descricao: `Mensalidade ${alunoModal.nome} - ${mesAno}`,
         valor: mat.valor,
@@ -135,7 +134,13 @@ export default function Alunos() {
         professor_id: mat.professor_id || null,
         origem: 'Manual',
         categoria_id,
-      })
+      }
+      const { error } = await supabase.from('movimentacoes').insert(payload)
+      if (error) {
+        alert('Erro ao registrar pagamento: ' + error.message + '\n\nDetalhes: ' + JSON.stringify(error.details))
+        setSalvandoPgto(false)
+        return
+      }
     }
 
     // Avança data_vencimento +1 mês
