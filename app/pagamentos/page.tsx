@@ -51,30 +51,43 @@ export default function Pagamentos() {
   }, [])
 
   useEffect(() => {
-    setLoading(true)
-    const dataInicio = obterDatasFiltro(periodo)
-    console.log('=== useEffect started ===', { periodo, dataInicio })
+    (async () => {
+      try {
+        setLoading(true)
+        const dataInicio = obterDatasFiltro(periodo)
 
-    supabase
-      .from('movimentacoes')
-      .select('*')
-      .then(({ data, error }) => {
-        console.log('Query result:', { data: data?.length, error })
-        if (error) console.error('Query error:', error)
+        const { data, error } = await supabase
+          .from('movimentacoes')
+          .select('*')
+
+        if (error) {
+          console.error('Query error:', error)
+          setLoading(false)
+          return
+        }
+
+        console.log('Total items:', data?.length)
+        console.log('Sample:', data?.[0])
 
         let filtrados = (data ?? [])
-          .filter(m => m.tipo === 'Entrada')
-          .filter(m => m.status !== 'Recebido')
+          .filter(m => {
+            console.log('Item:', { tipo: m.tipo, status: m.status, data_vencimento: m.data_vencimento })
+            return m.tipo === 'Entrada' && m.status !== 'Recebido'
+          })
           .filter(m => {
             const dataVenc = new Date(m.data_vencimento)
             const dataInicioDt = new Date(dataInicio)
             return dataVenc >= dataInicioDt
           })
 
-        console.log('Filtered:', { count: filtrados.length })
+        console.log('Final count:', filtrados.length)
         setMovimentacoes(filtrados)
         setLoading(false)
-      })
+      } catch (err) {
+        console.error('Catch:', err)
+        setLoading(false)
+      }
+    })()
   }, [periodo])
 
   async function darBaixa(mov: Movimentacao) {
