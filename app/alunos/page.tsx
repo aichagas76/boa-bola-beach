@@ -400,34 +400,7 @@ export default function Alunos() {
                 )}
               </div>
 
-              {/* Valor a pagar */}
-              {matriculasModal.length > 0 && (() => {
-                const total = matriculasModal.reduce((acc, m) => acc + m.valor, 0)
-                const pago = parseFloat(valorParcial.replace(',', '.')) || 0
-                const restante = total - pago
-                return (
-                  <div>
-                    <label className="text-xs text-gray-500 block mb-1">Valor pago</label>
-                    <input
-                      type="text"
-                      value={valorParcial}
-                      onChange={e => setValorParcial(mascaraValor(e.target.value))}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
-                      placeholder="0,00"
-                    />
-                    {pago > 0 && pago < total && (
-                      <p className="text-xs text-yellow-600 mt-1">
-                        Pagamento parcial — R$ {restante.toFixed(2).replace('.', ',')} restante
-                      </p>
-                    )}
-                    {pago >= total && (
-                      <p className="text-xs text-green-600 mt-1">✓ Pagamento total</p>
-                    )}
-                  </div>
-                )
-              })()}
-
-              {/* Valor a pagar */}
+              {/* Valor pago */}
               {matriculasModal.length > 0 && (
                 <div>
                   <label className="text-xs text-gray-500 block mb-1">Valor pago</label>
