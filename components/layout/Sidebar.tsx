@@ -32,6 +32,13 @@ export default function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
   const [isOpen, setIsOpen] = useState(false)
+  const [userEmail, setUserEmail] = useState('')
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setUserEmail(user?.email ?? '')
+    })
+  }, [])
 
   async function sair() {
     await supabase.auth.signOut()
@@ -174,6 +181,7 @@ export default function Sidebar() {
         </nav>
 
         <div className="p-4 border-t border-[#1a1a1a] space-y-2">
+          {userEmail && <div className="text-xs text-gray-400 truncate px-2 mb-2">{userEmail}</div>}
           <Link href="/configuracoes" className="flex items-center gap-3 text-xs text-gray-500 hover:text-[#7DC421] transition-colors">
             <Settings size={16} />
             <span>Configurações</span>
