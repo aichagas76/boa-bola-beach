@@ -273,8 +273,11 @@ export default function NovoAluno() {
         {clubinho && (
           <div className="mt-3 p-3 bg-gray-50 rounded-lg">
             <label className="text-xs text-gray-500 block mb-1">Valor mensal</label>
-            <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white" placeholder="150,00"
-              value={valorClubinho} onChange={e => setValorClubinho(mascaraValor(e.target.value))} />
+            <div className="flex items-center border border-gray-200 rounded-lg bg-white">
+              <span className="px-3 py-2 text-sm text-gray-600 font-semibold">R$</span>
+              <input className="flex-1 border-0 px-0 py-2 text-sm bg-transparent" placeholder="150,00"
+                value={valorClubinho} onChange={e => setValorClubinho(mascaraValor(e.target.value))} />
+            </div>
           </div>
         )}
 
@@ -307,8 +310,11 @@ export default function NovoAluno() {
                   </div>
                   <div>
                     <label className="text-xs text-gray-500 block mb-1">Valor mensal</label>
-                    <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white" placeholder="180,00"
-                      value={aula.valor} onChange={e => updateAula(i, 'valor', mascaraValor(e.target.value))} />
+                    <div className="flex items-center border border-gray-200 rounded-lg bg-white">
+                      <span className="px-3 py-2 text-sm text-gray-600 font-semibold">R$</span>
+                      <input className="flex-1 border-0 px-0 py-2 text-sm bg-transparent" placeholder="180,00"
+                        value={aula.valor} onChange={e => updateAula(i, 'valor', mascaraValor(e.target.value))} />
+                    </div>
                   </div>
                 </div>
               </div>
