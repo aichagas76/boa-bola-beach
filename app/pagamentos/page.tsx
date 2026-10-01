@@ -70,7 +70,6 @@ export default function Pagamentos() {
 
     return allData
       .filter(m => m.tipo === 'Entrada')
-      .filter(m => m.status !== 'Recebido')
       .filter(m => {
         const dataVenc = new Date(m.data_vencimento || '')
         const dataInicioDt = new Date(dataInicio)
