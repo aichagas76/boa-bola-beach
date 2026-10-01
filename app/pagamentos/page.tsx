@@ -15,8 +15,8 @@ type Movimentacao = {
   forma_pagamento: string | null
   descricao: string | null
   link_pagamento: string | null
-  categorias_financeiro: { categoria: string; subcategoria: string | null } | null
   tipo: string
+  alunos: { nome: string } | null
 }
 
 export default function Pagamentos() {
@@ -41,7 +41,7 @@ export default function Pagamentos() {
 
     const { data } = await supabase
       .from('movimentacoes')
-      .select('*')
+      .select('*, alunos(nome)')
       .order('data_vencimento', { ascending: false })
       .limit(1000)
 
@@ -181,7 +181,7 @@ export default function Pagamentos() {
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-200">
                     <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Competência</th>
-                    <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Categoria</th>
+                    <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Aluno</th>
                     <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Valor</th>
                     <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Status</th>
                     <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Data Pagamento</th>
@@ -201,7 +201,7 @@ export default function Pagamentos() {
                     <tr key={m.id} className={`border-b border-gray-100 hover:bg-gray-50 ${i === pagination.paginatedItems.length - 1 && pagination.currentPage === pagination.totalPages ? 'border-0' : ''}`}>
                     <td className="px-4 py-3 text-gray-600 text-xs">{formatarCompetencia(m.data_vencimento)}</td>
                     <td className="px-4 py-3 text-gray-600 text-xs">
-                      {m.categorias_financeiro?.subcategoria || m.categorias_financeiro?.categoria || '-'}
+                      {m.alunos?.nome || '-'}
                     </td>
                     <td className="px-4 py-3 text-gray-800 font-medium text-xs">
                       R$ {m.valor?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) ?? '0,00'}
