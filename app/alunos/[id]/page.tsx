@@ -24,6 +24,14 @@ type Matricula = {
   professor_nome: string
 }
 
+type Pagamento = {
+  id: string
+  data_vencimento: string | null
+  valor: number
+  status: string
+  link_pagamento: string | null
+}
+
 export default function DetalheAluno() {
   const router = useRouter()
   const params = useParams()
@@ -31,7 +39,9 @@ export default function DetalheAluno() {
 
   const [aluno, setAluno] = useState<Aluno | null>(null)
   const [matriculas, setMatriculas] = useState<Matricula[]>([])
+  const [pagamentos, setPagamentos] = useState<Pagamento[]>([])
   const [loading, setLoading] = useState(true)
+  const [copiado, setCopiado] = useState<string | null>(null)
 
   useEffect(() => {
     async function carregar() {
@@ -46,12 +56,31 @@ export default function DetalheAluno() {
         .select('*')
         .eq('aluno_id', id)
 
+      const { data: p } = await supabase
+        .from('pagamentos')
+        .select('*')
+        .eq('aluno_id', id)
+        .order('data_vencimento', { ascending: false })
+
       setAluno(a)
       setMatriculas(m ?? [])
+      setPagamentos(p ?? [])
       setLoading(false)
     }
     carregar()
   }, [id])
+
+  function copiarLink(link: string, id: string) {
+    navigator.clipboard.writeText(link)
+    setCopiado(id)
+    setTimeout(() => setCopiado(null), 2000)
+  }
+
+  function corStatus(status: string) {
+    if (status === 'Pago') return 'bg-green-50 text-green-700'
+    if (status === 'Atrasado') return 'bg-red-50 text-red-700'
+    return 'bg-yellow-50 text-yellow-700'
+  }
 
   function formataData(d: string) {
     if (!d) return '-'
@@ -127,6 +156,63 @@ export default function DetalheAluno() {
             <span className="text-sm text-gray-600">R$ {aula.valor?.toFixed(2).replace('.', ',')}/mês</span>
           </div>
         ))}
+      </div>
+
+      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden mb-4">
+        <div className="px-6 py-4 border-b border-gray-100">
+          <div className="text-xs font-medium text-gray-400 uppercase tracking-wider">Pagamentos</div>
+        </div>
+        {pagamentos.length === 0 ? (
+          <div className="px-6 py-4 text-sm text-gray-400">Nenhum pagamento encontrado.</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-200">
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Competência</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Vencimento</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Valor</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Status</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Link</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pagamentos.map((p, i) => (
+                  <tr key={p.id} className={`border-b border-gray-100 hover:bg-gray-50 ${i === pagamentos.length - 1 ? 'border-0' : ''}`}>
+                    <td className="px-4 py-3 text-gray-600 text-xs">
+                      {p.data_vencimento
+                        ? new Date(p.data_vencimento + 'T00:00:00').toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' })
+                        : '-'}
+                    </td>
+                    <td className="px-4 py-3 text-gray-600 text-xs">
+                      {p.data_vencimento ? formataData(p.data_vencimento) : '-'}
+                    </td>
+                    <td className="px-4 py-3 text-gray-800 font-medium text-xs">
+                      R$ {p.valor?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) ?? '0,00'}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${corStatus(p.status)}`}>
+                        {p.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-xs">
+                      {p.link_pagamento ? (
+                        <button
+                          onClick={() => copiarLink(p.link_pagamento!, p.id)}
+                          className="text-blue-600 hover:underline"
+                        >
+                          {copiado === p.id ? '✓ Copiado' : '🔗 Copiar link'}
+                        </button>
+                      ) : (
+                        <span className="text-gray-400">-</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       <div className="flex justify-end gap-3">
