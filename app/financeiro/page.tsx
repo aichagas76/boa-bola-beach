@@ -1,10 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
-import { Trash2, Edit2 } from 'lucide-react'
-
+import { Trash2, Edit2, Check } from 'lucide-react'
 type Movimentacao = {
   id: string
   tipo: 'Entrada' | 'Saída'
@@ -13,10 +12,11 @@ type Movimentacao = {
   descricao: string | null
   valor: number
   forma_pagamento: string
-  categorias_financeiro: {
-    categoria: string
-    subcategoria: string | null
-  }
+  status?: string
+  pessoa_id?: string
+  conta_bancaria_id?: string
+  pessoas?: { nome: string }
+  contas_bancarias?: { nome: string }
 }
 
 export default function Financeiro() {
@@ -27,14 +27,16 @@ export default function Financeiro() {
     const hoje = new Date()
     return `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`
   })
+  const [ordenacao, setOrdenacao] = useState({ coluna: 'data', direcao: 'desc' })
 
   async function carregar() {
     setLoading(true)
 
     const { data } = await supabase
       .from('movimentacoes')
-      .select('*, categorias_financeiro(categoria, subcategoria)')
+      .select('*, pessoas(nome), contas_bancarias(nome)')
       .order('data', { ascending: false })
+      .limit(100)
 
     setMovimentacoes(data ?? [])
     setLoading(false)
@@ -56,24 +58,69 @@ export default function Financeiro() {
     carregar()
   }
 
+  async function darBaixa(mov: Movimentacao) {
+    if (!confirm('Confirmar baixa desta movimentação?')) return
+
+    const novoStatus = mov.tipo === 'Entrada' ? 'Recebido' : 'Pago'
+    const hoje = new Date().toISOString().split('T')[0]
+
+    const { error } = await supabase
+      .from('movimentacoes')
+      .update({
+        status: novoStatus,
+        data_pagamento: hoje,
+      })
+      .eq('id', mov.id)
+
+    if (error) {
+      alert('Erro ao dar baixa: ' + error.message)
+      return
+    }
+
+    carregar()
+  }
+
+  function alternarOrdenacao(coluna: 'data' | 'valor' | 'status') {
+    if (ordenacao.coluna === coluna) {
+      setOrdenacao({ ...ordenacao, direcao: ordenacao.direcao === 'asc' ? 'desc' : 'asc' })
+    } else {
+      setOrdenacao({ coluna, direcao: 'desc' })
+    }
+  }
+
   useEffect(() => {
     carregar()
   }, [])
 
-  const filtrados = movimentacoes.filter(m => {
-    const matchTipo = filtroTipo === 'Todos' || m.tipo === filtroTipo
-    const dataMes = m.data.substring(0, 7)
-    const matchPeriodo = !filtroPeriodo || dataMes === filtroPeriodo
-    return matchTipo && matchPeriodo
-  })
+  const { filtrados, totais } = useMemo(() => {
+    let filtrados = movimentacoes.filter(m => {
+      const matchTipo = filtroTipo === 'Todos' || m.tipo === filtroTipo
+      const dataMes = m.data.substring(0, 7)
+      const matchPeriodo = !filtroPeriodo || dataMes === filtroPeriodo
+      return matchTipo && matchPeriodo
+    })
 
-  const entradasTotal = filtrados.filter(m => m.tipo === 'Entrada').reduce((acc, m) => acc + m.valor, 0)
-  const saidasTotal = filtrados.filter(m => m.tipo === 'Saída').reduce((acc, m) => acc + m.valor, 0)
-  const totais = {
-    entradas: entradasTotal,
-    saidas: saidasTotal,
-    saldo: entradasTotal - saidasTotal,
-  }
+    filtrados = filtrados.sort((a, b) => {
+      const dir = ordenacao.direcao === 'asc' ? 1 : -1
+      if (ordenacao.coluna === 'data') return (a.data > b.data ? 1 : -1) * dir
+      if (ordenacao.coluna === 'valor') return (a.valor - b.valor) * dir
+      if (ordenacao.coluna === 'status') return ((a.status || '') > (b.status || '') ? 1 : -1) * dir
+      if (ordenacao.coluna === 'vencimento') return ((a.data_vencimento ?? '') > (b.data_vencimento ?? '') ? 1 : -1) * dir
+      return 0
+    })
+
+    const entradasTotal = filtrados.filter(m => m.tipo === 'Entrada').reduce((acc, m) => acc + m.valor, 0)
+    const saidasTotal = filtrados.filter(m => m.tipo === 'Saída').reduce((acc, m) => acc + m.valor, 0)
+
+    return {
+      filtrados,
+      totais: {
+        entradas: entradasTotal,
+        saidas: saidasTotal,
+        saldo: entradasTotal - saidasTotal,
+      }
+    }
+  }, [movimentacoes, filtroTipo, filtroPeriodo, ordenacao])
 
   return (
     <div>
@@ -140,22 +187,42 @@ export default function Financeiro() {
         <table className="w-full text-sm min-w-full">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200">
-              <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Data</th>
+              <th
+                onClick={() => alternarOrdenacao('data')}
+                className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide cursor-pointer hover:bg-gray-100"
+              >
+                Data {ordenacao.coluna === 'data' && (ordenacao.direcao === 'asc' ? '↑' : '↓')}
+              </th>
               <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Tipo</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Categoria</th>
-              <th className="hidden md:table-cell text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Subcategoria</th>
               <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Descrição</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Valor</th>
-              <th className="hidden md:table-cell text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Forma Pagamento</th>
+              <th
+                onClick={() => alternarOrdenacao('status')}
+                className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide cursor-pointer hover:bg-gray-100"
+              >
+                Status {ordenacao.coluna === 'status' && (ordenacao.direcao === 'asc' ? '↑' : '↓')}
+              </th>
+              <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Pagamento</th>
+              <th
+                onClick={() => alternarOrdenacao('vencimento')}
+                className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide cursor-pointer hover:bg-gray-100"
+              >
+                Vencimento {ordenacao.coluna === 'vencimento' && (ordenacao.direcao === 'asc' ? '↑' : '↓')}
+              </th>
+              <th
+                onClick={() => alternarOrdenacao('valor')}
+                className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide cursor-pointer hover:bg-gray-100"
+              >
+                Valor {ordenacao.coluna === 'valor' && (ordenacao.direcao === 'asc' ? '↑' : '↓')}
+              </th>
               <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Ações</th>
             </tr>
           </thead>
           <tbody>
             {loading && (
-              <tr><td colSpan={7} className="text-center py-8 text-gray-400">Carregando...</td></tr>
+              <tr><td colSpan={8} className="text-center py-8 text-gray-400">Carregando...</td></tr>
             )}
             {!loading && filtrados.length === 0 && (
-              <tr><td colSpan={7} className="text-center py-8 text-gray-400">Nenhuma movimentação encontrada.</td></tr>
+              <tr><td colSpan={8} className="text-center py-8 text-gray-400">Nenhuma movimentação encontrada.</td></tr>
             )}
             {filtrados.map((m, i) => (
               <tr key={m.id} className={`border-b border-gray-100 hover:bg-gray-50 ${i === filtrados.length - 1 ? 'border-0' : ''}`}>
@@ -169,14 +236,35 @@ export default function Financeiro() {
                     {m.tipo}
                   </span>
                 </td>
-                <td className="px-4 py-3 text-gray-600">{m.categorias_financeiro?.categoria || '-'}</td>
-                <td className="hidden md:table-cell px-4 py-3 text-gray-600">{m.categorias_financeiro?.subcategoria || '-'}</td>
                 <td className="px-4 py-3 text-gray-600">{m.descricao || '-'}</td>
+                <td className="px-4 py-3">
+                  {m.status && (
+                    <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${
+                      m.status === 'Recebido' || m.status === 'Pago'
+                        ? 'bg-green-50 text-green-700'
+                        : 'bg-yellow-50 text-yellow-700'
+                    }`}>
+                      {m.status}
+                    </span>
+                  )}
+                </td>
+                <td className="px-4 py-3 text-gray-600">
+                  {m.data_pagamento ? new Date(m.data_pagamento + 'T00:00:00').toLocaleDateString('pt-BR') : '-'}
+                </td>
+                <td className="px-4 py-3 text-gray-600">
+                  {m.data_vencimento ? new Date(m.data_vencimento + 'T00:00:00').toLocaleDateString('pt-BR') : '-'}
+                </td>
                 <td className={`px-4 py-3 font-medium ${m.tipo === 'Entrada' ? 'text-green-600' : 'text-red-600'}`}>
                   {m.tipo === 'Entrada' ? '+' : '-'} R$ {m.valor.toFixed(2).replace('.', ',')}
                 </td>
-                <td className="hidden md:table-cell px-4 py-3 text-gray-600">{m.forma_pagamento}</td>
                 <td className="px-4 py-3 flex gap-2">
+                  {(m.status === 'Pendente' || m.status === 'Não recebido') ? (
+                    <button onClick={() => darBaixa(m)} className="text-green-600 hover:text-green-800" title="Dar baixa">
+                      <Check size={16} />
+                    </button>
+                  ) : (
+                    <div className="w-4" />
+                  )}
                   <Link href={`/financeiro/${m.id}/editar`} className="text-blue-600 hover:text-blue-800">
                     <Edit2 size={16} />
                   </Link>

@@ -11,31 +11,57 @@ type CategoriaFinanceiro = {
   subcategoria: string | null
 }
 
+type Pessoa = { id: string; nome: string }
+type ContaBancaria = { id: string; nome: string }
+
 export default function NovoFinanceiro() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [todasCategorias, setTodasCategorias] = useState<CategoriaFinanceiro[]>([])
+  const [pessoas, setPessoas] = useState<Pessoa[]>([])
+  const [contas, setContas] = useState<ContaBancaria[]>([])
 
   const [form, setForm] = useState({
     tipo: 'Entrada' as 'Entrada' | 'Saída',
     categoria_id: '',
+    pessoa_id: '',
+    conta_bancaria_id: '',
+    status: 'Não recebido' as 'Recebido' | 'Não recebido' | 'Pago' | 'Pendente',
     data: new Date().toISOString().split('T')[0],
+    data_vencimento: '',
+    data_pagamento: '',
     descricao: '',
     valor: '',
     forma_pagamento: 'Pix',
   })
 
+  function formatarValor(valor: string) {
+    const numeros = valor.replace(/\D/g, '')
+    if (!numeros) return ''
+    const num = parseInt(numeros, 10)
+    return (num / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  }
+
   useEffect(() => {
     async function carregar() {
-      const { data } = await supabase
-        .from('categorias_financeiro')
-        .select('*')
-        .order('tipo, categoria, subcategoria')
+      const { data: cats } = await supabase.from('categorias_financeiro').select('*')
+      setTodasCategorias(cats ?? [])
 
-      setTodasCategorias(data ?? [])
+      const { data: pess } = await supabase.from('pessoas').select('*').order('nome')
+      setPessoas(pess ?? [])
+
+      const { data: cont } = await supabase.from('contas_bancarias').select('*').order('nome')
+      setContas(cont ?? [])
     }
     carregar()
   }, [])
+
+  useEffect(() => {
+    setForm(f => ({
+      ...f,
+      status: form.tipo === 'Entrada' ? 'Não recebido' : 'Pendente'
+    }))
+  }, [form.tipo])
 
   const categoriasUnicas = Array.from(new Map(
     todasCategorias
@@ -54,30 +80,36 @@ export default function NovoFinanceiro() {
     : []
 
   async function salvar() {
-    if (!form.tipo) {
-      alert('Selecione o tipo (Entrada/Saída)')
+    if (!form.tipo || !form.categoria_id || !form.valor) {
+      alert('Preencha tipo, categoria e valor')
       return
     }
 
-    if (!form.categoria_id || !form.valor) {
-      alert('Preencha categoria e valor')
+    if (!form.data_vencimento) {
+      alert('Informe a data de vencimento')
+      return
+    }
+
+    if (!form.descricao) {
+      alert('Informe a descrição')
       return
     }
 
     setLoading(true)
 
-    const dadosInsertion = {
-      tipo: String(form.tipo),
+    const { error } = await supabase.from('movimentacoes').insert({
+      tipo: form.tipo,
       categoria_id: form.categoria_id,
+      pessoa_id: form.pessoa_id || null,
+      conta_bancaria_id: form.conta_bancaria_id || null,
+      status: form.status,
       data: form.data,
+      data_vencimento: form.data_vencimento || null,
+      data_pagamento: form.data_pagamento || null,
       descricao: form.descricao || null,
-      valor: parseFloat(form.valor.replace(',', '.')),
+      valor: parseFloat(form.valor.replace(/\D/g, '')) / 100,
       forma_pagamento: form.forma_pagamento,
-    }
-
-    const { error } = await supabase
-      .from('movimentacoes')
-      .insert(dadosInsertion)
+    })
 
     if (error) {
       alert('Erro ao salvar: ' + error.message)
@@ -139,6 +171,91 @@ export default function NovoFinanceiro() {
           </div>
 
           <div>
+            <label className="text-xs text-gray-500 block mb-1">{form.tipo === 'Entrada' ? 'Cliente' : 'Fornecedor'}</label>
+            <select
+              value={form.pessoa_id}
+              onChange={e => setForm({ ...form, pessoa_id: e.target.value })}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"
+            >
+              <option value="">Nenhum</option>
+              {pessoas.map(p => (
+                <option key={p.id} value={p.id}>{p.nome}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Conta bancária (opcional)</label>
+            <select
+              value={form.conta_bancaria_id}
+              onChange={e => setForm({ ...form, conta_bancaria_id: e.target.value })}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"
+            >
+              <option value="">Nenhuma</option>
+              {contas.map(c => (
+                <option key={c.id} value={c.id}>{c.nome}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Status</label>
+            <div className="flex gap-2">
+              {form.tipo === 'Entrada' ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setForm({ ...form, status: 'Recebido' })}
+                    className={`flex-1 px-3 py-2 text-xs rounded-lg font-medium ${
+                      form.status === 'Recebido'
+                        ? 'bg-[#7DC421] text-white'
+                        : 'bg-gray-100 text-gray-600'
+                    }`}
+                  >
+                    Recebido
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setForm({ ...form, status: 'Não recebido' })}
+                    className={`flex-1 px-3 py-2 text-xs rounded-lg font-medium ${
+                      form.status === 'Não recebido'
+                        ? 'bg-[#7DC421] text-white'
+                        : 'bg-gray-100 text-gray-600'
+                    }`}
+                  >
+                    Não recebido
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setForm({ ...form, status: 'Pago' })}
+                    className={`flex-1 px-3 py-2 text-xs rounded-lg font-medium ${
+                      form.status === 'Pago'
+                        ? 'bg-[#7DC421] text-white'
+                        : 'bg-gray-100 text-gray-600'
+                    }`}
+                  >
+                    Pago
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setForm({ ...form, status: 'Pendente' })}
+                    className={`flex-1 px-3 py-2 text-xs rounded-lg font-medium ${
+                      form.status === 'Pendente'
+                        ? 'bg-[#7DC421] text-white'
+                        : 'bg-gray-100 text-gray-600'
+                    }`}
+                  >
+                    Pendente
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+
+          <div>
             <label className="text-xs text-gray-500 block mb-1">Data</label>
             <input
               type="date"
@@ -148,14 +265,36 @@ export default function NovoFinanceiro() {
             />
           </div>
 
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Data de vencimento</label>
+            <input
+              type="date"
+              value={form.data_vencimento}
+              onChange={e => setForm({ ...form, data_vencimento: e.target.value })}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Data de pagamento (opcional)</label>
+            <input
+              type="date"
+              value={form.data_pagamento}
+              onChange={e => setForm({ ...form, data_pagamento: e.target.value })}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+            />
+          </div>
+
           <div className="md:col-span-2">
-            <label className="text-xs text-gray-500 block mb-1">Descrição (opcional)</label>
+            <label className="text-xs text-gray-500 block mb-1">Descrição</label>
             <input
               type="text"
               value={form.descricao}
               onChange={e => setForm({ ...form, descricao: e.target.value })}
               placeholder="Digite uma descrição"
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+              required
             />
           </div>
 
@@ -163,9 +302,9 @@ export default function NovoFinanceiro() {
             <label className="text-xs text-gray-500 block mb-1">Valor</label>
             <input
               type="text"
-              value={form.valor}
-              onChange={e => setForm({ ...form, valor: e.target.value })}
-              placeholder="0,00"
+              value={form.valor ? `R$ ${formatarValor(form.valor)}` : ''}
+              onChange={e => setForm({ ...form, valor: e.target.value.replace(/\D/g, '') })}
+              placeholder="R$ 0,00"
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
             />
           </div>
