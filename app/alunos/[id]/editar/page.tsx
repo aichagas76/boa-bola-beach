@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { registrarLog } from '@/lib/log'
 
 function validarCPF(cpf: string) {
   const nums = cpf.replace(/\D/g, '')
@@ -166,6 +167,7 @@ export default function EditarAluno() {
       }
     }
 
+    await registrarLog('Editou aluno', 'alunos', id, form.nome)
     router.push(`/alunos/${id}`)
   }
 

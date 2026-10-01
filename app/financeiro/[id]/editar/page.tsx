@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { registrarLog } from '@/lib/log'
 
 type Pessoa = { id: string; nome: string }
 type ContaBancaria = { id: string; nome: string }
@@ -119,6 +120,7 @@ export default function EditarMovimentacao() {
       forma_pagamento: form.forma_pagamento || null,
     }).eq('id', id)
     if (error) { alert('Erro: ' + error.message); setSaving(false); return }
+    await registrarLog('Editou movimentação', 'movimentacoes', id, form.descricao)
     router.push('/financeiro')
   }
 

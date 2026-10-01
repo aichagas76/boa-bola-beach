@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { LayoutDashboard, Users, CreditCard, AlertCircle, Settings, Menu, X, TrendingUp, Folder, Tags, Banknote, ChevronDown, ArrowUp, ArrowDown, LogOut, LucideIcon } from 'lucide-react'
+import { LayoutDashboard, Users, CreditCard, AlertCircle, Settings, Menu, X, TrendingUp, Folder, Tags, Banknote, ChevronDown, ArrowUp, ArrowDown, LogOut, ClipboardList, LucideIcon } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
 type SubItem = { href: string; label: string; icon: LucideIcon; color?: string }
@@ -14,6 +14,7 @@ const navItems: SubItem[] = [
   { href: '/pagamentos', label: 'Pagamentos', icon: CreditCard },
   { href: '/atraso', label: 'Em atraso', icon: AlertCircle },
   { href: '/financeiro', label: 'Financeiro', icon: TrendingUp },
+  { href: '/logs', label: 'Logs', icon: ClipboardList },
 ]
 
 const contasItems: SubItem[] = [

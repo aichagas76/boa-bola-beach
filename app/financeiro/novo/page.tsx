@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { registrarLog } from '@/lib/log'
 
 type CategoriaFinanceiro = {
   id: string
@@ -131,6 +132,7 @@ export default function NovoFinanceiro() {
       return
     }
 
+    await registrarLog('Nova movimentação', 'movimentacoes', undefined, form.descricao)
     router.push('/financeiro')
   }
 

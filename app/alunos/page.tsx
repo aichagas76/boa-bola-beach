@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { registrarLog } from '@/lib/log'
 import Link from 'next/link'
 
 type Aluno = {
@@ -238,6 +239,7 @@ export default function Alunos() {
       await supabase.from('alunos').update({ data_vencimento: novaData }).eq('id', alunoModal.id)
     }
 
+    await registrarLog('Pagamento manual', 'alunos', alunoModal.id, alunoModal.nome)
     setSalvandoPgto(false)
     setModalAberto(false)
     setAlunoModal(null)
@@ -256,6 +258,7 @@ export default function Alunos() {
     const { error: errAlu } = await supabase.from('alunos').delete().eq('id', id)
     if (errAlu) { alert('Erro ao excluir aluno: ' + errAlu.message); return }
 
+    await registrarLog('Excluiu aluno', 'alunos', id, nome)
     carregar()
   }
 
