@@ -41,7 +41,7 @@ export default function Pagamentos() {
 
     const { data } = await supabase
       .from('movimentacoes')
-      .select('*, alunos!movimentacoes_aluno_ref_id_fkey(nome)')
+      .select('*,alunos(nome)')
       .order('data_vencimento', { ascending: false })
       .limit(1000)
 
