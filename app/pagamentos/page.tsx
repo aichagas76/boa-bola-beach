@@ -66,7 +66,7 @@ export default function Pagamentos() {
 
   useEffect(() => {
     carregar()
-  }, [periodo])
+  }, [])
 
   async function darBaixa(mov: Movimentacao) {
     setBaixandoId(mov.id)
