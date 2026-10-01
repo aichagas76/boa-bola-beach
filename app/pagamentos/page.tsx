@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { registrarLog } from '@/lib/log'
 import { usePagination } from '@/lib/hooks/usePagination'
 import { Pagination } from '@/components/ui/pagination'
+import { Modal } from '@/components/ui/modal'
 
 type Movimentacao = {
   id: string
@@ -26,6 +27,7 @@ export default function Pagamentos() {
   const [alunoFiltro, setAlunoFiltro] = useState<string>('')
   const [loading, setLoading] = useState(true)
   const [baixandoId, setBaixandoId] = useState<string | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState<{ isOpen: boolean; id: string | null }>({ isOpen: false, id: null })
 
   function obterDatasFiltro(periodo: string) {
     const hoje = new Date()
@@ -63,15 +65,25 @@ export default function Pagamentos() {
     setTimeout(() => window.location.reload(), 800)
   }
 
-  async function deletarPagamento(mov: Movimentacao) {
-    if (!confirm('Deletar este pagamento?')) return
-    setBaixandoId(mov.id)
+  function abrirConfirmDelete(id: string) {
+    setConfirmDelete({ isOpen: true, id })
+  }
+
+  async function confirmarDelete() {
+    if (!confirmDelete.id) return
+    setBaixandoId(confirmDelete.id)
     const { error } = await supabase
       .from('movimentacoes')
       .delete()
-      .eq('id', mov.id)
-    if (error) { alert('Erro: ' + error.message); setBaixandoId(null); return }
-    await registrarLog('Deletou pagamento', 'movimentacoes', mov.id, 'Pagamento')
+      .eq('id', confirmDelete.id)
+    if (error) {
+      alert('Erro: ' + error.message)
+      setBaixandoId(null)
+      setConfirmDelete({ isOpen: false, id: null })
+      return
+    }
+    await registrarLog('Deletou pagamento', 'movimentacoes', confirmDelete.id, 'Pagamento')
+    setConfirmDelete({ isOpen: false, id: null })
     setTimeout(() => window.location.reload(), 800)
   }
 
@@ -129,6 +141,17 @@ export default function Pagamentos() {
 
   return (
     <div>
+      <Modal
+        isOpen={confirmDelete.isOpen}
+        title="Deletar pagamento"
+        message="Tem certeza que deseja deletar este pagamento? Esta ação não pode ser desfeita."
+        confirmText="Deletar"
+        cancelText="Cancelar"
+        isDestructive
+        onConfirm={confirmarDelete}
+        onCancel={() => setConfirmDelete({ isOpen: false, id: null })}
+      />
+
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-xl font-medium text-gray-900">Pagamentos</h1>
       </div>
@@ -260,7 +283,7 @@ export default function Pagamentos() {
                         </button>
                       )}
                       <button
-                        onClick={() => deletarPagamento(m)}
+                        onClick={() => abrirConfirmDelete(m.id)}
                         disabled={baixandoId === m.id}
                         className="px-3 py-1 text-xs bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50"
                       >
