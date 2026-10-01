@@ -13,6 +13,15 @@ type Aluno = {
   data_vencimento: string
   valor_total: number
   modalidades: string[]
+  ultimo_pagamento: string | null
+}
+
+type Matricula = {
+  id: string
+  tipo: string
+  valor: number
+  professor_nome: string | null
+  professor_id: string | null
 }
 
 export default function Alunos() {
@@ -21,6 +30,16 @@ export default function Alunos() {
   const [filtro, setFiltro] = useState('Todos')
   const [loading, setLoading] = useState(true)
   const [sortConfig, setSortConfig] = useState<{ column: 'nome' | 'data_vencimento' | 'valor_total', direction: 'asc' | 'desc' }>({ column: 'nome', direction: 'asc' })
+
+  // Modal pagamento
+  const [modalAberto, setModalAberto] = useState(false)
+  const [alunoModal, setAlunoModal] = useState<Aluno | null>(null)
+  const [matriculasModal, setMatriculasModal] = useState<Matricula[]>([])
+  const [formPgto, setFormPgto] = useState({
+    forma_pagamento: 'Pix',
+    data_pagamento: new Date().toISOString().split('T')[0],
+  })
+  const [salvandoPgto, setSalvandoPgto] = useState(false)
 
   async function carregar() {
     setLoading(true)
@@ -34,11 +53,27 @@ export default function Alunos() {
       .from('matriculas')
       .select('aluno_id, tipo, valor')
 
+    const { data: pagamentosData } = await supabase
+      .from('movimentacoes')
+      .select('aluno_ref_id, data_pagamento')
+      .eq('tipo', 'Entrada')
+      .eq('status', 'Recebido')
+      .not('aluno_ref_id', 'is', null)
+      .order('data_pagamento', { ascending: false })
+
+    // Pega o último pagamento por aluno
+    const ultimoPorAluno: Record<string, string> = {}
+    for (const p of (pagamentosData ?? [])) {
+      if (p.aluno_ref_id && !ultimoPorAluno[p.aluno_ref_id]) {
+        ultimoPorAluno[p.aluno_ref_id] = p.data_pagamento
+      }
+    }
+
     const alunos = (alunosData ?? []).map(a => {
       const mats = (matriculasData ?? []).filter(m => m.aluno_id === a.id)
       const valor_total = mats.reduce((acc, m) => acc + (m.valor ?? 0), 0)
       const modalidades = mats.map(m => m.tipo)
-      return { ...a, valor_total, modalidades }
+      return { ...a, valor_total, modalidades, ultimo_pagamento: ultimoPorAluno[a.id] ?? null }
     })
 
     setAlunos(alunos)
@@ -46,6 +81,76 @@ export default function Alunos() {
   }
 
   useEffect(() => { carregar() }, [])
+
+  async function abrirModal(aluno: Aluno) {
+    const { data } = await supabase
+      .from('matriculas')
+      .select('id, tipo, valor, professor_nome, professor_id')
+      .eq('aluno_id', aluno.id)
+
+    setMatriculasModal(data ?? [])
+    setAlunoModal(aluno)
+    setFormPgto({ forma_pagamento: 'Pix', data_pagamento: new Date().toISOString().split('T')[0] })
+    setModalAberto(true)
+  }
+
+  async function confirmarPagamento() {
+    if (!alunoModal) return
+    if (matriculasModal.length === 0) return alert('Este aluno não tem matrículas cadastradas.')
+    setSalvandoPgto(true)
+
+    const hoje = new Date()
+    const mesAno = hoje.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
+
+    // Busca categorias
+    const { data: catClubinho } = await supabase
+      .from('categorias_financeiro')
+      .select('id')
+      .eq('categoria', 'Clubinho')
+      .eq('tipo', 'Entrada')
+      .limit(1)
+
+    const { data: catAula } = await supabase
+      .from('categorias_financeiro')
+      .select('id')
+      .eq('categoria', 'Aula BT')
+      .eq('tipo', 'Entrada')
+      .limit(1)
+
+    const catClubinhoId = catClubinho?.[0]?.id ?? null
+    const catAulaId = catAula?.[0]?.id ?? null
+
+    for (const mat of matriculasModal) {
+      const categoria_id = mat.tipo === 'Clubinho' ? catClubinhoId : catAulaId
+      await supabase.from('movimentacoes').insert({
+        tipo: 'Entrada',
+        descricao: `Mensalidade ${alunoModal.nome} - ${mesAno}`,
+        valor: mat.valor,
+        forma_pagamento: formPgto.forma_pagamento,
+        data_pagamento: formPgto.data_pagamento,
+        data_vencimento: alunoModal.data_vencimento || null,
+        data: formPgto.data_pagamento,
+        status: 'Recebido',
+        aluno_ref_id: alunoModal.id,
+        professor_id: mat.professor_id || null,
+        origem: 'Manual',
+        categoria_id,
+      })
+    }
+
+    // Avança data_vencimento +1 mês
+    if (alunoModal.data_vencimento) {
+      const venc = new Date(alunoModal.data_vencimento + 'T00:00:00')
+      venc.setMonth(venc.getMonth() + 1)
+      const novaData = venc.toISOString().split('T')[0]
+      await supabase.from('alunos').update({ data_vencimento: novaData }).eq('id', alunoModal.id)
+    }
+
+    setSalvandoPgto(false)
+    setModalAberto(false)
+    setAlunoModal(null)
+    carregar()
+  }
 
   const filtrados = sortAlunos(alunos.filter(a => {
     const matchBusca = a.nome?.toLowerCase().includes(busca.toLowerCase()) ||
@@ -70,11 +175,6 @@ export default function Alunos() {
     return '-'
   }
 
-  function formatarWhatsApp(celular: string) {
-    const numeros = celular.replace(/\D/g, '')
-    return `55${numeros}`
-  }
-
   function mascaraCelular(v: string) {
     v = v.replace(/\D/g, '').slice(0, 11)
     if (v.length > 6) v = v.replace(/(\d{2})(\d{5})(\d{0,4})/, '($1) $2-$3')
@@ -93,12 +193,10 @@ export default function Alunos() {
     return [...lista].sort((a, b) => {
       let aVal: any = a[sortConfig.column]
       let bVal: any = b[sortConfig.column]
-
       if (sortConfig.column === 'nome') {
         aVal = (aVal || '').toLowerCase()
         bVal = (bVal || '').toLowerCase()
       }
-
       if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1
       if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1
       return 0
@@ -111,7 +209,7 @@ export default function Alunos() {
         <h1 className="text-xl font-medium text-gray-900">Alunos</h1>
         <Link
           href="/alunos/novo"
-          className="flex items-center gap-2 bg-blue-600 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+          className="flex items-center gap-2 bg-[#7DC421] text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-[#6ab01a] transition-colors"
         >
           + Novo aluno
         </Link>
@@ -123,7 +221,7 @@ export default function Alunos() {
           placeholder="Buscar por nome, CPF ou celular..."
           value={busca}
           onChange={e => setBusca(e.target.value)}
-          className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+          className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#7DC421]"
         />
       </div>
 
@@ -134,7 +232,7 @@ export default function Alunos() {
             onClick={() => setFiltro(f)}
             className={`px-4 py-1.5 rounded-full text-xs font-medium border transition-colors ${
               filtro === f
-                ? 'bg-blue-50 text-blue-700 border-blue-200'
+                ? 'bg-[#7DC421] text-white border-[#7DC421]'
                 : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
             }`}
           >
@@ -147,24 +245,16 @@ export default function Alunos() {
         <table className="w-full text-sm min-w-full">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200">
-              <th
-                onClick={() => handleSort('nome')}
-                className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide cursor-pointer hover:bg-gray-100 transition-colors"
-              >
+              <th onClick={() => handleSort('nome')} className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide cursor-pointer hover:bg-gray-100 transition-colors">
                 Nome {sortConfig.column === 'nome' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
               </th>
               <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Celular</th>
-              <th
-                onClick={() => handleSort('data_vencimento')}
-                className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide cursor-pointer hover:bg-gray-100 transition-colors"
-              >
+              <th onClick={() => handleSort('data_vencimento')} className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide cursor-pointer hover:bg-gray-100 transition-colors">
                 Vencimento {sortConfig.column === 'data_vencimento' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
               </th>
+              <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Últ. Pagamento</th>
               <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Modalidade</th>
-              <th
-                onClick={() => handleSort('valor_total')}
-                className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide cursor-pointer hover:bg-gray-100 transition-colors"
-              >
+              <th onClick={() => handleSort('valor_total')} className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide cursor-pointer hover:bg-gray-100 transition-colors">
                 Valor {sortConfig.column === 'valor_total' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
               </th>
               <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Status</th>
@@ -173,10 +263,10 @@ export default function Alunos() {
           </thead>
           <tbody>
             {loading && (
-              <tr><td colSpan={7} className="text-center py-8 text-gray-400">Carregando...</td></tr>
+              <tr><td colSpan={8} className="text-center py-8 text-gray-400">Carregando...</td></tr>
             )}
             {!loading && filtrados.length === 0 && (
-              <tr><td colSpan={7} className="text-center py-8 text-gray-400">Nenhum aluno encontrado.</td></tr>
+              <tr><td colSpan={8} className="text-center py-8 text-gray-400">Nenhum aluno encontrado.</td></tr>
             )}
             {filtrados.map((aluno, i) => (
               <tr key={aluno.id} className={`border-b border-gray-100 hover:bg-gray-50 ${i === filtrados.length - 1 ? 'border-0' : ''}`}>
@@ -192,6 +282,9 @@ export default function Alunos() {
                 <td className="px-4 py-3 text-gray-600">
                   {aluno.data_vencimento ? new Date(aluno.data_vencimento + 'T00:00:00').toLocaleDateString('pt-BR') : '-'}
                 </td>
+                <td className="px-4 py-3 text-gray-600 text-xs">
+                  {aluno.ultimo_pagamento ? new Date(aluno.ultimo_pagamento + 'T00:00:00').toLocaleDateString('pt-BR') : '-'}
+                </td>
                 <td className="px-4 py-3 text-lg">{iconeModalidade(aluno.modalidades)}</td>
                 <td className="px-4 py-3 text-gray-600">
                   {aluno.valor_total > 0 ? `R$ ${aluno.valor_total.toFixed(2).replace('.', ',')}` : '-'}
@@ -203,7 +296,14 @@ export default function Alunos() {
                     {aluno.status}
                   </span>
                 </td>
-                <td className="px-4 py-3">
+                <td className="px-4 py-3 flex items-center gap-2">
+                  <button
+                    onClick={() => abrirModal(aluno)}
+                    title="Registrar pagamento"
+                    className="text-lg hover:scale-110 transition-transform"
+                  >
+                    💰
+                  </button>
                   <Link href={`/alunos/${aluno.id}`} className="text-xs text-blue-600 hover:underline">
                     Ver
                   </Link>
@@ -213,6 +313,93 @@ export default function Alunos() {
           </tbody>
         </table>
       </div>
+
+      {/* Modal pagamento */}
+      {modalAberto && alunoModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
+            <div className="p-6 border-b border-gray-100">
+              <h2 className="text-lg font-semibold text-gray-900">Registrar pagamento</h2>
+              <p className="text-sm text-gray-500 mt-1">{alunoModal.nome}</p>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {/* Matrículas */}
+              <div>
+                <div className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-2">Matrículas</div>
+                {matriculasModal.length === 0 ? (
+                  <p className="text-sm text-gray-400">Nenhuma matrícula encontrada.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {matriculasModal.map(m => (
+                      <div key={m.id} className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2">
+                        <div>
+                          <span className="text-sm font-medium text-gray-800">{m.tipo}</span>
+                          {m.professor_nome && (
+                            <span className="text-xs text-gray-500 ml-2">— {m.professor_nome}</span>
+                          )}
+                        </div>
+                        <span className="text-sm font-semibold text-[#7DC421]">
+                          R$ {m.valor.toFixed(2).replace('.', ',')}
+                        </span>
+                      </div>
+                    ))}
+                    <div className="flex justify-between pt-1 border-t border-gray-100">
+                      <span className="text-xs font-medium text-gray-500">Total</span>
+                      <span className="text-sm font-bold text-gray-900">
+                        R$ {matriculasModal.reduce((acc, m) => acc + m.valor, 0).toFixed(2).replace('.', ',')}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Forma de pagamento */}
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Meio de pagamento</label>
+                <select
+                  value={formPgto.forma_pagamento}
+                  onChange={e => setFormPgto({ ...formPgto, forma_pagamento: e.target.value })}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"
+                >
+                  <option>Pix</option>
+                  <option>Dinheiro</option>
+                  <option>Cartão Débito</option>
+                  <option>Cartão Crédito</option>
+                  <option>Transferência</option>
+                </select>
+              </div>
+
+              {/* Data de pagamento */}
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Data de pagamento</label>
+                <input
+                  type="date"
+                  value={formPgto.data_pagamento}
+                  onChange={e => setFormPgto({ ...formPgto, data_pagamento: e.target.value })}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                />
+              </div>
+            </div>
+
+            <div className="p-6 border-t border-gray-100 flex justify-end gap-3">
+              <button
+                onClick={() => { setModalAberto(false); setAlunoModal(null) }}
+                className="px-4 py-2 text-sm border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmarPagamento}
+                disabled={salvandoPgto || matriculasModal.length === 0}
+                className="px-4 py-2 text-sm bg-[#7DC421] text-white rounded-lg hover:bg-[#6ab01a] disabled:opacity-50"
+              >
+                {salvandoPgto ? 'Salvando...' : 'Confirmar Pagamento'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
