@@ -53,6 +53,7 @@ export default function Pagamentos() {
   useEffect(() => {
     (async () => {
       try {
+        alert('useEffect started!')
         setLoading(true)
         const dataInicio = obterDatasFiltro(periodo)
 
