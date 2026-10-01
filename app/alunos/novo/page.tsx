@@ -61,6 +61,13 @@ export default function NovoAluno() {
     return v
   }
 
+  function mascaraValor(v: string) {
+    v = v.replace(/\D/g, '')
+    if (!v) return ''
+    v = (parseInt(v) / 100).toFixed(2)
+    return v.replace('.', ',')
+  }
+
   function mascaraCelular(v: string) {
     v = v.replace(/\D/g, '').slice(0, 11)
     if (v.length > 6) v = v.replace(/(\d{2})(\d{5})(\d{0,4})/, '($1) $2-$3')
@@ -217,7 +224,7 @@ export default function NovoAluno() {
           <div className="mt-3 p-3 bg-gray-50 rounded-lg">
             <label className="text-xs text-gray-500 block mb-1">Valor mensal</label>
             <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white" placeholder="150,00"
-              value={valorClubinho} onChange={e => setValorClubinho(e.target.value)} />
+              value={valorClubinho} onChange={e => setValorClubinho(mascaraValor(e.target.value))} />
           </div>
         )}
 
@@ -251,7 +258,7 @@ export default function NovoAluno() {
                   <div>
                     <label className="text-xs text-gray-500 block mb-1">Valor mensal</label>
                     <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white" placeholder="180,00"
-                      value={aula.valor} onChange={e => updateAula(i, 'valor', e.target.value)} />
+                      value={aula.valor} onChange={e => updateAula(i, 'valor', mascaraValor(e.target.value))} />
                   </div>
                 </div>
               </div>
