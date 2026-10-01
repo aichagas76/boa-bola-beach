@@ -4,32 +4,27 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { registrarLog } from '@/lib/log'
-
-function validarCPF(cpf: string) {
-  const nums = cpf.replace(/\D/g, '')
-  if (nums.length !== 11) return false
-  if (/^(\d)\1+$/.test(nums)) return false
-
-  let soma = 0
-  for (let i = 0; i < 9; i++) soma += parseInt(nums[i]) * (10 - i)
-  let resto = (soma * 10) % 11
-  if (resto === 10 || resto === 11) resto = 0
-  if (resto !== parseInt(nums[9])) return false
-
-  soma = 0
-  for (let i = 0; i < 10; i++) soma += parseInt(nums[i]) * (11 - i)
-  resto = (soma * 10) % 11
-  if (resto === 10 || resto === 11) resto = 0
-  if (resto !== parseInt(nums[10])) return false
-
-  return true
-}
+import { useFormValidation } from '@/lib/hooks/useFormValidation'
+import { FormInput, FormSelect, FormError } from '@/components/ui/form-error'
+import { validarCPF, validarCelular, VALIDATION_MESSAGES } from '@/lib/validators'
 
 export default function NovoAluno() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
-  const [cpfValido, setCpfValido] = useState<boolean | null>(null)
   const [professores, setProfessores] = useState<{ id: string; nome: string }[]>([])
+
+  const rules = {
+    nome: { required: true, minLength: 3, message: 'Nome deve ter no mínimo 3 caracteres' },
+    cpf: {
+      validate: (v: string) => !v || validarCPF(v) ? true : 'CPF inválido',
+    },
+    celular: {
+      validate: (v: string) => !v || validarCelular(v) ? true : 'Celular inválido',
+    },
+    data_vencimento: { required: true, message: 'Data de vencimento é obrigatória' },
+  }
+
+  const validation = useFormValidation(rules)
 
   useEffect(() => {
     supabase.from('professores').select('id, nome').eq('ativo', true).order('nome')
@@ -91,8 +86,8 @@ export default function NovoAluno() {
   }
 
   async function salvar() {
-    if (!form.nome) return alert('Informe o nome do aluno')
-    if (form.cpf && !validarCPF(form.cpf)) return alert('CPF inválido')
+    if (!validation.validate(form)) return
+
     setLoading(true)
 
     const { data: aluno, error } = await supabase
@@ -155,38 +150,59 @@ export default function NovoAluno() {
         <div className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-4">Dados pessoais</div>
         <div className="grid grid-cols-2 gap-4">
           <div className="col-span-2">
-            <label className="text-xs text-gray-500 block mb-1">Nome completo</label>
-            <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" placeholder="Nome completo do aluno"
-              value={form.nome} onChange={e => setForm({ ...form, nome: e.target.value })} />
+            <FormInput
+              label="Nome completo"
+              placeholder="Nome completo do aluno"
+              value={form.nome}
+              error={validation.getFieldError('nome')}
+              touched={validation.touched.nome}
+              onChange={e => {
+                setForm({ ...form, nome: e.target.value })
+                validation.handleChange('nome', e.target.value)
+              }}
+              onBlur={() => validation.handleBlur('nome')}
+            />
           </div>
           <div>
-            <label className="text-xs text-gray-500 block mb-1">Celular</label>
-            <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" placeholder="(00) 9 0000-0000"
-              value={form.celular} onChange={e => setForm({ ...form, celular: mascaraCelular(e.target.value) })} />
+            <FormInput
+              label="Celular"
+              placeholder="(00) 9 0000-0000"
+              value={form.celular}
+              error={validation.getFieldError('celular')}
+              touched={validation.touched.celular}
+              onChange={e => {
+                const masked = mascaraCelular(e.target.value)
+                setForm({ ...form, celular: masked })
+                validation.handleChange('celular', masked)
+              }}
+              onBlur={() => validation.handleBlur('celular')}
+            />
           </div>
           <div>
-            <label className="text-xs text-gray-500 block mb-1">CPF</label>
-            <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" placeholder="000.000.000-00"
-              value={form.cpf} onChange={e => {
+            <FormInput
+              label="CPF"
+              placeholder="000.000.000-00"
+              value={form.cpf}
+              error={validation.getFieldError('cpf')}
+              touched={validation.touched.cpf}
+              onChange={e => {
                 const masked = mascaraCPF(e.target.value)
                 setForm({ ...form, cpf: masked })
-                if (masked.replace(/\D/g, '').length === 11) {
-                  setCpfValido(validarCPF(masked))
-                } else {
-                  setCpfValido(null)
-                }
-              }} />
-            {cpfValido === true && <p className="text-xs text-green-600 mt-1">✓ CPF válido</p>}
-            {cpfValido === false && <p className="text-xs text-red-600 mt-1">✗ CPF inválido</p>}
+                validation.handleChange('cpf', masked)
+              }}
+              onBlur={() => validation.handleBlur('cpf')}
+            />
           </div>
           <div>
-            <label className="text-xs text-gray-500 block mb-1">Sexo</label>
-            <select className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"
-              value={form.sexo} onChange={e => setForm({ ...form, sexo: e.target.value })}>
+            <FormSelect
+              label="Sexo"
+              value={form.sexo}
+              onChange={e => setForm({ ...form, sexo: e.target.value })}
+            >
               <option value="">Selecionar</option>
               <option value="M">Masculino</option>
               <option value="F">Feminino</option>
-            </select>
+            </FormSelect>
           </div>
           <div>
             <label className="text-xs text-gray-500 block mb-1">Data de nascimento</label>
@@ -199,9 +215,18 @@ export default function NovoAluno() {
               value={form.data_cadastro} onChange={e => setForm({ ...form, data_cadastro: e.target.value })} />
           </div>
           <div>
-            <label className="text-xs text-gray-500 block mb-1">Data de vencimento</label>
-            <input type="date" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
-              value={form.data_vencimento} onChange={e => setForm({ ...form, data_vencimento: e.target.value })} />
+            <FormInput
+              type="date"
+              label="Data de vencimento"
+              value={form.data_vencimento}
+              error={validation.getFieldError('data_vencimento')}
+              touched={validation.touched.data_vencimento}
+              onChange={e => {
+                setForm({ ...form, data_vencimento: e.target.value })
+                validation.handleChange('data_vencimento', e.target.value)
+              }}
+              onBlur={() => validation.handleBlur('data_vencimento')}
+            />
           </div>
           <div className="col-span-2 flex items-center justify-between">
             <div>
