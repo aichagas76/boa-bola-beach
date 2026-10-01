@@ -153,6 +153,13 @@ export default function Alunos() {
 
     const totalMats = matriculasModal.reduce((acc, m) => acc + (m.valor ?? 0), 0)
     const valorPago = parseFloat(valorParcial.replace(',', '.')) || 0
+
+    if (valorPago > totalMats) {
+      alert('Valor não pode ser maior que o total da mensalidade')
+      setSalvandoPgto(false)
+      return
+    }
+
     const isParcial = valorPago < totalMats
 
     if (isParcial) {
@@ -204,6 +211,16 @@ export default function Alunos() {
         })
         if (error) { alert('Erro ao lançar: ' + error.message); setSalvandoPgto(false); return }
       }
+
+      // Deleta pagamentos parciais do mês atual deste aluno (já foi pago o total)
+      const mesAtual = new Date().toLocaleDateString('en-CA').substring(0, 7)
+      await supabase
+        .from('movimentacoes')
+        .delete()
+        .eq('aluno_ref_id', alunoModal.id)
+        .ilike('descricao', '%Pagamento parcial%')
+        .gte('data_pagamento', `${mesAtual}-01`)
+        .lte('data_pagamento', `${mesAtual}-31`)
     }
 
     // Avança data_vencimento +1 mês apenas no pagamento total
@@ -325,7 +342,7 @@ export default function Alunos() {
               <th onClick={() => handleSort('valor_total')} className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide cursor-pointer hover:bg-gray-100 transition-colors">
                 Valor {sortConfig.column === 'valor_total' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
               </th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Pago</th>
+              <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Parcial</th>
               <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Status</th>
               <th className="px-4 py-3"></th>
             </tr>
