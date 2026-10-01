@@ -20,7 +20,7 @@ export default function RootLayout({
       <body className={geist.className}>
         <div className="flex">
           <Sidebar />
-          <main className="w-full md:ml-36 md:flex-1 min-h-screen bg-[#F5F5F5] p-4 md:p-6">
+          <main className="w-full md:ml-20 md:flex-1 min-h-screen bg-[#F5F5F5] p-4 md:p-6">
             {children}
           </main>
         </div>
