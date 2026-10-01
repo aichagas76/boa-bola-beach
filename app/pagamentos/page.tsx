@@ -78,10 +78,18 @@ export default function Pagamentos() {
       })
   }, [allData, periodo])
 
-  const totalPago = allData
-    .filter(m => m.tipo === 'Entrada')
-    .filter(m => m.status === 'Recebido')
-    .reduce((acc, m) => acc + (m.valor ?? 0), 0)
+  const totalPago = useMemo(() => {
+    const dataInicio = obterDatasFiltro(periodo)
+    return allData
+      .filter(m => m.tipo === 'Entrada')
+      .filter(m => m.status === 'Recebido')
+      .filter(m => {
+        const dataVenc = new Date(m.data_vencimento || '')
+        const dataInicioDt = new Date(dataInicio)
+        return dataVenc >= dataInicioDt
+      })
+      .reduce((acc, m) => acc + (m.valor ?? 0), 0)
+  }, [allData, periodo])
 
   const totalPendente = movimentacoes
     .reduce((acc, m) => acc + (m.valor ?? 0), 0)
