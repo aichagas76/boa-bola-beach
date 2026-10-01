@@ -99,31 +99,47 @@ export default function Alunos() {
     if (matriculasModal.length === 0) return alert('Este aluno não tem matrículas cadastradas.')
     setSalvandoPgto(true)
 
-    const hoje = new Date()
-    const mesAno = hoje.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
-
-    // Busca categorias
+    // Busca categorias (subcategoria IS NULL para pegar a categoria raiz)
     const { data: catClubinho } = await supabase
       .from('categorias_financeiro')
       .select('id')
       .eq('categoria', 'Clubinho')
       .eq('tipo', 'Entrada')
+      .is('subcategoria', null)
       .limit(1)
+
     const { data: catAula } = await supabase
       .from('categorias_financeiro')
       .select('id')
       .eq('categoria', 'Aula BT')
       .eq('tipo', 'Entrada')
+      .is('subcategoria', null)
       .limit(1)
 
     const catClubinhoId = catClubinho?.[0]?.id ?? null
     const catAulaId = catAula?.[0]?.id ?? null
 
     for (const mat of matriculasModal) {
-      const categoria_id = mat.tipo === 'Clubinho' ? catClubinhoId : catAulaId
+      // Resolve professor_id a partir do professor_nome da matrícula
+      let professor_id: string | null = null
+      if (mat.professor_nome) {
+        const { data: prof } = await supabase
+          .from('professores')
+          .select('id')
+          .eq('nome', mat.professor_nome)
+          .limit(1)
+        professor_id = prof?.[0]?.id ?? null
+      }
+
+      const isClubinho = mat.tipo === 'Clubinho'
+      const categoria_id = isClubinho ? catClubinhoId : catAulaId
+      const descricao = isClubinho
+        ? `Mensalidade Clubinho - ${alunoModal.nome}`
+        : `Mensalidade Aula - ${alunoModal.nome}${mat.professor_nome ? ' - Prof. ' + mat.professor_nome : ''}`
+
       const payload = {
         tipo: 'Entrada',
-        descricao: `Mensalidade ${alunoModal.nome} - ${mesAno}`,
+        descricao,
         valor: mat.valor,
         forma_pagamento: formPgto.forma_pagamento,
         data_pagamento: formPgto.data_pagamento,
@@ -131,13 +147,14 @@ export default function Alunos() {
         data: formPgto.data_pagamento,
         status: 'Recebido',
         aluno_ref_id: alunoModal.id,
-        professor_id: mat.professor_id || null,
+        professor_id,
         origem: 'Manual',
         categoria_id,
       }
+
       const { error } = await supabase.from('movimentacoes').insert(payload)
       if (error) {
-        alert('Erro ao registrar pagamento: ' + error.message + '\n\nDetalhes: ' + JSON.stringify(error.details))
+        alert('Erro ao lançar: ' + error.message)
         setSalvandoPgto(false)
         return
       }
