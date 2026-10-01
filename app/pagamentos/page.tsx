@@ -57,11 +57,11 @@ export default function Pagamentos() {
       .from('movimentacoes')
       .select('*, categorias_financeiro(categoria, subcategoria), link_pagamento')
       .eq('tipo', 'Entrada')
-      .neq('status', 'Recebido')
       .gte('data_vencimento', dataInicio)
       .order('data_vencimento', { ascending: false })
       .then(({ data }) => {
-        setMovimentacoes(data ?? [])
+        const filtrados = (data ?? []).filter(m => m.status !== 'Recebido')
+        setMovimentacoes(filtrados)
         setLoading(false)
       })
   }, [periodo])
