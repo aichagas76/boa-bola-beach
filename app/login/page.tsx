@@ -16,10 +16,16 @@ export default function Login() {
     setErro('')
     setLoading(true)
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password: senha })
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password: senha })
 
     if (error) {
-      setErro('Email ou senha incorretos.')
+      setErro(`Erro: ${error.message} (${error.status ?? 'sem status'})`)
+      setLoading(false)
+      return
+    }
+
+    if (!data.session) {
+      setErro('Login efetuado mas sessão não criada. Tente novamente.')
       setLoading(false)
       return
     }
