@@ -126,13 +126,10 @@ export default function Alunos() {
       .gte('data_pagamento', `${mesAtual}-01`)
       .lte('data_pagamento', `${mesAtual}-31`)
 
-    const jaPago = (pgtos ?? []).reduce((acc, p) => acc + (p.valor ?? 0), 0)
-    const restante = Math.max(total - jaPago, 0)
-
     setMatriculasModal(mats)
     setAlunoModal(aluno)
     setFormPgto({ forma_pagamento: 'Pix', data_pagamento: new Date().toLocaleDateString('en-CA') })
-    setValorParcial(restante.toFixed(2).replace('.', ','))
+    setValorParcial(total.toFixed(2).replace('.', ','))
     setModalAberto(true)
   }
 
