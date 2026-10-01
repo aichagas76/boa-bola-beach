@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
-import { LayoutDashboard, Users, CreditCard, AlertCircle, Settings, Menu, X, TrendingUp, Folder, Tags, Banknote, ChevronDown, ArrowUp, ArrowDown, LucideIcon } from 'lucide-react'
+import { usePathname, useRouter } from 'next/navigation'
+import { LayoutDashboard, Users, CreditCard, AlertCircle, Settings, Menu, X, TrendingUp, Folder, Tags, Banknote, ChevronDown, ArrowUp, ArrowDown, LogOut, LucideIcon } from 'lucide-react'
+import { supabase } from '@/lib/supabase'
 
 type SubItem = { href: string; label: string; icon: LucideIcon; color?: string }
 
@@ -29,7 +30,13 @@ const cadastrosItems: SubItem[] = [
 
 export default function Sidebar() {
   const pathname = usePathname()
+  const router = useRouter()
   const [isOpen, setIsOpen] = useState(false)
+
+  async function sair() {
+    await supabase.auth.signOut()
+    router.push('/login')
+  }
   const [cadastrosAberto, setCadastrosAberto] = useState(false)
   const [contasAberto, setContasAberto] = useState(false)
 
@@ -166,11 +173,18 @@ export default function Sidebar() {
           )}
         </nav>
 
-        <div className="p-4 border-t border-[#1a1a1a]">
+        <div className="p-4 border-t border-[#1a1a1a] space-y-2">
           <Link href="/configuracoes" className="flex items-center gap-3 text-xs text-gray-500 hover:text-[#7DC421] transition-colors">
             <Settings size={16} />
             <span>Configurações</span>
           </Link>
+          <button
+            onClick={sair}
+            className="w-full flex items-center gap-3 text-xs text-gray-500 hover:text-red-400 transition-colors"
+          >
+            <LogOut size={16} />
+            <span>Sair</span>
+          </button>
         </div>
       </aside>
     </>
