@@ -422,7 +422,7 @@ export default function Alunos() {
                   >
                     💰
                   </button>
-                  <Link href={`/alunos/${aluno.id}`} className="text-gray-500 hover:text-blue-600" title="Editar">✏️</Link>
+                  <Link href={`/alunos/${aluno.id}/editar`} className="text-gray-500 hover:text-blue-600" title="Editar">✏️</Link>
                   <button
                     onClick={() => excluirAluno(aluno.id, aluno.nome)}
                     title="Excluir aluno"
