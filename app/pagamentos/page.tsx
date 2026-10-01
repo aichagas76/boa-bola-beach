@@ -59,22 +59,13 @@ export default function Pagamentos() {
         return
       }
 
-      alert(`TEST: ${data.length} registros. Primeiro: tipo="${data[0]?.tipo}", status="${data[0]?.status}"`)
+      // Mostrar TODOS os dados sem filtro por agora
+      const sorted = [...data].sort((a, b) =>
+        new Date(b.data_vencimento || '').getTime() -
+        new Date(a.data_vencimento || '').getTime()
+      )
 
-      const filtered = data
-        .filter(m => m.tipo === 'Entrada')
-        .filter(m => m.status !== 'Recebido')
-        .filter(m => {
-          const dataVenc = new Date(m.data_vencimento || '')
-          const dataInicioDt = new Date(dataInicio)
-          return dataVenc >= dataInicioDt
-        })
-        .sort((a, b) =>
-          new Date(b.data_vencimento || '').getTime() -
-          new Date(a.data_vencimento || '').getTime()
-        )
-
-      setMovimentacoes(filtered)
+      setMovimentacoes(sorted)
       setLoading(false)
     })()
   }, [periodo])
