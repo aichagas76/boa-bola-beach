@@ -181,6 +181,7 @@ export default function Pagamentos() {
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-200">
                     <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Competência</th>
+                    <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Aluno</th>
                     <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Valor</th>
                     <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Status</th>
                     <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Data Pagamento</th>
@@ -190,14 +191,15 @@ export default function Pagamentos() {
                 </thead>
                 <tbody>
                   {loading && (
-                    <tr><td colSpan={6} className="text-center py-8 text-gray-400">Carregando...</td></tr>
+                    <tr><td colSpan={7} className="text-center py-8 text-gray-400">Carregando...</td></tr>
                   )}
                   {!loading && movimentacoes.length === 0 && (
-                    <tr><td colSpan={6} className="text-center py-8 text-gray-400">Nenhum pagamento encontrado.</td></tr>
+                    <tr><td colSpan={7} className="text-center py-8 text-gray-400">Nenhum pagamento encontrado.</td></tr>
                   )}
                   {pagination.paginatedItems.map((m, i) => (
                     <tr key={m.id} className={`border-b border-gray-100 hover:bg-gray-50 ${i === pagination.paginatedItems.length - 1 && pagination.currentPage === pagination.totalPages ? 'border-0' : ''}`}>
                     <td className="px-4 py-3 text-gray-600 text-xs">{formatarCompetencia(m.data_vencimento)}</td>
+                    <td className="px-4 py-3 text-gray-600 text-xs">{m.alunos?.nome || '-'}</td>
                     <td className="px-4 py-3 text-gray-800 font-medium text-xs">
                       R$ {m.valor?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) ?? '0,00'}
                     </td>
