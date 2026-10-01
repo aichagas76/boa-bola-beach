@@ -57,11 +57,15 @@ export default function Pagamentos() {
       .from('movimentacoes')
       .select('*')
       .eq('tipo', 'Entrada')
-      .gte('data_vencimento', dataInicio)
-      .order('data_vencimento', { ascending: false })
       .then(({ data, error }) => {
+        console.log('Query result:', { data, error })
         if (error) console.error('Query error:', error)
-        const filtrados = (data ?? []).filter(m => m.status !== 'Recebido')
+        let filtrados = (data ?? []).filter(m => m.status !== 'Recebido')
+        filtrados = filtrados.filter(m => {
+          const dataVenc = new Date(m.data_vencimento)
+          const dataInicioDt = new Date(dataInicio)
+          return dataVenc >= dataInicioDt
+        })
         setMovimentacoes(filtrados)
         setLoading(false)
       })
