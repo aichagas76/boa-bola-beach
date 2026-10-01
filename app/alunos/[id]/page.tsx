@@ -15,6 +15,7 @@ type Aluno = {
   data_vencimento: string
   status: string
   observacao: string
+  asaas_customer_id: string | null
 }
 
 type Matricula = {
@@ -129,6 +130,10 @@ export default function DetalheAluno() {
           <div>
             <div className="text-xs text-gray-500 mb-1">Data de vencimento</div>
             <div className="text-gray-900">{formataData(aluno.data_vencimento)}</div>
+          </div>
+          <div>
+            <div className="text-xs text-gray-500 mb-1">ID Asaas</div>
+            <div className="text-gray-900 font-mono text-xs">{aluno.asaas_customer_id ?? '-'}</div>
           </div>
         </div>
       </div>
