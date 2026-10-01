@@ -93,6 +93,7 @@ export default function DetalheAluno() {
 
   const clubinho = matriculas.find(m => m.tipo === 'Clubinho')
   const aulasList = matriculas.filter(m => m.tipo === 'Aula')
+  const pagamentoComLink = pagamentos.find(p => p.link_pagamento)
 
   return (
     <div className="max-w-2xl">
@@ -134,6 +135,19 @@ export default function DetalheAluno() {
           <div>
             <div className="text-xs text-gray-500 mb-1">ID Asaas</div>
             <div className="text-gray-900 font-mono text-xs">{aluno.asaas_customer_id ?? '-'}</div>
+          </div>
+          <div>
+            <div className="text-xs text-gray-500 mb-1">Link Pagamento</div>
+            <div className="text-gray-900 text-xs">
+              {pagamentoComLink?.link_pagamento ? (
+                <button
+                  onClick={() => copiarLink(pagamentoComLink.link_pagamento!, 'header')}
+                  className="text-blue-600 hover:underline"
+                >
+                  {copiado === 'header' ? '✓ Copiado' : '🔗 Copiar link'}
+                </button>
+              ) : '-'}
+            </div>
           </div>
         </div>
       </div>
