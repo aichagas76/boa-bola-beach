@@ -74,10 +74,19 @@ export default function Pagamentos() {
       .eq('id', mov.id)
     if (error) { alert('Erro: ' + error.message); setBaixandoId(null); return }
     await registrarLog('Baixa pagamento', 'movimentacoes', mov.id, 'Pagamento')
-    setMovimentacoes(prev => prev.map(m =>
-      m.id === mov.id ? { ...m, status: 'Recebido', data_pagamento: hoje } : m
-    ))
-    setBaixandoId(null)
+
+    // Recarregar dados
+    const dataInicio = obterDatasFiltro(periodo)
+    supabase
+      .from('movimentacoes')
+      .select('*, categorias_financeiro(categoria, subcategoria), alunos(nome), link_pagamento')
+      .eq('tipo', 'Entrada')
+      .gte('data_vencimento', dataInicio)
+      .order('data_vencimento', { ascending: false })
+      .then(({ data }) => {
+        setMovimentacoes(data ?? [])
+        setBaixandoId(null)
+      })
   }
 
   const totalPago = movimentacoes
