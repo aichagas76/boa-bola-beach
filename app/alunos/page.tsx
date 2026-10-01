@@ -354,7 +354,7 @@ export default function Alunos() {
               </th>
               <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Parcial</th>
               <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Status</th>
-              <th className="px-4 py-3"></th>
+              <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Ações</th>
             </tr>
           </thead>
           <tbody>
@@ -410,6 +410,18 @@ export default function Alunos() {
                   <Link href={`/alunos/${aluno.id}`} className="text-xs text-blue-600 hover:underline">
                     Ver
                   </Link>
+                  <button
+                    onClick={async () => {
+                      if (!confirm(`Excluir ${aluno.nome}? Esta ação não pode ser desfeita.`)) return
+                      await supabase.from('matriculas').delete().eq('aluno_id', aluno.id)
+                      await supabase.from('alunos').delete().eq('id', aluno.id)
+                      carregar()
+                    }}
+                    title="Excluir aluno"
+                    className="text-lg hover:scale-110 transition-transform"
+                  >
+                    🗑️
+                  </button>
                 </td>
               </tr>
             ))}
