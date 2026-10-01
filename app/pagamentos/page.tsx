@@ -57,6 +57,7 @@ export default function Pagamentos() {
       .from('movimentacoes')
       .select('*, categorias_financeiro(categoria, subcategoria), link_pagamento')
       .eq('tipo', 'Entrada')
+      .eq('status', 'Não recebido')
       .gte('data_vencimento', dataInicio)
       .order('data_vencimento', { ascending: false })
       .then(({ data }) => {
@@ -66,8 +67,6 @@ export default function Pagamentos() {
   }, [periodo])
 
   async function darBaixa(mov: Movimentacao) {
-    console.log('darBaixa chamado para:', mov.id)
-    alert('Marcando como recebido...')
     setBaixandoId(mov.id)
     const hoje = new Date().toLocaleDateString('en-CA')
     const { error } = await supabase
