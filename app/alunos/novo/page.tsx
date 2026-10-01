@@ -58,10 +58,11 @@ export default function NovoAluno() {
   }
 
   function mascaraValor(v: string) {
-    let num = v.replace(/\D/g, '')
+    // Remove tudo que não é número
+    const num = v.replace(/\D/g, '')
     if (!num) return ''
-    const n = parseInt(num)
-    return n.toLocaleString('pt-BR') + ',00'
+    // Formata com vírgula
+    return num
   }
 
   function mascaraCelular(v: string) {
