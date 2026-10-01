@@ -96,11 +96,25 @@ export default function Alunos() {
       .eq('aluno_id', aluno.id)
 
     const mats = data ?? []
+    const total = mats.reduce((acc, m) => acc + (m.valor ?? 0), 0)
+
+    // Soma pagamentos já feitos no mês atual para este aluno
+    const mesAtual = new Date().toLocaleDateString('en-CA').substring(0, 7) // YYYY-MM
+    const { data: pgtos } = await supabase
+      .from('movimentacoes')
+      .select('valor')
+      .eq('aluno_ref_id', aluno.id)
+      .eq('status', 'Recebido')
+      .gte('data_pagamento', `${mesAtual}-01`)
+      .lte('data_pagamento', `${mesAtual}-31`)
+
+    const jaPago = (pgtos ?? []).reduce((acc, p) => acc + (p.valor ?? 0), 0)
+    const restante = Math.max(total - jaPago, 0)
+
     setMatriculasModal(mats)
     setAlunoModal(aluno)
     setFormPgto({ forma_pagamento: 'Pix', data_pagamento: new Date().toLocaleDateString('en-CA') })
-    const total = mats.reduce((acc, m) => acc + (m.valor ?? 0), 0)
-    setValorParcial((total).toFixed(2).replace('.', ','))
+    setValorParcial(restante.toFixed(2).replace('.', ','))
     setModalAberto(true)
   }
 
