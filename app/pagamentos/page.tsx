@@ -181,17 +181,16 @@ export default function Pagamentos() {
                     <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Status</th>
                     <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Data Pagamento</th>
                     <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Forma Pagamento</th>
-                    <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">ID Asaas</th>
                     <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Link</th>
                     <th className="px-4 py-3"></th>
                   </tr>
                 </thead>
                 <tbody>
                   {loading && (
-                    <tr><td colSpan={9} className="text-center py-8 text-gray-400">Carregando...</td></tr>
+                    <tr><td colSpan={8} className="text-center py-8 text-gray-400">Carregando...</td></tr>
                   )}
                   {!loading && movimentacoes.length === 0 && (
-                    <tr><td colSpan={9} className="text-center py-8 text-gray-400">Nenhum pagamento encontrado.</td></tr>
+                    <tr><td colSpan={8} className="text-center py-8 text-gray-400">Nenhum pagamento encontrado.</td></tr>
                   )}
                   {pagination.paginatedItems.map((m, i) => (
                     <tr key={m.id} className={`border-b border-gray-100 hover:bg-gray-50 ${i === pagination.paginatedItems.length - 1 && pagination.currentPage === pagination.totalPages ? 'border-0' : ''}`}>
@@ -213,9 +212,6 @@ export default function Pagamentos() {
                         : '-'}
                     </td>
                     <td className="px-4 py-3 text-gray-600 text-xs">{m.forma_pagamento || '-'}</td>
-                    <td className="px-4 py-3 text-gray-500 text-xs font-mono">
-                      {alunos.find(a => a.id === alunoSelecionado)?.asaas_customer_id ?? '-'}
-                    </td>
                     <td className="px-4 py-3 text-xs">
                       {m.link_pagamento
                         ? <a href={m.link_pagamento} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">🔗 Pagar</a>
