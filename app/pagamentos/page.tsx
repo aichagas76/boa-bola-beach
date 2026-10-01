@@ -22,10 +22,27 @@ type Movimentacao = {
 
 export default function Pagamentos() {
   const [alunos, setAlunos] = useState<Aluno[]>([])
-  const [alunoSelecionado, setAlunoSelecionado] = useState('')
+  const [periodo, setPeriodo] = useState('semana') // 'dia' | 'semana' | 'mes'
   const [movimentacoes, setMovimentacoes] = useState<Movimentacao[]>([])
   const [loading, setLoading] = useState(false)
   const [baixandoId, setBaixandoId] = useState<string | null>(null)
+
+  function obterDatasFiltro(periodo: string) {
+    const hoje = new Date()
+    hoje.setHours(0, 0, 0, 0)
+    let dataInicio: Date
+
+    if (periodo === 'dia') {
+      dataInicio = new Date(hoje)
+    } else if (periodo === 'semana') {
+      dataInicio = new Date(hoje)
+      dataInicio.setDate(dataInicio.getDate() - 7)
+    } else { // mes
+      dataInicio = new Date(hoje)
+      dataInicio.setDate(1)
+    }
+    return dataInicio.toISOString().split('T')[0]
+  }
 
   useEffect(() => {
     supabase.from('alunos').select('id, nome, asaas_customer_id').order('nome').then(({ data }) => {
@@ -34,19 +51,19 @@ export default function Pagamentos() {
   }, [])
 
   useEffect(() => {
-    if (!alunoSelecionado) { setMovimentacoes([]); return }
     setLoading(true)
+    const dataInicio = obterDatasFiltro(periodo)
     supabase
       .from('movimentacoes')
-      .select('*, categorias_financeiro(categoria, subcategoria), link_pagamento')
-      .eq('aluno_ref_id', alunoSelecionado)
+      .select('*, categorias_financeiro(categoria, subcategoria), alunos(nome), link_pagamento')
       .eq('tipo', 'Entrada')
+      .gte('data_vencimento', dataInicio)
       .order('data_vencimento', { ascending: false })
       .then(({ data }) => {
         setMovimentacoes(data ?? [])
         setLoading(false)
       })
-  }, [alunoSelecionado])
+  }, [periodo])
 
   async function darBaixa(mov: Movimentacao) {
     setBaixandoId(mov.id)
@@ -56,8 +73,7 @@ export default function Pagamentos() {
       .update({ status: 'Recebido', data_pagamento: hoje })
       .eq('id', mov.id)
     if (error) { alert('Erro: ' + error.message); setBaixandoId(null); return }
-    const alunoNome = alunos.find(a => a.id === alunoSelecionado)?.nome ?? alunoSelecionado
-    await registrarLog('Baixa pagamento', 'movimentacoes', mov.id, alunoNome)
+    await registrarLog('Baixa pagamento', 'movimentacoes', mov.id, 'Pagamento')
     setMovimentacoes(prev => prev.map(m =>
       m.id === mov.id ? { ...m, status: 'Recebido', data_pagamento: hoje } : m
     ))
@@ -95,28 +111,43 @@ export default function Pagamentos() {
       </div>
 
       <div className="bg-white border border-gray-200 rounded-xl p-4 mb-4">
-        <label className="text-xs text-gray-500 block mb-1">Aluno</label>
-        <select
-          value={alunoSelecionado}
-          onChange={e => setAlunoSelecionado(e.target.value)}
-          className="w-full max-w-xs border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"
-        >
-          <option value="">Selecione um aluno...</option>
-          {alunos.map(a => (
-            <option key={a.id} value={a.id}>{a.nome}</option>
-          ))}
-        </select>
+        <label className="text-xs text-gray-500 block mb-2">Período</label>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setPeriodo('dia')}
+            className={`px-3 py-1.5 text-xs font-medium rounded-lg transition ${
+              periodo === 'dia'
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            Do dia
+          </button>
+          <button
+            onClick={() => setPeriodo('semana')}
+            className={`px-3 py-1.5 text-xs font-medium rounded-lg transition ${
+              periodo === 'semana'
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            7 dias
+          </button>
+          <button
+            onClick={() => setPeriodo('mes')}
+            className={`px-3 py-1.5 text-xs font-medium rounded-lg transition ${
+              periodo === 'mes'
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            Do mês
+          </button>
+        </div>
       </div>
 
-      {!alunoSelecionado && (
-        <div className="text-center py-16 text-gray-400 text-sm">
-          Selecione um aluno para ver o histórico
-        </div>
-      )}
-
-      {alunoSelecionado && (
-        <>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+      <>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
             <div className="bg-white border border-gray-200 rounded-xl p-4">
               <div className="text-xs text-gray-500 mb-1">Total pago</div>
               <div className="text-lg font-semibold text-green-700">
@@ -215,8 +246,7 @@ export default function Pagamentos() {
               onPageChange={pagination.goToPage}
             />
           </div>
-        </>
-      )}
+      </>
     </div>
   )
 }
