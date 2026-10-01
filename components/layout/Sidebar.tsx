@@ -3,7 +3,9 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, Users, CreditCard, AlertCircle, Settings, Menu, X, TrendingUp, Folder, Tags, Banknote, ChevronDown, ArrowUp, ArrowDown } from 'lucide-react'
+import { LayoutDashboard, Users, CreditCard, AlertCircle, Settings, Menu, X, TrendingUp, Folder, Tags, Banknote, ChevronDown, ArrowUp, ArrowDown, LucideIcon } from 'lucide-react'
+
+type SubItem = { href: string; label: string; icon: LucideIcon; color?: string }
 
 const navItems = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -13,12 +15,12 @@ const navItems = [
   { href: '/financeiro', label: 'Financeiro', icon: TrendingUp },
 ]
 
-const contasItems = [
+const contasItems: SubItem[] = [
   { href: '/contas-receber', label: 'Contas a Receber', icon: ArrowUp, color: 'text-green-500' },
   { href: '/contas-pagar', label: 'Contas a Pagar', icon: ArrowDown, color: 'text-red-500' },
 ]
 
-const cadastrosItems = [
+const cadastrosItems: SubItem[] = [
   { href: '/categorias', label: 'Categorias', icon: Tags },
   { href: '/pessoas', label: 'Fornecedores/Clientes', icon: Users },
   { href: '/contas', label: 'Contas', icon: Banknote },

@@ -6,17 +6,18 @@ import Link from 'next/link'
 import { Trash2, Edit2, Check } from 'lucide-react'
 type Movimentacao = {
   id: string
-  tipo: 'Entrada' | 'Saída'
-  categoria_id: string
   data: string
-  descricao: string | null
+  tipo: string
+  descricao: string
   valor: number
   forma_pagamento: string
-  status?: string
-  pessoa_id?: string
-  conta_bancaria_id?: string
-  pessoas?: { nome: string }
-  contas_bancarias?: { nome: string }
+  status: string
+  data_vencimento: string | null
+  data_pagamento: string | null
+  origem: string
+  categorias_financeiro: { categoria: string; subcategoria: string } | null
+  pessoas: { nome: string } | null
+  contas_bancarias: { nome: string } | null
 }
 
 export default function Financeiro() {
@@ -27,7 +28,7 @@ export default function Financeiro() {
     const hoje = new Date()
     return `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`
   })
-  const [ordenacao, setOrdenacao] = useState({ coluna: 'data', direcao: 'desc' })
+  const [ordenacao, setOrdenacao] = useState<{ coluna: 'data' | 'valor' | 'status' | 'vencimento', direcao: 'asc' | 'desc' }>({ coluna: 'data', direcao: 'desc' })
 
   async function carregar() {
     setLoading(true)
@@ -80,7 +81,7 @@ export default function Financeiro() {
     carregar()
   }
 
-  function alternarOrdenacao(coluna: 'data' | 'valor' | 'status') {
+  function alternarOrdenacao(coluna: 'data' | 'valor' | 'status' | 'vencimento') {
     if (ordenacao.coluna === coluna) {
       setOrdenacao({ ...ordenacao, direcao: ordenacao.direcao === 'asc' ? 'desc' : 'asc' })
     } else {
