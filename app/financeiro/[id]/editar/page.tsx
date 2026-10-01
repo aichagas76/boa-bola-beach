@@ -6,6 +6,8 @@ import { supabase } from '@/lib/supabase'
 
 type Pessoa = { id: string; nome: string }
 type ContaBancaria = { id: string; nome: string }
+type AlunoRef = { id: string; nome: string }
+type Professor = { id: string; nome: string }
 
 export default function EditarMovimentacao() {
   const router = useRouter()
@@ -17,11 +19,15 @@ export default function EditarMovimentacao() {
   const [categorias, setCategorias] = useState<any[]>([])
   const [pessoas, setPessoas] = useState<Pessoa[]>([])
   const [contas, setContas] = useState<ContaBancaria[]>([])
+  const [alunos, setAlunos] = useState<AlunoRef[]>([])
+  const [professores, setProfessores] = useState<Professor[]>([])
 
   const [form, setForm] = useState({
     tipo: '' as 'Entrada' | 'Saída' | '',
     categoria_id: '',
     pessoa_id: '',
+    aluno_ref_id: '',
+    professor_id: '',
     conta_bancaria_id: '',
     status: '',
     data: '',
@@ -53,6 +59,12 @@ export default function EditarMovimentacao() {
         const { data: cont } = await supabase.from('contas_bancarias').select('*').order('nome')
         setContas(cont ?? [])
 
+        const { data: alns } = await supabase.from('alunos').select('id, nome').order('nome')
+        setAlunos(alns ?? [])
+
+        const { data: profs } = await supabase.from('professores').select('id, nome').order('nome')
+        setProfessores(profs ?? [])
+
         const { data: movs } = await supabase.from('movimentacoes').select('*').eq('id', id)
         if (movs && movs.length > 0) {
           const mov = movs[0]
@@ -60,6 +72,8 @@ export default function EditarMovimentacao() {
             tipo: mov.tipo ?? '',
             categoria_id: mov.categoria_id ?? '',
             pessoa_id: mov.pessoa_id ?? '',
+            aluno_ref_id: mov.aluno_ref_id ?? '',
+            professor_id: mov.professor_id ?? '',
             conta_bancaria_id: mov.conta_bancaria_id ?? '',
             status: mov.status ?? '',
             data: mov.data ?? '',
@@ -93,6 +107,8 @@ export default function EditarMovimentacao() {
       tipo: form.tipo,
       categoria_id: form.categoria_id || null,
       pessoa_id: form.pessoa_id || null,
+      aluno_ref_id: form.aluno_ref_id || null,
+      professor_id: form.professor_id || null,
       conta_bancaria_id: form.conta_bancaria_id || null,
       status: form.status || null,
       data: form.data,
@@ -166,6 +182,30 @@ export default function EditarMovimentacao() {
             >
               <option value="">Nenhum</option>
               {pessoas.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
+            </select>
+          </div>
+
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Aluno (opcional)</label>
+            <select
+              value={form.aluno_ref_id}
+              onChange={e => setForm({ ...form, aluno_ref_id: e.target.value })}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"
+            >
+              <option value="">Nenhum</option>
+              {alunos.map(a => <option key={a.id} value={a.id}>{a.nome}</option>)}
+            </select>
+          </div>
+
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Professor (opcional)</label>
+            <select
+              value={form.professor_id}
+              onChange={e => setForm({ ...form, professor_id: e.target.value })}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"
+            >
+              <option value="">Nenhum</option>
+              {professores.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
             </select>
           </div>
 
