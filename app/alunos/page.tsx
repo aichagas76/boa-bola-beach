@@ -15,6 +15,7 @@ type Aluno = {
   modalidades: string[]
   ultimo_pagamento: string | null
   pago_mes: number
+  parcial_mes: number
 }
 
 type Matricula = {
@@ -63,17 +64,18 @@ export default function Alunos() {
 
     const { data: pagamentosData } = await supabase
       .from('movimentacoes')
-      .select('aluno_ref_id, data_pagamento, valor')
+      .select('aluno_ref_id, data_pagamento, valor, descricao')
       .eq('tipo', 'Entrada')
       .eq('status', 'Recebido')
       .not('aluno_ref_id', 'is', null)
       .order('data_pagamento', { ascending: false })
 
-    const mesAtual = new Date().toLocaleDateString('en-CA').substring(0, 7)
+    const mesAtual = new Date().toISOString().slice(0, 7)
 
-    // Último pagamento e soma paga no mês por aluno
+    // Último pagamento, soma total paga e soma parcial no mês por aluno
     const ultimoPorAluno: Record<string, string> = {}
     const pagoMesPorAluno: Record<string, number> = {}
+    const parcialMesPorAluno: Record<string, number> = {}
     for (const p of (pagamentosData ?? [])) {
       if (!p.aluno_ref_id) continue
       if (!ultimoPorAluno[p.aluno_ref_id]) {
@@ -81,6 +83,9 @@ export default function Alunos() {
       }
       if (p.data_pagamento?.startsWith(mesAtual)) {
         pagoMesPorAluno[p.aluno_ref_id] = (pagoMesPorAluno[p.aluno_ref_id] ?? 0) + (p.valor ?? 0)
+        if (p.descricao?.toLowerCase().includes('parcial')) {
+          parcialMesPorAluno[p.aluno_ref_id] = (parcialMesPorAluno[p.aluno_ref_id] ?? 0) + (p.valor ?? 0)
+        }
       }
     }
 
@@ -88,7 +93,12 @@ export default function Alunos() {
       const mats = (matriculasData ?? []).filter(m => m.aluno_id === a.id)
       const valor_total = mats.reduce((acc, m) => acc + (m.valor ?? 0), 0)
       const modalidades = mats.map(m => m.tipo)
-      return { ...a, valor_total, modalidades, ultimo_pagamento: ultimoPorAluno[a.id] ?? null, pago_mes: pagoMesPorAluno[a.id] ?? 0 }
+      return {
+        ...a, valor_total, modalidades,
+        ultimo_pagamento: ultimoPorAluno[a.id] ?? null,
+        pago_mes: pagoMesPorAluno[a.id] ?? 0,
+        parcial_mes: parcialMesPorAluno[a.id] ?? 0,
+      }
     })
 
     setAlunos(alunos)
@@ -155,7 +165,7 @@ export default function Alunos() {
     const valorPago = parseFloat(valorParcial.replace(',', '.')) || 0
 
     if (valorPago > totalMats) {
-      alert('Valor não pode ser maior que o total da mensalidade')
+      alert('Valor pago não pode ser maior que R$ ' + totalMats.toFixed(2).replace('.', ','))
       setSalvandoPgto(false)
       return
     }
@@ -376,10 +386,8 @@ export default function Alunos() {
                   {aluno.valor_total > 0 ? `R$ ${aluno.valor_total.toFixed(2).replace('.', ',')}` : '-'}
                 </td>
                 <td className="px-4 py-3 text-xs font-medium">
-                  {aluno.pago_mes >= aluno.valor_total && aluno.pago_mes > 0 ? (
-                    <span className="text-green-600">✓ R$ {aluno.pago_mes.toFixed(2).replace('.', ',')}</span>
-                  ) : aluno.pago_mes > 0 ? (
-                    <span className="text-yellow-600">R$ {aluno.pago_mes.toFixed(2).replace('.', ',')}</span>
+                  {aluno.parcial_mes > 0 ? (
+                    <span className="text-yellow-600">R$ {aluno.parcial_mes.toFixed(2).replace('.', ',')}</span>
                   ) : (
                     <span className="text-gray-400">-</span>
                   )}
