@@ -38,6 +38,26 @@ export default function Pagamentos() {
   const [loading, setLoading] = useState(false)
   const [baixandoId, setBaixandoId] = useState<string | null>(null)
 
+  async function carregar() {
+    setLoading(true)
+    const dataInicio = obterDatasFiltro(periodo)
+
+    const { data } = await supabase
+      .from('movimentacoes')
+      .select('*')
+      .order('data_vencimento', { ascending: false })
+
+    if (!data) {
+      setMovimentacoes([])
+      setLoading(false)
+      return
+    }
+
+    // Mostrar TODOS os dados para teste
+    setMovimentacoes(data)
+    setLoading(false)
+  }
+
   useEffect(() => {
     supabase.from('alunos').select('id, nome, asaas_customer_id').order('nome').then(({ data }) => {
       setAlunos(data ?? [])
@@ -45,29 +65,7 @@ export default function Pagamentos() {
   }, [])
 
   useEffect(() => {
-    (async () => {
-      setLoading(true)
-      const dataInicio = obterDatasFiltro(periodo)
-
-      const { data, error } = await supabase
-        .from('movimentacoes')
-        .select('*')
-
-      if (error || !data) {
-        setMovimentacoes([])
-        setLoading(false)
-        return
-      }
-
-      // Mostrar TODOS os dados sem filtro por agora
-      const sorted = [...data].sort((a, b) =>
-        new Date(b.data_vencimento || '').getTime() -
-        new Date(a.data_vencimento || '').getTime()
-      )
-
-      setMovimentacoes(sorted)
-      setLoading(false)
-    })()
+    carregar()
   }, [periodo])
 
   async function darBaixa(mov: Movimentacao) {
