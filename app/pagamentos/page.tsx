@@ -55,7 +55,7 @@ export default function Pagamentos() {
     const dataInicio = obterDatasFiltro(periodo)
     supabase
       .from('movimentacoes')
-      .select('*, categorias_financeiro(categoria, subcategoria), alunos(nome), link_pagamento')
+      .select('*, categorias_financeiro(categoria, subcategoria), link_pagamento')
       .eq('tipo', 'Entrada')
       .gte('data_vencimento', dataInicio)
       .order('data_vencimento', { ascending: false })
@@ -79,7 +79,7 @@ export default function Pagamentos() {
     const dataInicio = obterDatasFiltro(periodo)
     supabase
       .from('movimentacoes')
-      .select('*, categorias_financeiro(categoria, subcategoria), alunos(nome), link_pagamento')
+      .select('*, categorias_financeiro(categoria, subcategoria), link_pagamento')
       .eq('tipo', 'Entrada')
       .gte('data_vencimento', dataInicio)
       .order('data_vencimento', { ascending: false })
