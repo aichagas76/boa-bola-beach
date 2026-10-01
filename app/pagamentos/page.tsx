@@ -20,23 +20,23 @@ type Movimentacao = {
   categorias_financeiro: { categoria: string; subcategoria: string | null } | null
 }
 
+function obterDatasFiltro(periodo: string) {
+  const hoje = new Date()
+  hoje.setHours(0, 0, 0, 0)
+  let dataInicio = new Date(hoje)
+
+  if (periodo === 'semana') dataInicio.setDate(dataInicio.getDate() - 7)
+  else if (periodo === 'mes') dataInicio.setDate(1)
+
+  return dataInicio.toISOString().split('T')[0]
+}
+
 export default function Pagamentos() {
   const [alunos, setAlunos] = useState<Aluno[]>([])
   const [periodo, setPeriodo] = useState('semana')
   const [movimentacoes, setMovimentacoes] = useState<Movimentacao[]>([])
   const [loading, setLoading] = useState(false)
   const [baixandoId, setBaixandoId] = useState<string | null>(null)
-
-  function obterDatasFiltro(periodo: string) {
-    const hoje = new Date()
-    hoje.setHours(0, 0, 0, 0)
-    let dataInicio = new Date(hoje)
-
-    if (periodo === 'semana') dataInicio.setDate(dataInicio.getDate() - 7)
-    else if (periodo === 'mes') dataInicio.setDate(1)
-
-    return dataInicio.toISOString().split('T')[0]
-  }
 
   useEffect(() => {
     supabase.from('alunos').select('id, nome, asaas_customer_id').order('nome').then(({ data }) => {
@@ -45,41 +45,39 @@ export default function Pagamentos() {
   }, [])
 
   useEffect(() => {
-    loadPayments()
-  }, [periodo])
+    (async () => {
+      setLoading(true)
+      const dataInicio = obterDatasFiltro(periodo)
 
-  async function loadPayments() {
-    setLoading(true)
-    const dataInicio = obterDatasFiltro(periodo)
+      const { data, error } = await supabase
+        .from('movimentacoes')
+        .select('*')
 
-    const { data, error } = await supabase
-      .from('movimentacoes')
-      .select('*')
+      if (error || !data) {
+        setMovimentacoes([])
+        setLoading(false)
+        return
+      }
 
-    if (error || !data) {
-      setMovimentacoes([])
+      alert(`TEST: ${data.length} registros. Primeiro: tipo="${data[0]?.tipo}", status="${data[0]?.status}"`)
+
+      const filtered = data
+        .filter(m => m.tipo === 'Entrada')
+        .filter(m => m.status !== 'Recebido')
+        .filter(m => {
+          const dataVenc = new Date(m.data_vencimento || '')
+          const dataInicioDt = new Date(dataInicio)
+          return dataVenc >= dataInicioDt
+        })
+        .sort((a, b) =>
+          new Date(b.data_vencimento || '').getTime() -
+          new Date(a.data_vencimento || '').getTime()
+        )
+
+      setMovimentacoes(filtered)
       setLoading(false)
-      return
-    }
-
-    alert(`TEST: ${data.length} registros. Primeiro: tipo="${data[0]?.tipo}", status="${data[0]?.status}"`)
-
-    const filtered = data
-      .filter(m => m.tipo === 'Entrada')
-      .filter(m => m.status !== 'Recebido')
-      .filter(m => {
-        const dataVenc = new Date(m.data_vencimento || '')
-        const dataInicioDt = new Date(dataInicio)
-        return dataVenc >= dataInicioDt
-      })
-      .sort((a, b) =>
-        new Date(b.data_vencimento || '').getTime() -
-        new Date(a.data_vencimento || '').getTime()
-      )
-
-    setMovimentacoes(filtered)
-    setLoading(false)
-  }
+    })()
+  }, [periodo])
 
   async function darBaixa(mov: Movimentacao) {
     setBaixandoId(mov.id)
