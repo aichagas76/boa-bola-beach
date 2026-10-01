@@ -14,7 +14,6 @@ const navItems: SubItem[] = [
   { href: '/pagamentos', label: 'Pagamentos', icon: CreditCard },
   { href: '/atraso', label: 'Em atraso', icon: AlertCircle },
   { href: '/financeiro', label: 'Financeiro', icon: TrendingUp },
-  { href: '/logs', label: 'Logs', icon: ClipboardList },
 ]
 
 const contasItems: SubItem[] = [
@@ -182,6 +181,10 @@ export default function Sidebar() {
         </nav>
 
         <div className="p-4 border-t border-[#1a1a1a] space-y-2">
+          <Link href="/logs" className="flex items-center gap-3 text-xs text-gray-500 hover:text-[#7DC421] transition-colors">
+            <ClipboardList size={16} />
+            <span>Logs</span>
+          </Link>
           {userEmail && <div className="text-xs text-gray-400 truncate px-2 mb-2">{userEmail}</div>}
           <Link href="/configuracoes" className="flex items-center gap-3 text-xs text-gray-500 hover:text-[#7DC421] transition-colors">
             <Settings size={16} />
