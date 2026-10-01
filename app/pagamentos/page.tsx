@@ -75,10 +75,6 @@ export default function Pagamentos() {
         setMovimentacoes(filtrados)
         setLoading(false)
       })
-      .catch(err => {
-        console.error('Catch error:', err)
-        setLoading(false)
-      })
   }, [periodo])
 
   async function darBaixa(mov: Movimentacao) {
