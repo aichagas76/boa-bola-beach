@@ -58,10 +58,7 @@ export default function NovoAluno() {
   }
 
   function mascaraValor(v: string) {
-    v = v.replace(/\D/g, '')
-    if (!v) return ''
-    const num = parseInt(v)
-    return `R$ ${num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    return v.replace(/\D/g, '')
   }
 
   function mascaraCelular(v: string) {
