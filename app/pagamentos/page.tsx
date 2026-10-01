@@ -1,12 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import { registrarLog } from '@/lib/log'
 import { usePagination } from '@/lib/hooks/usePagination'
 import { Pagination } from '@/components/ui/pagination'
-
-type Aluno = { id: string; nome: string; asaas_customer_id: string | null }
 
 type Movimentacao = {
   id: string
@@ -18,55 +16,38 @@ type Movimentacao = {
   descricao: string | null
   link_pagamento: string | null
   categorias_financeiro: { categoria: string; subcategoria: string | null } | null
-}
-
-function obterDatasFiltro(periodo: string) {
-  const hoje = new Date()
-  hoje.setHours(0, 0, 0, 0)
-  let dataInicio = new Date(hoje)
-
-  if (periodo === 'semana') dataInicio.setDate(dataInicio.getDate() - 7)
-  else if (periodo === 'mes') dataInicio.setDate(1)
-
-  return dataInicio.toISOString().split('T')[0]
+  tipo: string
 }
 
 export default function Pagamentos() {
-  const [alunos, setAlunos] = useState<Aluno[]>([])
+  const [allData, setAllData] = useState<Movimentacao[]>([])
   const [periodo, setPeriodo] = useState('semana')
-  const [movimentacoes, setMovimentacoes] = useState<Movimentacao[]>([])
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [baixandoId, setBaixandoId] = useState<string | null>(null)
+
+  function obterDatasFiltro(periodo: string) {
+    const hoje = new Date()
+    hoje.setHours(0, 0, 0, 0)
+    let dataInicio = new Date(hoje)
+
+    if (periodo === 'semana') dataInicio.setDate(dataInicio.getDate() - 7)
+    else if (periodo === 'mes') dataInicio.setDate(1)
+
+    return dataInicio.toISOString().split('T')[0]
+  }
 
   async function carregar() {
     setLoading(true)
-    const dataInicio = obterDatasFiltro(periodo)
 
     const { data } = await supabase
       .from('movimentacoes')
       .select('*')
       .order('data_vencimento', { ascending: false })
+      .limit(1000)
 
-    if (!data) {
-      setMovimentacoes([])
-      setLoading(false)
-      return
-    }
-
-    // Mostrar TODOS os dados para teste
-    setMovimentacoes(data)
+    setAllData(data ?? [])
     setLoading(false)
   }
-
-  useEffect(() => {
-    supabase.from('alunos').select('id, nome, asaas_customer_id').order('nome').then(({ data }) => {
-      setAlunos(data ?? [])
-    })
-  }, [])
-
-  useEffect(() => {
-    carregar()
-  }, [])
 
   async function darBaixa(mov: Movimentacao) {
     setBaixandoId(mov.id)
@@ -80,15 +61,33 @@ export default function Pagamentos() {
     setTimeout(() => window.location.reload(), 800)
   }
 
-  const totalPago = movimentacoes
+  useEffect(() => {
+    carregar()
+  }, [])
+
+  const movimentacoes = useMemo(() => {
+    const dataInicio = obterDatasFiltro(periodo)
+
+    return allData
+      .filter(m => m.tipo === 'Entrada')
+      .filter(m => m.status !== 'Recebido')
+      .filter(m => {
+        const dataVenc = new Date(m.data_vencimento || '')
+        const dataInicioDt = new Date(dataInicio)
+        return dataVenc >= dataInicioDt
+      })
+  }, [allData, periodo])
+
+  const totalPago = allData
+    .filter(m => m.tipo === 'Entrada')
     .filter(m => m.status === 'Recebido')
     .reduce((acc, m) => acc + (m.valor ?? 0), 0)
 
   const totalPendente = movimentacoes
-    .filter(m => m.status !== 'Recebido')
     .reduce((acc, m) => acc + (m.valor ?? 0), 0)
 
-  const ultimoPagamento = movimentacoes
+  const ultimoPagamento = allData
+    .filter(m => m.tipo === 'Entrada')
     .filter(m => m.status === 'Recebido' && m.data_pagamento)
     .sort((a, b) => (b.data_pagamento ?? '').localeCompare(a.data_pagamento ?? ''))[0]
 
