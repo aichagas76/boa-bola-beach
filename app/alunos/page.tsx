@@ -14,6 +14,7 @@ type Aluno = {
   valor_total: number
   modalidades: string[]
   ultimo_pagamento: string | null
+  pago_mes: number
 }
 
 type Matricula = {
@@ -62,17 +63,24 @@ export default function Alunos() {
 
     const { data: pagamentosData } = await supabase
       .from('movimentacoes')
-      .select('aluno_ref_id, data_pagamento')
+      .select('aluno_ref_id, data_pagamento, valor')
       .eq('tipo', 'Entrada')
       .eq('status', 'Recebido')
       .not('aluno_ref_id', 'is', null)
       .order('data_pagamento', { ascending: false })
 
-    // Pega o último pagamento por aluno
+    const mesAtual = new Date().toLocaleDateString('en-CA').substring(0, 7)
+
+    // Último pagamento e soma paga no mês por aluno
     const ultimoPorAluno: Record<string, string> = {}
+    const pagoMesPorAluno: Record<string, number> = {}
     for (const p of (pagamentosData ?? [])) {
-      if (p.aluno_ref_id && !ultimoPorAluno[p.aluno_ref_id]) {
+      if (!p.aluno_ref_id) continue
+      if (!ultimoPorAluno[p.aluno_ref_id]) {
         ultimoPorAluno[p.aluno_ref_id] = p.data_pagamento
+      }
+      if (p.data_pagamento?.startsWith(mesAtual)) {
+        pagoMesPorAluno[p.aluno_ref_id] = (pagoMesPorAluno[p.aluno_ref_id] ?? 0) + (p.valor ?? 0)
       }
     }
 
@@ -80,7 +88,7 @@ export default function Alunos() {
       const mats = (matriculasData ?? []).filter(m => m.aluno_id === a.id)
       const valor_total = mats.reduce((acc, m) => acc + (m.valor ?? 0), 0)
       const modalidades = mats.map(m => m.tipo)
-      return { ...a, valor_total, modalidades, ultimo_pagamento: ultimoPorAluno[a.id] ?? null }
+      return { ...a, valor_total, modalidades, ultimo_pagamento: ultimoPorAluno[a.id] ?? null, pago_mes: pagoMesPorAluno[a.id] ?? 0 }
     })
 
     setAlunos(alunos)
@@ -164,6 +172,15 @@ export default function Alunos() {
         categoria_id: catClubinhoId ?? catAulaId,
       })
       if (error) { alert('Erro ao lançar: ' + error.message); setSalvandoPgto(false); return }
+
+      // Distribui o valor pago pelas matrículas em ordem
+      let restante = valorPago
+      for (const mat of matriculasModal) {
+        if (restante <= 0) break
+        const novoValor = parseFloat(Math.max(mat.valor - restante, 0).toFixed(2))
+        restante = parseFloat((restante - mat.valor).toFixed(2))
+        await supabase.from('matriculas').update({ valor: novoValor }).eq('id', mat.id)
+      }
     } else {
       // Pagamento total — lançamento por matrícula
       for (const mat of matriculasModal) {
@@ -317,16 +334,17 @@ export default function Alunos() {
               <th onClick={() => handleSort('valor_total')} className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide cursor-pointer hover:bg-gray-100 transition-colors">
                 Valor {sortConfig.column === 'valor_total' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
               </th>
+              <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Pago</th>
               <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Status</th>
               <th className="px-4 py-3"></th>
             </tr>
           </thead>
           <tbody>
             {loading && (
-              <tr><td colSpan={8} className="text-center py-8 text-gray-400">Carregando...</td></tr>
+              <tr><td colSpan={9} className="text-center py-8 text-gray-400">Carregando...</td></tr>
             )}
             {!loading && filtrados.length === 0 && (
-              <tr><td colSpan={8} className="text-center py-8 text-gray-400">Nenhum aluno encontrado.</td></tr>
+              <tr><td colSpan={9} className="text-center py-8 text-gray-400">Nenhum aluno encontrado.</td></tr>
             )}
             {filtrados.map((aluno, i) => (
               <tr key={aluno.id} className={`border-b border-gray-100 hover:bg-gray-50 ${i === filtrados.length - 1 ? 'border-0' : ''}`}>
@@ -348,6 +366,15 @@ export default function Alunos() {
                 <td className="px-4 py-3 text-lg">{iconeModalidade(aluno.modalidades)}</td>
                 <td className="px-4 py-3 text-gray-600">
                   {aluno.valor_total > 0 ? `R$ ${aluno.valor_total.toFixed(2).replace('.', ',')}` : '-'}
+                </td>
+                <td className="px-4 py-3 text-xs font-medium">
+                  {aluno.pago_mes >= aluno.valor_total && aluno.pago_mes > 0 ? (
+                    <span className="text-green-600">✓ R$ {aluno.pago_mes.toFixed(2).replace('.', ',')}</span>
+                  ) : aluno.pago_mes > 0 ? (
+                    <span className="text-yellow-600">R$ {aluno.pago_mes.toFixed(2).replace('.', ',')}</span>
+                  ) : (
+                    <span className="text-gray-400">-</span>
+                  )}
                 </td>
                 <td className="px-4 py-3">
                   <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${
