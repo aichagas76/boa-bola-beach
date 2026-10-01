@@ -41,17 +41,18 @@ export function ChartPagamentos({ data, loading }: ChartPagamentosProps) {
           cx="50%"
           cy="50%"
           labelLine={false}
-          label={({ status, percent }) => `${status} ${(percent * 100).toFixed(0)}%`}
+          label={({ name, percent }: any) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}
           outerRadius={80}
           fill="#8884d8"
           dataKey="valor"
+          nameKey="status"
         >
           {data.map((entry, index) => (
             <Cell key={`cell-${index}`} fill={COLORS[entry.status as keyof typeof COLORS] || '#8884d8'} />
           ))}
         </Pie>
         <Tooltip
-          formatter={(value) => `R$ ${value.toFixed(2).replace('.', ',')}`}
+          formatter={(value: any) => `R$ ${(typeof value === 'number' ? value : 0).toFixed(2).replace('.', ',')}`}
           contentStyle={{ backgroundColor: '#f9fafb', border: '1px solid #e5e5e5' }}
         />
         <Legend />

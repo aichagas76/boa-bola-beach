@@ -19,8 +19,11 @@ export function MobileSidebar() {
   ]
 
   const handleLogout = async () => {
-    const { createClientComponentClient } = await import('@supabase/auth-helpers-nextjs')
-    const supabase = createClientComponentClient()
+    const { createBrowserClient } = await import('@supabase/ssr')
+    const supabase = createBrowserClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!
+    )
     await supabase.auth.signOut()
     router.push('/login')
   }

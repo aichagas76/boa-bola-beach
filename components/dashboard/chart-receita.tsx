@@ -34,7 +34,7 @@ export function ChartReceita({ data, loading }: ChartReceitaProps) {
         <XAxis dataKey="modalidade" />
         <YAxis />
         <Tooltip
-          formatter={(value) => `R$ ${value.toFixed(2).replace('.', ',')}`}
+          formatter={(value: any) => `R$ ${(typeof value === 'number' ? value : 0).toFixed(2).replace('.', ',')}`}
           contentStyle={{ backgroundColor: '#f9fafb', border: '1px solid #e5e5e5' }}
         />
         <Legend />
