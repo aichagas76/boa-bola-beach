@@ -55,11 +55,12 @@ export default function Pagamentos() {
     const dataInicio = obterDatasFiltro(periodo)
     supabase
       .from('movimentacoes')
-      .select('*, categorias_financeiro(categoria, subcategoria), link_pagamento')
+      .select('*')
       .eq('tipo', 'Entrada')
       .gte('data_vencimento', dataInicio)
       .order('data_vencimento', { ascending: false })
-      .then(({ data }) => {
+      .then(({ data, error }) => {
+        if (error) console.error('Query error:', error)
         const filtrados = (data ?? []).filter(m => m.status !== 'Recebido')
         setMovimentacoes(filtrados)
         setLoading(false)
