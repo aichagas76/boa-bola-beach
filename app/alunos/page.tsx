@@ -201,9 +201,7 @@ export default function Alunos() {
 
         const isClubinho = mat.tipo === 'Clubinho'
         const categoria_id = isClubinho ? catClubinhoId : catAulaId
-        const descricao = isClubinho
-          ? `Mensalidade Clubinho - ${alunoModal.nome}`
-          : `Mensalidade Aula - ${alunoModal.nome}${mat.professor_nome ? ' - Prof. ' + mat.professor_nome : ''}`
+        const descricao = isClubinho ? 'Clubinho' : 'Aula'
 
         const { error } = await supabase.from('movimentacoes').insert({
           tipo: 'Entrada',

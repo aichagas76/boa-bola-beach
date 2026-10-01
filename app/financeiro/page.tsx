@@ -18,6 +18,8 @@ type Movimentacao = {
   categorias_financeiro: { categoria: string; subcategoria: string } | null
   pessoas: { nome: string } | null
   contas_bancarias: { nome: string } | null
+  professores: { nome: string } | null
+  alunos: { nome: string } | null
 }
 
 export default function Financeiro() {
@@ -35,7 +37,7 @@ export default function Financeiro() {
 
     const { data } = await supabase
       .from('movimentacoes')
-      .select('*, pessoas(nome), contas_bancarias(nome), categorias_financeiro(categoria, subcategoria)')
+      .select('*, categorias_financeiro(categoria, subcategoria), pessoas(nome), contas_bancarias(nome), professores(nome), alunos!movimentacoes_aluno_ref_id_fkey(nome)')
       .order('data', { ascending: false })
       .limit(100)
 
@@ -198,6 +200,8 @@ export default function Financeiro() {
               <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Categoria</th>
               <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Subcategoria</th>
               <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Descrição</th>
+              <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Professor</th>
+              <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Aluno</th>
               <th
                 onClick={() => alternarOrdenacao('status')}
                 className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide cursor-pointer hover:bg-gray-100"
@@ -222,10 +226,10 @@ export default function Financeiro() {
           </thead>
           <tbody>
             {loading && (
-              <tr><td colSpan={10} className="text-center py-8 text-gray-400">Carregando...</td></tr>
+              <tr><td colSpan={12} className="text-center py-8 text-gray-400">Carregando...</td></tr>
             )}
             {!loading && filtrados.length === 0 && (
-              <tr><td colSpan={10} className="text-center py-8 text-gray-400">Nenhuma movimentação encontrada.</td></tr>
+              <tr><td colSpan={12} className="text-center py-8 text-gray-400">Nenhuma movimentação encontrada.</td></tr>
             )}
             {filtrados.map((m, i) => (
               <tr key={m.id} className={`border-b border-gray-100 hover:bg-gray-50 ${i === filtrados.length - 1 ? 'border-0' : ''}`}>
@@ -242,6 +246,8 @@ export default function Financeiro() {
                 <td className="px-4 py-3 text-gray-600">{m.categorias_financeiro?.categoria ?? '-'}</td>
                 <td className="px-4 py-3 text-gray-600">{m.categorias_financeiro?.subcategoria ?? '-'}</td>
                 <td className="px-4 py-3 text-gray-600">{m.descricao || '-'}</td>
+                <td className="px-4 py-3 text-gray-600">{m.professores?.nome ?? '-'}</td>
+                <td className="px-4 py-3 text-gray-600">{m.alunos?.nome ?? '-'}</td>
                 <td className="px-4 py-3">
                   {m.status && (
                     <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${
