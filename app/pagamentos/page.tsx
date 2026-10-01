@@ -63,6 +63,18 @@ export default function Pagamentos() {
     setTimeout(() => window.location.reload(), 800)
   }
 
+  async function deletarPagamento(mov: Movimentacao) {
+    if (!confirm('Deletar este pagamento?')) return
+    setBaixandoId(mov.id)
+    const { error } = await supabase
+      .from('movimentacoes')
+      .delete()
+      .eq('id', mov.id)
+    if (error) { alert('Erro: ' + error.message); setBaixandoId(null); return }
+    await registrarLog('Deletou pagamento', 'movimentacoes', mov.id, 'Pagamento')
+    setTimeout(() => window.location.reload(), 800)
+  }
+
   useEffect(() => {
     supabase.from('alunos').select('id, nome').order('nome').then(({ data }) => {
       setAlunos(data ?? [])
@@ -237,7 +249,7 @@ export default function Pagamentos() {
                         : '-'}
                     </td>
                     <td className="px-4 py-3 text-gray-600 text-xs">{m.forma_pagamento || '-'}</td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3 flex gap-2">
                       {m.status === 'Não recebido' && (
                         <button
                           onClick={() => darBaixa(m)}
@@ -247,6 +259,13 @@ export default function Pagamentos() {
                           {baixandoId === m.id ? '...' : 'Dar baixa'}
                         </button>
                       )}
+                      <button
+                        onClick={() => deletarPagamento(m)}
+                        disabled={baixandoId === m.id}
+                        className="px-3 py-1 text-xs bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50"
+                      >
+                        {baixandoId === m.id ? '...' : 'Deletar'}
+                      </button>
                     </td>
                   </tr>
                 ))}
