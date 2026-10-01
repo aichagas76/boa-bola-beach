@@ -20,8 +20,10 @@ type Movimentacao = {
 }
 
 export default function Pagamentos() {
+  const [alunos, setAlunos] = useState<{ id: string; nome: string }[]>([])
   const [allData, setAllData] = useState<Movimentacao[]>([])
   const [periodo, setPeriodo] = useState('semana')
+  const [alunoFiltro, setAlunoFiltro] = useState<string>('')
   const [loading, setLoading] = useState(true)
   const [baixandoId, setBaixandoId] = useState<string | null>(null)
 
@@ -62,6 +64,9 @@ export default function Pagamentos() {
   }
 
   useEffect(() => {
+    supabase.from('alunos').select('id, nome').order('nome').then(({ data }) => {
+      setAlunos(data ?? [])
+    })
     carregar()
   }, [])
 
@@ -75,7 +80,8 @@ export default function Pagamentos() {
         const dataInicioDt = new Date(dataInicio)
         return dataVenc >= dataInicioDt
       })
-  }, [allData, periodo])
+      .filter(m => !alunoFiltro || m.alunos?.nome === alunoFiltro)
+  }, [allData, periodo, alunoFiltro])
 
   const totalPago = useMemo(() => {
     const dataInicio = obterDatasFiltro(periodo)
@@ -116,38 +122,55 @@ export default function Pagamentos() {
       </div>
 
       <div className="bg-white border border-gray-200 rounded-xl p-4 mb-4">
-        <label className="text-xs text-gray-500 block mb-2">Período</label>
-        <div className="flex gap-2">
-          <button
-            onClick={() => setPeriodo('dia')}
-            className={`px-3 py-1.5 text-xs font-medium rounded-lg transition ${
-              periodo === 'dia'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            Do dia
-          </button>
-          <button
-            onClick={() => setPeriodo('semana')}
-            className={`px-3 py-1.5 text-xs font-medium rounded-lg transition ${
-              periodo === 'semana'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            7 dias
-          </button>
-          <button
-            onClick={() => setPeriodo('mes')}
-            className={`px-3 py-1.5 text-xs font-medium rounded-lg transition ${
-              periodo === 'mes'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            Do mês
-          </button>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="text-xs text-gray-500 block mb-2">Período</label>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setPeriodo('dia')}
+                className={`px-3 py-1.5 text-xs font-medium rounded-lg transition ${
+                  periodo === 'dia'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                Do dia
+              </button>
+              <button
+                onClick={() => setPeriodo('semana')}
+                className={`px-3 py-1.5 text-xs font-medium rounded-lg transition ${
+                  periodo === 'semana'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                7 dias
+              </button>
+              <button
+                onClick={() => setPeriodo('mes')}
+                className={`px-3 py-1.5 text-xs font-medium rounded-lg transition ${
+                  periodo === 'mes'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                Do mês
+              </button>
+            </div>
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 block mb-2">Aluno</label>
+            <select
+              value={alunoFiltro}
+              onChange={e => setAlunoFiltro(e.target.value)}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs bg-white"
+            >
+              <option value="">Todos</option>
+              {alunos.map(a => (
+                <option key={a.id} value={a.nome}>{a.nome}</option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
