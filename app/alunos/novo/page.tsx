@@ -60,7 +60,8 @@ export default function NovoAluno() {
   function mascaraValor(v: string) {
     v = v.replace(/\D/g, '')
     if (!v) return ''
-    return v
+    const num = parseInt(v)
+    return `R$ ${num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
   }
 
   function mascaraCelular(v: string) {
@@ -105,7 +106,7 @@ export default function NovoAluno() {
       await supabase.from('matriculas').insert({
         aluno_id: aluno.id,
         tipo: 'Clubinho',
-        valor: parseFloat(valorClubinho) || 0,
+        valor: parseFloat(valorClubinho.replace(/\D/g, '')) || 0,
       })
     }
 
@@ -114,7 +115,7 @@ export default function NovoAluno() {
         await supabase.from('matriculas').insert({
           aluno_id: aluno.id,
           tipo: 'Aula',
-          valor: parseFloat(a.valor) || 0,
+          valor: parseFloat(a.valor.replace(/\D/g, '')) || 0,
           professor_nome: a.professor || null,
         })
       }
