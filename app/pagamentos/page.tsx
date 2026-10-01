@@ -53,20 +53,30 @@ export default function Pagamentos() {
   useEffect(() => {
     setLoading(true)
     const dataInicio = obterDatasFiltro(periodo)
+    console.log('=== useEffect started ===', { periodo, dataInicio })
+
     supabase
       .from('movimentacoes')
       .select('*')
-      .eq('tipo', 'Entrada')
       .then(({ data, error }) => {
-        console.log('Query result:', { data, error })
+        console.log('Query result:', { data: data?.length, error })
         if (error) console.error('Query error:', error)
-        let filtrados = (data ?? []).filter(m => m.status !== 'Recebido')
-        filtrados = filtrados.filter(m => {
-          const dataVenc = new Date(m.data_vencimento)
-          const dataInicioDt = new Date(dataInicio)
-          return dataVenc >= dataInicioDt
-        })
+
+        let filtrados = (data ?? [])
+          .filter(m => m.tipo === 'Entrada')
+          .filter(m => m.status !== 'Recebido')
+          .filter(m => {
+            const dataVenc = new Date(m.data_vencimento)
+            const dataInicioDt = new Date(dataInicio)
+            return dataVenc >= dataInicioDt
+          })
+
+        console.log('Filtered:', { count: filtrados.length })
         setMovimentacoes(filtrados)
+        setLoading(false)
+      })
+      .catch(err => {
+        console.error('Catch error:', err)
         setLoading(false)
       })
   }, [periodo])
