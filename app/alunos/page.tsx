@@ -162,7 +162,7 @@ export default function Alunos() {
     const catAulaId = catAula?.[0]?.id ?? null
 
     const totalMats = matriculasModal.reduce((acc, m) => acc + (m.valor ?? 0), 0)
-    const valorPago = parseFloat(valorParcial.replace(',', '.')) || 0
+    const valorPago = parseFloat(valorParcial.replace(',', '.') || '0')
 
     if (valorPago > totalMats) {
       alert('Valor pago não pode ser maior que R$ ' + totalMats.toFixed(2).replace('.', ','))
@@ -464,7 +464,16 @@ export default function Alunos() {
                   <input
                     type="text"
                     value={valorParcial}
-                    onChange={e => setValorParcial(mascaraValor(e.target.value))}
+                    onChange={e => {
+                      const totalMats = matriculasModal.reduce((acc, m) => acc + (m.valor ?? 0), 0)
+                      const masked = mascaraValor(e.target.value)
+                      const num = parseFloat(masked.replace(',', '.')) || 0
+                      if (num > totalMats) {
+                        setValorParcial(totalMats.toFixed(2).replace('.', ','))
+                      } else {
+                        setValorParcial(masked)
+                      }
+                    }}
                     className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
                     placeholder="0,00"
                   />
