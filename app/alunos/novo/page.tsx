@@ -122,17 +122,25 @@ export default function NovoAluno() {
     }
 
     try {
+      console.log('📤 Criando cliente Asaas...', { nome: form.nome, cpf: form.cpf })
       const asaasRes = await fetch('/api/asaas/criar-cliente', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ nome: form.nome, celular: form.celular, cpf: form.cpf, aluno_id: aluno.id })
       })
       const asaasData = await asaasRes.json()
+      console.log('📥 Resposta Asaas:', asaasData)
+
       if (asaasData.id) {
+        console.log('✅ Cliente criado! ID:', asaasData.id)
         await supabase.from('alunos').update({ asaas_customer_id: asaasData.id }).eq('id', aluno.id)
+      } else if (asaasData.error) {
+        console.error('❌ Erro Asaas:', asaasData.error)
+        alert('Erro ao criar cliente Asaas: ' + asaasData.error)
       }
     } catch (e) {
-      console.error('Erro Asaas:', e)
+      console.error('❌ Erro na requisição Asaas:', e)
+      alert('Erro ao criar cliente Asaas')
     }
 
     await registrarLog('Cadastrou aluno', 'alunos', aluno.id, form.nome)
