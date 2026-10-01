@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { registrarLog } from '@/lib/log'
 import Link from 'next/link'
+import { usePagination } from '@/lib/hooks/usePagination'
+import { Pagination } from '@/components/ui/pagination'
 
 type Aluno = {
   id: string
@@ -287,6 +289,8 @@ export default function Alunos() {
     return matchBusca && matchFiltro
   }))
 
+  const pagination = usePagination(filtrados, 15)
+
   const contadores = {
     Todos: alunos.length,
     Ativo: alunos.filter(a => a.status === 'Ativo').length,
@@ -368,10 +372,11 @@ export default function Alunos() {
         ))}
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden overflow-x-auto">
-        <table className="w-full text-sm min-w-full">
-          <thead>
-            <tr className="bg-gray-50 border-b border-gray-200">
+      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-full">
+            <thead>
+              <tr className="bg-gray-50 border-b border-gray-200">
               <th onClick={() => handleSort('nome')} className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide cursor-pointer hover:bg-gray-100 transition-colors">
                 Nome {sortConfig.column === 'nome' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
               </th>
@@ -399,8 +404,8 @@ export default function Alunos() {
             {!loading && filtrados.length === 0 && (
               <tr><td colSpan={12} className="text-center py-8 text-gray-400">Nenhum aluno encontrado.</td></tr>
             )}
-            {filtrados.map((aluno, i) => (
-              <tr key={aluno.id} className={`border-b border-gray-100 hover:bg-gray-50 ${i === filtrados.length - 1 ? 'border-0' : ''}`}>
+            {pagination.paginatedItems.map((aluno, i) => (
+              <tr key={aluno.id} className={`border-b border-gray-100 hover:bg-gray-50 ${i === pagination.paginatedItems.length - 1 && pagination.currentPage === pagination.totalPages ? 'border-0' : ''}`}>
                 <td className="px-4 py-3 font-medium text-gray-900">{aluno.nome}</td>
                 <td className="px-4 py-3 text-gray-600">
                   <a href={`https://wa.me/55${aluno.celular.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2">
@@ -465,7 +470,16 @@ export default function Alunos() {
               </tr>
             ))}
           </tbody>
-        </table>
+            </table>
+        </div>
+
+        <Pagination
+          currentPage={pagination.currentPage}
+          totalPages={pagination.totalPages}
+          totalItems={pagination.totalItems}
+          pageSize={pagination.pageSize}
+          onPageChange={pagination.goToPage}
+        />
       </div>
 
       {/* Modal pagamento */}

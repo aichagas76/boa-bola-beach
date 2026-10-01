@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Trash2, Edit2, Check, X } from 'lucide-react'
+import { usePagination } from '@/lib/hooks/usePagination'
+import { Pagination } from '@/components/ui/pagination'
 
 type Professor = {
   id: string
@@ -97,6 +99,8 @@ export default function Professores() {
     carregar()
   }
 
+  const pagination = usePagination(professores, 15)
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
@@ -165,24 +169,25 @@ export default function Professores() {
       )}
 
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="bg-gray-50 border-b border-gray-200">
-              <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Nome</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Celular</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Comissão %</th>
-              <th className="px-4 py-3"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading && (
-              <tr><td colSpan={4} className="text-center py-8 text-gray-400">Carregando...</td></tr>
-            )}
-            {!loading && professores.length === 0 && (
-              <tr><td colSpan={4} className="text-center py-8 text-gray-400">Nenhum professor cadastrado.</td></tr>
-            )}
-            {professores.map((p, i) => (
-              <tr key={p.id} className={`border-b border-gray-100 hover:bg-gray-50 ${i === professores.length - 1 ? 'border-0' : ''}`}>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-gray-50 border-b border-gray-200">
+                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Nome</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Celular</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Comissão %</th>
+                <th className="px-4 py-3"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading && (
+                <tr><td colSpan={4} className="text-center py-8 text-gray-400">Carregando...</td></tr>
+              )}
+              {!loading && professores.length === 0 && (
+                <tr><td colSpan={4} className="text-center py-8 text-gray-400">Nenhum professor cadastrado.</td></tr>
+              )}
+              {pagination.paginatedItems.map((p, i) => (
+                <tr key={p.id} className={`border-b border-gray-100 hover:bg-gray-50 ${i === pagination.paginatedItems.length - 1 && pagination.currentPage === pagination.totalPages ? 'border-0' : ''}`}>
                 <td className="px-4 py-3 font-medium text-gray-900">{p.nome}</td>
                 <td className="px-4 py-3 text-gray-600">{p.celular ? mascaraCelular(p.celular) : '-'}</td>
                 <td className="px-4 py-3 text-gray-600">
@@ -198,8 +203,17 @@ export default function Professores() {
                 </td>
               </tr>
             ))}
-          </tbody>
-        </table>
+            </tbody>
+          </table>
+        </div>
+
+        <Pagination
+          currentPage={pagination.currentPage}
+          totalPages={pagination.totalPages}
+          totalItems={pagination.totalItems}
+          pageSize={pagination.pageSize}
+          onPageChange={pagination.goToPage}
+        />
       </div>
     </div>
   )

@@ -4,6 +4,8 @@ import { useEffect, useState, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
 import { Trash2, Edit2, Check } from 'lucide-react'
+import { usePagination } from '@/lib/hooks/usePagination'
+import { Pagination } from '@/components/ui/pagination'
 type Movimentacao = {
   id: string
   data: string
@@ -124,6 +126,8 @@ export default function Financeiro() {
     }
   }, [movimentacoes, filtroTipo, filtroPeriodo, ordenacao])
 
+  const pagination = usePagination(filtrados, 20)
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
@@ -212,16 +216,17 @@ export default function Financeiro() {
         </div>
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden overflow-x-auto">
-        <table className="w-full text-sm min-w-full">
-          <thead>
-            <tr className="bg-gray-50 border-b border-gray-200">
-              <th
-                onClick={() => alternarOrdenacao('data')}
-                className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide cursor-pointer hover:bg-gray-100"
-              >
-                Data {ordenacao.coluna === 'data' && (ordenacao.direcao === 'asc' ? '↑' : '↓')}
-              </th>
+      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-full">
+            <thead>
+              <tr className="bg-gray-50 border-b border-gray-200">
+                <th
+                  onClick={() => alternarOrdenacao('data')}
+                  className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide cursor-pointer hover:bg-gray-100"
+                >
+                  Data {ordenacao.coluna === 'data' && (ordenacao.direcao === 'asc' ? '↑' : '↓')}
+                </th>
               <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Tipo</th>
               <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Categoria</th>
               <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Subcategoria</th>
@@ -249,17 +254,17 @@ export default function Financeiro() {
                 Valor {ordenacao.coluna === 'valor' && (ordenacao.direcao === 'asc' ? '↑' : '↓')}
               </th>
               <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Ações</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading && (
-              <tr><td colSpan={13} className="text-center py-8 text-gray-400">Carregando...</td></tr>
-            )}
-            {!loading && filtrados.length === 0 && (
-              <tr><td colSpan={13} className="text-center py-8 text-gray-400">Nenhuma movimentação encontrada.</td></tr>
-            )}
-            {filtrados.map((m, i) => (
-              <tr key={m.id} className={`border-b border-gray-100 hover:bg-gray-50 ${i === filtrados.length - 1 ? 'border-0' : ''}`}>
+              </tr>
+            </thead>
+            <tbody>
+              {loading && (
+                <tr><td colSpan={13} className="text-center py-8 text-gray-400">Carregando...</td></tr>
+              )}
+              {!loading && filtrados.length === 0 && (
+                <tr><td colSpan={13} className="text-center py-8 text-gray-400">Nenhuma movimentação encontrada.</td></tr>
+              )}
+              {pagination.paginatedItems.map((m, i) => (
+                <tr key={m.id} className={`border-b border-gray-100 hover:bg-gray-50 ${i === pagination.paginatedItems.length - 1 && pagination.currentPage === pagination.totalPages ? 'border-0' : ''}`}>
                 <td className="px-4 py-3 text-gray-600">
                   {new Date(m.data + 'T00:00:00').toLocaleDateString('pt-BR')}
                 </td>
@@ -315,8 +320,17 @@ export default function Financeiro() {
                 </td>
               </tr>
             ))}
-          </tbody>
-        </table>
+            </tbody>
+          </table>
+        </div>
+
+        <Pagination
+          currentPage={pagination.currentPage}
+          totalPages={pagination.totalPages}
+          totalItems={pagination.totalItems}
+          pageSize={pagination.pageSize}
+          onPageChange={pagination.goToPage}
+        />
       </div>
     </div>
   )
