@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { registrarLog } from '@/lib/log'
 
-type Aluno = { id: string; nome: string }
+type Aluno = { id: string; nome: string; asaas_customer_id: string | null }
 
 type Movimentacao = {
   id: string
@@ -14,6 +14,7 @@ type Movimentacao = {
   data_pagamento: string | null
   forma_pagamento: string | null
   descricao: string | null
+  link_pagamento: string | null
   categorias_financeiro: { categoria: string; subcategoria: string | null } | null
 }
 
@@ -25,7 +26,7 @@ export default function Pagamentos() {
   const [baixandoId, setBaixandoId] = useState<string | null>(null)
 
   useEffect(() => {
-    supabase.from('alunos').select('id, nome').order('nome').then(({ data }) => {
+    supabase.from('alunos').select('id, nome, asaas_customer_id').order('nome').then(({ data }) => {
       setAlunos(data ?? [])
     })
   }, [])
@@ -35,7 +36,7 @@ export default function Pagamentos() {
     setLoading(true)
     supabase
       .from('movimentacoes')
-      .select('*, categorias_financeiro(categoria, subcategoria)')
+      .select('*, categorias_financeiro(categoria, subcategoria), link_pagamento')
       .eq('aluno_ref_id', alunoSelecionado)
       .eq('tipo', 'Entrada')
       .order('data_vencimento', { ascending: false })
@@ -144,15 +145,17 @@ export default function Pagamentos() {
                   <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Status</th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Data Pagamento</th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Forma Pagamento</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">ID Asaas</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Link</th>
                   <th className="px-4 py-3"></th>
                 </tr>
               </thead>
               <tbody>
                 {loading && (
-                  <tr><td colSpan={7} className="text-center py-8 text-gray-400">Carregando...</td></tr>
+                  <tr><td colSpan={9} className="text-center py-8 text-gray-400">Carregando...</td></tr>
                 )}
                 {!loading && movimentacoes.length === 0 && (
-                  <tr><td colSpan={7} className="text-center py-8 text-gray-400">Nenhum pagamento encontrado.</td></tr>
+                  <tr><td colSpan={9} className="text-center py-8 text-gray-400">Nenhum pagamento encontrado.</td></tr>
                 )}
                 {movimentacoes.map((m, i) => (
                   <tr key={m.id} className={`border-b border-gray-100 hover:bg-gray-50 ${i === movimentacoes.length - 1 ? 'border-0' : ''}`}>
@@ -174,6 +177,14 @@ export default function Pagamentos() {
                         : '-'}
                     </td>
                     <td className="px-4 py-3 text-gray-600 text-xs">{m.forma_pagamento || '-'}</td>
+                    <td className="px-4 py-3 text-gray-500 text-xs font-mono">
+                      {alunos.find(a => a.id === alunoSelecionado)?.asaas_customer_id ?? '-'}
+                    </td>
+                    <td className="px-4 py-3 text-xs">
+                      {m.link_pagamento
+                        ? <a href={m.link_pagamento} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">🔗 Pagar</a>
+                        : <span className="text-gray-400">-</span>}
+                    </td>
                     <td className="px-4 py-3">
                       {m.status === 'Não recebido' && (
                         <button
