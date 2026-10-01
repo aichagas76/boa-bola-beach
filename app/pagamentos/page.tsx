@@ -57,7 +57,7 @@ export default function Pagamentos() {
       .from('movimentacoes')
       .select('*, categorias_financeiro(categoria, subcategoria), link_pagamento')
       .eq('tipo', 'Entrada')
-      .eq('status', 'Não recebido')
+      .neq('status', 'Recebido')
       .gte('data_vencimento', dataInicio)
       .order('data_vencimento', { ascending: false })
       .then(({ data }) => {
