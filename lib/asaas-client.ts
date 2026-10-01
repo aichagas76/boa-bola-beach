@@ -63,14 +63,18 @@ export class AsaasClient {
       options.body = JSON.stringify(data)
     }
 
+    console.log(`[Asaas] ${method} ${endpoint}`)
     const response = await fetch(url, options)
 
     if (!response.ok) {
       const error = await response.json()
-      throw new Error(`Asaas Error: ${error.errors?.[0]?.detail || error.message}`)
+      console.error(`[Asaas Error] Status: ${response.status}`, error)
+      throw new Error(`Asaas Error: ${error.errors?.[0]?.detail || error.message || JSON.stringify(error)}`)
     }
 
-    return response.json()
+    const result = await response.json()
+    console.log(`[Asaas Success] ${endpoint}`, result)
+    return result
   }
 
   async createCustomer(params: CreateCustomerParams) {
