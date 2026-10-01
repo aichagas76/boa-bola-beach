@@ -407,7 +407,7 @@ export default function Alunos() {
                 const restante = total - pago
                 return (
                   <div>
-                    <label className="text-xs text-gray-500 block mb-1">Valor a pagar</label>
+                    <label className="text-xs text-gray-500 block mb-1">Valor pago</label>
                     <input
                       type="text"
                       value={valorParcial}
@@ -430,7 +430,7 @@ export default function Alunos() {
               {/* Valor a pagar */}
               {matriculasModal.length > 0 && (
                 <div>
-                  <label className="text-xs text-gray-500 block mb-1">Valor a pagar</label>
+                  <label className="text-xs text-gray-500 block mb-1">Valor pago</label>
                   <input
                     type="text"
                     value={valorParcial}
