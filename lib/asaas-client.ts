@@ -55,7 +55,7 @@ export class AsaasClient {
       method,
       headers: {
         'Content-Type': 'application/json',
-        'access_token': this.apiKey,
+        'Authorization': `Bearer ${this.apiKey}`,
       },
     }
 
