@@ -51,6 +51,7 @@ export default function EditarAluno() {
 
   const [aulas, setAulas] = useState(false)
   const [aulasList, setAulasList] = useState<{ id: string | null, professor: string, valor: string }[]>([{ id: null, professor: '', valor: '' }])
+  const [professores, setProfessores] = useState<{ id: string; nome: string }[]>([])
 
   function mascaraCPF(v: string) {
     v = v.replace(/\D/g, '').slice(0, 11)
@@ -100,6 +101,9 @@ export default function EditarAluno() {
           setAulasList(al.map(x => ({ id: x.id, professor: x.professor_nome ?? '', valor: x.valor?.toString().replace('.', ',') ?? '' })))
         }
       }
+
+      const { data: profs } = await supabase.from('professores').select('id, nome').eq('ativo', true).order('nome')
+      setProfessores(profs ?? [])
 
       setLoading(false)
     }
@@ -281,8 +285,11 @@ export default function EditarAluno() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="text-xs text-gray-500 block mb-1">Professor</label>
-                    <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white" placeholder="Nome do professor"
-                      value={aula.professor} onChange={e => updateAula(i, 'professor', e.target.value)} />
+                    <select className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"
+                      value={aula.professor} onChange={e => updateAula(i, 'professor', e.target.value)}>
+                      <option value="">Selecionar professor</option>
+                      {professores.map(p => <option key={p.id} value={p.nome}>{p.nome}</option>)}
+                    </select>
                   </div>
                   <div>
                     <label className="text-xs text-gray-500 block mb-1">Valor mensal</label>

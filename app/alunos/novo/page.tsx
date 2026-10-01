@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 
@@ -28,6 +28,12 @@ export default function NovoAluno() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [cpfValido, setCpfValido] = useState<boolean | null>(null)
+  const [professores, setProfessores] = useState<{ id: string; nome: string }[]>([])
+
+  useEffect(() => {
+    supabase.from('professores').select('id, nome').eq('ativo', true).order('nome')
+      .then(({ data }) => setProfessores(data ?? []))
+  }, [])
 
   const [form, setForm] = useState({
     nome: '',
@@ -236,8 +242,11 @@ export default function NovoAluno() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="text-xs text-gray-500 block mb-1">Professor</label>
-                    <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white" placeholder="Nome do professor"
-                      value={aula.professor} onChange={e => updateAula(i, 'professor', e.target.value)} />
+                    <select className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"
+                      value={aula.professor} onChange={e => updateAula(i, 'professor', e.target.value)}>
+                      <option value="">Selecionar professor</option>
+                      {professores.map(p => <option key={p.id} value={p.nome}>{p.nome}</option>)}
+                    </select>
                   </div>
                   <div>
                     <label className="text-xs text-gray-500 block mb-1">Valor mensal</label>
