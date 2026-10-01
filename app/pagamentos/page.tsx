@@ -75,18 +75,8 @@ export default function Pagamentos() {
     if (error) { alert('Erro: ' + error.message); setBaixandoId(null); return }
     await registrarLog('Baixa pagamento', 'movimentacoes', mov.id, 'Pagamento')
 
-    // Recarregar dados
-    const dataInicio = obterDatasFiltro(periodo)
-    supabase
-      .from('movimentacoes')
-      .select('*, categorias_financeiro(categoria, subcategoria), link_pagamento')
-      .eq('tipo', 'Entrada')
-      .gte('data_vencimento', dataInicio)
-      .order('data_vencimento', { ascending: false })
-      .then(({ data }) => {
-        setMovimentacoes(data ?? [])
-        setBaixandoId(null)
-      })
+    // Reload página para atualizar
+    setTimeout(() => window.location.reload(), 800)
   }
 
   const totalPago = movimentacoes
