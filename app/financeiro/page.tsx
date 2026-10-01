@@ -26,10 +26,9 @@ export default function Financeiro() {
   const [movimentacoes, setMovimentacoes] = useState<Movimentacao[]>([])
   const [loading, setLoading] = useState(true)
   const [filtroTipo, setFiltroTipo] = useState('Todos')
-  const [filtroPeriodo, setFiltroPeriodo] = useState(() => {
-    const hoje = new Date()
-    return `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`
-  })
+  const [filtroMes, setFiltroMes] = useState(() => String(new Date().getMonth() + 1).padStart(2, '0'))
+  const [filtroAno, setFiltroAno] = useState(() => String(new Date().getFullYear()))
+  const filtroPeriodo = filtroMes && filtroAno ? `${filtroAno}-${filtroMes}` : ''
   const [ordenacao, setOrdenacao] = useState<{ coluna: 'data' | 'valor' | 'status' | 'vencimento', direcao: 'asc' | 'desc' }>({ coluna: 'data', direcao: 'desc' })
 
   async function carregar() {
@@ -163,13 +162,40 @@ export default function Financeiro() {
       <div className="bg-white border border-gray-200 rounded-xl p-6 mb-6">
         <div className="flex gap-4">
           <div>
-            <label className="text-xs text-gray-500 block mb-1">Período</label>
-            <input
-              type="month"
-              value={filtroPeriodo}
-              onChange={e => setFiltroPeriodo(e.target.value)}
+            <label className="text-xs text-gray-500 block mb-1">Mês</label>
+            <select
+              value={filtroMes}
+              onChange={e => setFiltroMes(e.target.value)}
               className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"
-            />
+            >
+              <option value="">Todos</option>
+              <option value="01">Janeiro</option>
+              <option value="02">Fevereiro</option>
+              <option value="03">Março</option>
+              <option value="04">Abril</option>
+              <option value="05">Maio</option>
+              <option value="06">Junho</option>
+              <option value="07">Julho</option>
+              <option value="08">Agosto</option>
+              <option value="09">Setembro</option>
+              <option value="10">Outubro</option>
+              <option value="11">Novembro</option>
+              <option value="12">Dezembro</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Ano</label>
+            <select
+              value={filtroAno}
+              onChange={e => setFiltroAno(e.target.value)}
+              className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"
+            >
+              <option value="">Todos</option>
+              <option value="2024">2024</option>
+              <option value="2025">2025</option>
+              <option value="2026">2026</option>
+              <option value="2027">2027</option>
+            </select>
           </div>
           <div>
             <label className="text-xs text-gray-500 block mb-1">Tipo</label>
