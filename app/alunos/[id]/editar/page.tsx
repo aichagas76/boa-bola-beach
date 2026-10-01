@@ -63,10 +63,11 @@ export default function EditarAluno() {
   }
 
   function mascaraValor(v: string) {
-    v = v.replace(/\D/g, '')
-    if (!v) return ''
-    v = (parseInt(v) / 100).toFixed(2)
-    return v.replace('.', ',')
+    // Remove tudo que não é número
+    const num = v.replace(/\D/g, '')
+    if (!num) return ''
+    // Retorna apenas os números
+    return num
   }
 
   function mascaraCelular(v: string) {
@@ -168,7 +169,7 @@ export default function EditarAluno() {
     }
 
     await registrarLog('Editou aluno', 'alunos', id, form.nome)
-    router.push(`/alunos/${id}`)
+    router.push('/alunos')
   }
 
   if (loading) return <div className="text-gray-400 text-sm">Carregando...</div>
