@@ -17,6 +17,8 @@ export async function POST(req: NextRequest) {
     })
   })
 
+  console.log('Asaas status:', response.status)
   const data = await response.json()
+  console.log('Asaas response:', JSON.stringify(data))
   return NextResponse.json(data)
 }
