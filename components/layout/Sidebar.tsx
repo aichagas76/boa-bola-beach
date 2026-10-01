@@ -7,7 +7,7 @@ import { LayoutDashboard, Users, CreditCard, AlertCircle, Settings, Menu, X, Tre
 
 type SubItem = { href: string; label: string; icon: LucideIcon; color?: string }
 
-const navItems = [
+const navItems: SubItem[] = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/alunos', label: 'Alunos', icon: Users },
   { href: '/pagamentos', label: 'Pagamentos', icon: CreditCard },
