@@ -247,6 +247,21 @@ export default function Alunos() {
     carregar()
   }
 
+  async function excluirAluno(id: string, nome: string) {
+    if (!confirm('Excluir ' + nome + '? Esta ação não pode ser desfeita.')) return
+
+    const { error: errMat } = await supabase.from('matriculas').delete().eq('aluno_id', id)
+    if (errMat) { alert('Erro ao excluir matrículas: ' + errMat.message); return }
+
+    const { error: errMov } = await supabase.from('movimentacoes').delete().eq('aluno_ref_id', id)
+    if (errMov) { alert('Erro ao excluir movimentações: ' + errMov.message); return }
+
+    const { error: errAlu } = await supabase.from('alunos').delete().eq('id', id)
+    if (errAlu) { alert('Erro ao excluir aluno: ' + errAlu.message); return }
+
+    carregar()
+  }
+
   const filtrados = sortAlunos(alunos.filter(a => {
     const matchBusca = a.nome?.toLowerCase().includes(busca.toLowerCase()) ||
       a.cpf?.includes(busca) ||
@@ -411,12 +426,7 @@ export default function Alunos() {
                     Ver
                   </Link>
                   <button
-                    onClick={async () => {
-                      if (!confirm(`Excluir ${aluno.nome}? Esta ação não pode ser desfeita.`)) return
-                      await supabase.from('matriculas').delete().eq('aluno_id', aluno.id)
-                      await supabase.from('alunos').delete().eq('id', aluno.id)
-                      carregar()
-                    }}
+                    onClick={() => excluirAluno(aluno.id, aluno.nome)}
                     title="Excluir aluno"
                     className="text-lg hover:scale-110 transition-transform"
                   >
