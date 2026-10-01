@@ -62,6 +62,8 @@ export default function Pagamentos() {
       return
     }
 
+    alert(`TEST: ${data.length} registros. Primeiro: tipo="${data[0]?.tipo}", status="${data[0]?.status}"`)
+
     const filtered = data
       .filter(m => m.tipo === 'Entrada')
       .filter(m => m.status !== 'Recebido')
