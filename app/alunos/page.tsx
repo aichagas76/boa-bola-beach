@@ -172,15 +172,6 @@ export default function Alunos() {
         categoria_id: catClubinhoId ?? catAulaId,
       })
       if (error) { alert('Erro ao lançar: ' + error.message); setSalvandoPgto(false); return }
-
-      // Distribui o valor pago pelas matrículas em ordem
-      let restante = valorPago
-      for (const mat of matriculasModal) {
-        if (restante <= 0) break
-        const novoValor = parseFloat(Math.max(mat.valor - restante, 0).toFixed(2))
-        restante = parseFloat((restante - mat.valor).toFixed(2))
-        await supabase.from('matriculas').update({ valor: novoValor }).eq('id', mat.id)
-      }
     } else {
       // Pagamento total — lançamento por matrícula
       for (const mat of matriculasModal) {
