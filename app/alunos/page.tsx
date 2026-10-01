@@ -13,6 +13,7 @@ type Aluno = {
   data_vencimento: string
   valor_total: number
   modalidades: string[]
+  professores_nomes: string
   ultimo_pagamento: string | null
   pago_mes: number
   parcial_mes: number
@@ -60,7 +61,7 @@ export default function Alunos() {
 
     const { data: matriculasData } = await supabase
       .from('matriculas')
-      .select('aluno_id, tipo, valor')
+      .select('aluno_id, tipo, valor, professor_nome')
 
     const { data: pagamentosData } = await supabase
       .from('movimentacoes')
@@ -93,8 +94,9 @@ export default function Alunos() {
       const mats = (matriculasData ?? []).filter(m => m.aluno_id === a.id)
       const valor_total = mats.reduce((acc, m) => acc + (m.valor ?? 0), 0)
       const modalidades = mats.map(m => m.tipo)
+      const professores_nomes = mats.filter(m => m.tipo === 'Aula' && m.professor_nome).map(m => m.professor_nome).join(' / ') || '-'
       return {
-        ...a, valor_total, modalidades,
+        ...a, valor_total, modalidades, professores_nomes,
         ultimo_pagamento: ultimoPorAluno[a.id] ?? null,
         pago_mes: pagoMesPorAluno[a.id] ?? 0,
         parcial_mes: parcialMesPorAluno[a.id] ?? 0,
@@ -359,6 +361,7 @@ export default function Alunos() {
               </th>
               <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Últ. Pagamento</th>
               <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Modalidade</th>
+              <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Professor</th>
               <th onClick={() => handleSort('valor_total')} className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide cursor-pointer hover:bg-gray-100 transition-colors">
                 Valor {sortConfig.column === 'valor_total' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
               </th>
@@ -369,10 +372,10 @@ export default function Alunos() {
           </thead>
           <tbody>
             {loading && (
-              <tr><td colSpan={9} className="text-center py-8 text-gray-400">Carregando...</td></tr>
+              <tr><td colSpan={10} className="text-center py-8 text-gray-400">Carregando...</td></tr>
             )}
             {!loading && filtrados.length === 0 && (
-              <tr><td colSpan={9} className="text-center py-8 text-gray-400">Nenhum aluno encontrado.</td></tr>
+              <tr><td colSpan={10} className="text-center py-8 text-gray-400">Nenhum aluno encontrado.</td></tr>
             )}
             {filtrados.map((aluno, i) => (
               <tr key={aluno.id} className={`border-b border-gray-100 hover:bg-gray-50 ${i === filtrados.length - 1 ? 'border-0' : ''}`}>
@@ -392,6 +395,7 @@ export default function Alunos() {
                   {aluno.ultimo_pagamento ? new Date(aluno.ultimo_pagamento + 'T00:00:00').toLocaleDateString('pt-BR') : '-'}
                 </td>
                 <td className="px-4 py-3 text-lg">{iconeModalidade(aluno.modalidades)}</td>
+                <td className="px-4 py-3 text-gray-600 text-xs">{aluno.professores_nomes}</td>
                 <td className="px-4 py-3 text-gray-600">
                   {aluno.valor_total > 0 ? `R$ ${aluno.valor_total.toFixed(2).replace('.', ',')}` : '-'}
                 </td>
