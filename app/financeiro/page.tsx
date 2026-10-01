@@ -35,7 +35,7 @@ export default function Financeiro() {
 
     const { data } = await supabase
       .from('movimentacoes')
-      .select('*, pessoas(nome), contas_bancarias(nome)')
+      .select('*, pessoas(nome), contas_bancarias(nome), categorias_financeiro(categoria, subcategoria)')
       .order('data', { ascending: false })
       .limit(100)
 
@@ -195,6 +195,8 @@ export default function Financeiro() {
                 Data {ordenacao.coluna === 'data' && (ordenacao.direcao === 'asc' ? '↑' : '↓')}
               </th>
               <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Tipo</th>
+              <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Categoria</th>
+              <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Subcategoria</th>
               <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Descrição</th>
               <th
                 onClick={() => alternarOrdenacao('status')}
@@ -220,10 +222,10 @@ export default function Financeiro() {
           </thead>
           <tbody>
             {loading && (
-              <tr><td colSpan={8} className="text-center py-8 text-gray-400">Carregando...</td></tr>
+              <tr><td colSpan={10} className="text-center py-8 text-gray-400">Carregando...</td></tr>
             )}
             {!loading && filtrados.length === 0 && (
-              <tr><td colSpan={8} className="text-center py-8 text-gray-400">Nenhuma movimentação encontrada.</td></tr>
+              <tr><td colSpan={10} className="text-center py-8 text-gray-400">Nenhuma movimentação encontrada.</td></tr>
             )}
             {filtrados.map((m, i) => (
               <tr key={m.id} className={`border-b border-gray-100 hover:bg-gray-50 ${i === filtrados.length - 1 ? 'border-0' : ''}`}>
@@ -237,6 +239,8 @@ export default function Financeiro() {
                     {m.tipo}
                   </span>
                 </td>
+                <td className="px-4 py-3 text-gray-600">{m.categorias_financeiro?.categoria ?? '-'}</td>
+                <td className="px-4 py-3 text-gray-600">{m.categorias_financeiro?.subcategoria ?? '-'}</td>
                 <td className="px-4 py-3 text-gray-600">{m.descricao || '-'}</td>
                 <td className="px-4 py-3">
                   {m.status && (
