@@ -55,7 +55,7 @@ export class AsaasClient {
       method,
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${this.apiKey}`,
+        'access_token': this.apiKey,
       },
     }
 
@@ -131,7 +131,7 @@ let clientInstance: AsaasClient | null = null
 
 export function getAsaasClient(): AsaasClient {
   if (!clientInstance) {
-    const apiKey = process.env.ASAAS_API_KEY
+    const apiKey = process.env.ASAAS_API_KEY?.trim()
     if (!apiKey) {
       throw new Error('ASAAS_API_KEY não configurada nas variáveis de ambiente')
     }
