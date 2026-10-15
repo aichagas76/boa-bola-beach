@@ -96,6 +96,7 @@ export default function Alunos() {
       .from('pagamentos')
       .select('aluno_id, link_pagamento')
       .not('link_pagamento', 'is', null)
+      .neq('status', 'Pago')
       .order('data_vencimento', { ascending: false })
 
     const { data: matriculasData } = await supabase
@@ -284,6 +285,15 @@ export default function Alunos() {
       venc.setMonth(venc.getMonth() + 1)
       const novaData = venc.toISOString().split('T')[0]
       await supabase.from('alunos').update({ data_vencimento: novaData }).eq('id', alunoModal.id)
+    }
+
+    // Pagamento total: baixa as cobranças em aberto do aluno (some o link "Pagar")
+    if (!isParcial) {
+      await supabase
+        .from('pagamentos')
+        .update({ status: 'Pago', data_pagamento: formPgto.data_pagamento })
+        .eq('aluno_id', alunoModal.id)
+        .neq('status', 'Pago')
     }
 
     await registrarLog('Pagamento manual', 'alunos', alunoModal.id, alunoModal.nome)

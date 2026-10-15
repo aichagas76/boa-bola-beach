@@ -123,7 +123,7 @@ export default function DetalheAluno() {
 
   const clubinho = matriculas.find(m => m.tipo === 'Clubinho')
   const aulasList = matriculas.filter(m => m.tipo === 'Aula')
-  const pagamentoComLink = pagamentos.find(p => p.link_pagamento)
+  const pagamentoComLink = pagamentos.find(p => p.link_pagamento && p.status !== 'Pago')
 
   return (
     <div className="max-w-2xl">
