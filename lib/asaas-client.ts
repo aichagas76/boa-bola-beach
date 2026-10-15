@@ -5,7 +5,7 @@
 
 interface CreateCustomerParams {
   name: string
-  email: string
+  email?: string
   phone?: string
   cpf?: string
 }
@@ -20,17 +20,13 @@ interface CreatePaymentParams {
 
 interface AsaasPayment {
   id: string
-  status: 'PENDING' | 'RECEIVED' | 'OVERDUE' | 'CANCELLED'
+  status: string
   value: number
   netValue?: number
   dueDate: string
   confirmationDate?: string
-  paymentUrl: string
-  customer: {
-    id: string
-    name: string
-    email: string
-  }
+  invoiceUrl: string
+  customer: string
 }
 
 export class AsaasClient {
@@ -80,24 +76,21 @@ export class AsaasClient {
   async createCustomer(params: CreateCustomerParams) {
     return this.request('/customers', 'POST', {
       name: params.name,
-      email: params.email,
-      phone: params.phone,
-      cpfCnpj: params.cpf,
+      email: params.email || undefined,
+      mobilePhone: params.phone?.replace(/\D/g, '') || undefined,
+      cpfCnpj: params.cpf?.replace(/\D/g, '') || undefined,
       notificationDisabled: false,
     })
   }
 
   async createPayment(params: CreatePaymentParams): Promise<AsaasPayment> {
     return this.request('/payments', 'POST', {
-      customerId: params.customerId,
+      customer: params.customerId,
       value: params.value,
       dueDate: params.dueDate,
       description: params.description,
       externalReference: params.reference,
-      billingType: 'PIX', // PIX é mais rápido no Brasil
-      reminders: {
-        status: 'ENABLED',
-      },
+      billingType: 'UNDEFINED', // cliente escolhe PIX, boleto ou cartão na página
     })
   }
 

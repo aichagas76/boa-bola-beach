@@ -43,6 +43,7 @@ export default function DetalheAluno() {
   const [pagamentos, setPagamentos] = useState<Pagamento[]>([])
   const [loading, setLoading] = useState(true)
   const [copiado, setCopiado] = useState<string | null>(null)
+  const [gerando, setGerando] = useState<string | null>(null)
 
   useEffect(() => {
     async function carregar() {
@@ -70,6 +71,24 @@ export default function DetalheAluno() {
     }
     carregar()
   }, [id])
+
+  async function gerarCobranca(pagamentoId: string) {
+    setGerando(pagamentoId)
+    try {
+      const res = await fetch('/api/pagamentos/criar-asaas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pagamentoId }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Erro ao gerar cobrança')
+      setPagamentos(prev => prev.map(p => (p.id === pagamentoId ? { ...p, link_pagamento: data.paymentUrl } : p)))
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Erro ao gerar cobrança')
+    } finally {
+      setGerando(null)
+    }
+  }
 
   function copiarLink(link: string, id: string) {
     navigator.clipboard.writeText(link)
@@ -221,6 +240,14 @@ export default function DetalheAluno() {
                           className="text-blue-600 hover:underline"
                         >
                           {copiado === p.id ? '✓ Copiado' : '🔗 Copiar link'}
+                        </button>
+                      ) : p.status !== 'Pago' ? (
+                        <button
+                          onClick={() => gerarCobranca(p.id)}
+                          disabled={gerando === p.id}
+                          className="text-blue-600 hover:underline disabled:text-gray-400"
+                        >
+                          {gerando === p.id ? 'Gerando...' : '💳 Gerar cobrança'}
                         </button>
                       ) : (
                         <span className="text-gray-400">-</span>

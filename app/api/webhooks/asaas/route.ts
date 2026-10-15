@@ -1,90 +1,59 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
+import { getSupabaseAdmin } from '@/lib/supabase-admin'
+
+export const runtime = 'nodejs'
+
+// Evento Asaas -> status usado no app (pagamentos: Pago/Pendente/Atrasado)
+const EVENT_STATUS: Record<string, string> = {
+  PAYMENT_RECEIVED: 'Pago',
+  PAYMENT_CONFIRMED: 'Pago',
+  PAYMENT_OVERDUE: 'Atrasado',
+  PAYMENT_RESTORED: 'Pendente',
+  PAYMENT_REFUNDED: 'Pendente',
+}
 
 export async function POST(request: NextRequest) {
+  // Token configurado no painel do Asaas (opcional, mas recomendado)
+  const expected = process.env.ASAAS_WEBHOOK_TOKEN
+  if (expected && request.headers.get('asaas-access-token') !== expected) {
+    return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
+  }
+
   try {
-    const body = await request.json()
-    const { event, payment } = body
-
-    // Validar webhook
-    if (!event || !payment) {
-      return NextResponse.json(
-        { error: 'Webhook inválido' },
-        { status: 400 }
-      )
+    const { event, payment } = await request.json()
+    if (!event || !payment?.id) {
+      return NextResponse.json({ error: 'Webhook inválido' }, { status: 400 })
     }
 
-    const cookieStore = await cookies()
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
-      {
-        cookies: {
-          getAll() {
-            return cookieStore.getAll()
-          },
-          setAll(cookiesToSet) {
-            cookiesToSet.forEach(({ name, value, options }) => {
-              cookieStore.set(name, value, options)
-            })
-          },
-        },
-      }
-    )
+    const status = EVENT_STATUS[event]
+    if (!status) return NextResponse.json({ success: true, ignored: event })
 
-    let status = 'pendente'
-    let syncStatus = 'synced'
+    const db = getSupabaseAdmin()
+    const pago = status === 'Pago'
+    const dataPagamento = pago
+      ? payment.paymentDate || payment.confirmedDate || new Date().toLocaleDateString('en-CA')
+      : null
 
-    // Mapear status do Asaas para o banco
-    switch (payment.status) {
-      case 'RECEIVED':
-        status = 'recebido'
-        break
-      case 'PENDING':
-        status = 'pendente'
-        break
-      case 'OVERDUE':
-        status = 'vencido'
-        break
-      case 'CANCELLED':
-        status = 'cancelado'
-        break
-    }
-
-    // Atualizar pagamento no banco
-    const { error } = await supabase
+    const { error } = await db
       .from('pagamentos')
       .update({
         status,
-        sync_status: syncStatus,
-        data_pagamento: payment.confirmationDate || null,
+        data_pagamento: dataPagamento,
+        valor_pago: pago ? payment.value : null,
+        meio_pagamento: payment.billingType ?? null,
+        id_pagamento_asaas: payment.id,
       })
-      .eq('asaas_payment_id', payment.id)
+      .eq('id_cobranca_asaas', payment.id)
 
     if (error) {
       console.error('Erro ao atualizar pagamento via webhook:', error)
-      return NextResponse.json(
-        { error: 'Erro ao atualizar pagamento' },
-        { status: 500 }
-      )
+      return NextResponse.json({ error: 'Erro ao atualizar pagamento' }, { status: 500 })
     }
 
-    // Log do webhook
-    console.log(`[Asaas Webhook] Pagamento ${payment.id} - Status: ${status}`)
-
-    return NextResponse.json({
-      success: true,
-      message: 'Webhook processado com sucesso',
-    })
+    console.log(`[Asaas Webhook] ${event} ${payment.id} -> ${status}`)
+    return NextResponse.json({ success: true })
   } catch (error) {
     console.error('Erro ao processar webhook Asaas:', error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Erro desconhecido' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Erro ao processar' }, { status: 500 })
   }
 }
-
-// Webhook não precisa de autenticação (Asaas chama diretamente)
-export const runtime = 'nodejs'
