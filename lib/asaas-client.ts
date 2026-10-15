@@ -124,10 +124,12 @@ let clientInstance: AsaasClient | null = null
 
 export function getAsaasClient(): AsaasClient {
   if (!clientInstance) {
-    const apiKey = process.env.ASAAS_API_KEY?.trim()
+    let apiKey = process.env.ASAAS_API_KEY?.trim()
     if (!apiKey) {
       throw new Error('ASAAS_API_KEY não configurada nas variáveis de ambiente')
     }
+    // Chaves Asaas começam com "$aact_"; o "$" costuma se perder em .env/cópia
+    if (apiKey.startsWith('aact_')) apiKey = `$${apiKey}`
     clientInstance = new AsaasClient(apiKey)
   }
   return clientInstance
