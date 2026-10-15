@@ -72,17 +72,28 @@ export default function DetalheAluno() {
     carregar()
   }, [id])
 
-  async function gerarCobranca(pagamentoId: string) {
-    setGerando(pagamentoId)
+  async function gerarCobranca(pagamentoId?: string) {
+    let payload: Record<string, unknown> = { pagamentoId }
+    if (!pagamentoId) {
+      const sugerido = matriculas.reduce((acc, m) => acc + (m.valor ?? 0), 0)
+      const txt = window.prompt('Valor da cobrança (R$):', sugerido ? String(sugerido) : '')
+      if (!txt) return
+      const valor = Number(txt.replace(',', '.'))
+      if (!valor || valor <= 0) return alert('Valor inválido')
+      const hoje = new Date().toLocaleDateString('en-CA')
+      const venc = aluno?.data_vencimento && aluno.data_vencimento >= hoje ? aluno.data_vencimento : hoje
+      payload = { alunoId: id, valor, dataVencimento: venc }
+    }
+    setGerando(pagamentoId ?? 'novo')
     try {
       const res = await fetch('/api/pagamentos/criar-asaas', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pagamentoId }),
+        body: JSON.stringify(payload),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Erro ao gerar cobrança')
-      setPagamentos(prev => prev.map(p => (p.id === pagamentoId ? { ...p, link_pagamento: data.paymentUrl } : p)))
+      window.location.reload()
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Erro ao gerar cobrança')
     } finally {
@@ -165,7 +176,15 @@ export default function DetalheAluno() {
                 >
                   {copiado === 'header' ? '✓ Copiado' : '🔗 Copiar link'}
                 </button>
-              ) : '-'}
+              ) : (
+                <button
+                  onClick={() => gerarCobranca()}
+                  disabled={gerando === 'novo'}
+                  className="text-blue-600 hover:underline disabled:text-gray-400"
+                >
+                  {gerando === 'novo' ? 'Gerando...' : '💳 Gerar cobrança'}
+                </button>
+              )}
             </div>
           </div>
         </div>

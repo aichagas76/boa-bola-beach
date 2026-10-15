@@ -6,9 +6,10 @@ import { getSupabaseAdmin } from '@/lib/supabase-admin'
 
 export async function POST(request: NextRequest) {
   try {
-    const { pagamentoId } = await request.json()
-    if (!pagamentoId) {
-      return NextResponse.json({ error: 'pagamentoId obrigatório' }, { status: 400 })
+    const body = await request.json()
+    let pagamentoId: string | undefined = body.pagamentoId
+    if (!pagamentoId && !body.alunoId) {
+      return NextResponse.json({ error: 'pagamentoId ou alunoId obrigatório' }, { status: 400 })
     }
 
     // Exige usuário logado
@@ -22,6 +23,31 @@ export async function POST(request: NextRequest) {
     if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
 
     const db = getSupabaseAdmin()
+
+    // Sem pagamento existente: cria um registro novo para o aluno
+    if (!pagamentoId) {
+      const valor = Number(body.valor)
+      if (!valor || valor <= 0) {
+        return NextResponse.json({ error: 'Valor inválido' }, { status: 400 })
+      }
+      const venc: string = body.dataVencimento || new Date().toLocaleDateString('en-CA')
+      const { data: novo, error: novoError } = await db
+        .from('pagamentos')
+        .insert({
+          aluno_id: body.alunoId,
+          valor,
+          data_vencimento: venc,
+          competencia: venc.slice(0, 7),
+          status: 'Pendente',
+        })
+        .select('id')
+        .single()
+      if (novoError || !novo) {
+        console.error('Erro ao criar pagamento:', novoError)
+        return NextResponse.json({ error: 'Erro ao criar pagamento' }, { status: 500 })
+      }
+      pagamentoId = novo.id
+    }
 
     const { data: pag } = await db
       .from('pagamentos')
