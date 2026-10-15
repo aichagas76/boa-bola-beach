@@ -49,6 +49,34 @@ export default function Alunos() {
   })
   const [salvandoPgto, setSalvandoPgto] = useState(false)
   const [valorParcial, setValorParcial] = useState('')
+  const [gerandoId, setGerandoId] = useState<string | null>(null)
+
+  async function gerarCobranca(aluno: Aluno) {
+    const txt = window.prompt(
+      `Valor da cobrança de ${aluno.nome} (R$):`,
+      aluno.valor_total ? String(aluno.valor_total) : ''
+    )
+    if (!txt) return
+    const valor = Number(txt.replace(',', '.'))
+    if (!valor || valor <= 0) return alert('Valor inválido')
+    const hoje = new Date().toLocaleDateString('en-CA')
+    const venc = aluno.data_vencimento && aluno.data_vencimento >= hoje ? aluno.data_vencimento : hoje
+    setGerandoId(aluno.id)
+    try {
+      const res = await fetch('/api/pagamentos/criar-asaas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ alunoId: aluno.id, valor, dataVencimento: venc }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Erro ao gerar cobrança')
+      await carregar()
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Erro ao gerar cobrança')
+    } finally {
+      setGerandoId(null)
+    }
+  }
 
   function mascaraValor(v: string) {
     v = v.replace(/\D/g, '')
@@ -440,7 +468,13 @@ export default function Alunos() {
                   {aluno.link_pagamento ? (
                     <a href={aluno.link_pagamento} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">🔗 Pagar</a>
                   ) : (
-                    <span className="text-gray-400">-</span>
+                    <button
+                      onClick={() => gerarCobranca(aluno)}
+                      disabled={gerandoId === aluno.id}
+                      className="text-blue-600 hover:underline disabled:text-gray-400"
+                    >
+                      {gerandoId === aluno.id ? 'Gerando...' : '💳 Gerar cobrança'}
+                    </button>
                   )}
                 </td>
                 <td className="px-4 py-3">
