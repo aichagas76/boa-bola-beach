@@ -77,6 +77,27 @@ export async function POST(request: NextRequest) {
           console.error('Erro ao lançar entrada via webhook:', movError)
           return NextResponse.json({ error: 'Erro ao lançar entrada' }, { status: 500 })
         }
+
+        // Pagamento total: avança o vencimento do aluno em 1 mês (igual ao pagamento manual)
+        const alunoId = data[0].aluno_id
+        const { data: mats } = await db.from('matriculas').select('valor').eq('aluno_id', alunoId)
+        const totalMats = (mats ?? []).reduce((acc, m) => acc + (m.valor ?? 0), 0)
+        const valorPago = Number(payment.value ?? data[0].valor)
+        if (totalMats > 0 && valorPago >= totalMats) {
+          const { data: aluno } = await db
+            .from('alunos')
+            .select('data_vencimento')
+            .eq('id', alunoId)
+            .single()
+          if (aluno?.data_vencimento) {
+            const [y, m, d] = aluno.data_vencimento.split('-').map(Number)
+            const proximo = new Date(Date.UTC(y, m, d)) // mês seguinte (m já é base 1)
+            await db
+              .from('alunos')
+              .update({ data_vencimento: proximo.toISOString().split('T')[0] })
+              .eq('id', alunoId)
+          }
+        }
       }
     }
 
