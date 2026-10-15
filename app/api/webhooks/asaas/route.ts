@@ -12,6 +12,14 @@ const EVENT_STATUS: Record<string, string> = {
   PAYMENT_REFUNDED: 'Pendente',
 }
 
+// Rótulo da forma de pagamento quando a cobrança é paga pelo Asaas
+const FORMA_ASAAS: Record<string, string> = {
+  PIX: 'PIX Asaas',
+  BOLETO: 'Boleto Asaas',
+  CREDIT_CARD: 'Cartão Asaas',
+  DEBIT_CARD: 'Cartão Asaas',
+}
+
 export async function POST(request: NextRequest) {
   // Token configurado no painel do Asaas (opcional, mas recomendado)
   const expected = process.env.ASAAS_WEBHOOK_TOKEN
@@ -30,6 +38,7 @@ export async function POST(request: NextRequest) {
 
     const db = getSupabaseAdmin()
     const pago = status === 'Pago'
+    const formaPagamento = FORMA_ASAAS[payment.billingType] ?? 'Asaas'
     const dataPagamento = pago
       ? payment.paymentDate || payment.confirmedDate || new Date().toLocaleDateString('en-CA')
       : null
@@ -40,7 +49,7 @@ export async function POST(request: NextRequest) {
         status,
         data_pagamento: dataPagamento,
         valor_pago: pago ? payment.value : null,
-        meio_pagamento: payment.billingType ?? null,
+        meio_pagamento: formaPagamento,
         id_pagamento_asaas: payment.id,
       })
       .eq('id_cobranca_asaas', payment.id)
@@ -64,7 +73,7 @@ export async function POST(request: NextRequest) {
           tipo: 'Entrada',
           descricao: 'Cobrança Asaas',
           valor: payment.value ?? data[0].valor,
-          forma_pagamento: payment.billingType ?? null,
+          forma_pagamento: formaPagamento,
           data: dataPagamento,
           data_pagamento: dataPagamento,
           data_vencimento: payment.dueDate ?? null,
