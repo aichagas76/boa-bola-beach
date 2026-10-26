@@ -196,3 +196,10 @@ td, th { font-variant-numeric: tabular-nums; }
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
+
+/* Telas de lista com letras cerca de 15% maiores (14px -> 16px, 12px -> 13,8px, cabeçalhos 13px -> 15px).
+   Fica fora das camadas do Tailwind para valer sobre as classes text-sm / text-xs / text-th de dentro. */
+.ampliar-15 .text-sm { font-size: 1rem; line-height: 1.5rem; }
+.ampliar-15 .text-xs { font-size: 0.8625rem; line-height: 1.25rem; }
+.ampliar-15 .text-th { font-size: 0.9375rem; line-height: 1.375rem; }
+.ampliar-15 .text-label { font-size: 0.9375rem; line-height: 1.375rem; }

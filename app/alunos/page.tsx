@@ -282,6 +282,9 @@ export default function Alunos() {
     carregar()
   }
 
+  // A coluna Parcial só aparece quando algum aluno tem pagamento parcial no mês (poupa largura da tabela)
+  const temParcial = alunos.some(a => a.parcial_mes > 0)
+
   const filtrados = ordenar(alunos.filter(a => {
     const matchBusca = a.nome?.toLowerCase().includes(busca.toLowerCase()) ||
       a.cpf?.includes(busca) ||
@@ -312,7 +315,7 @@ export default function Alunos() {
   }
 
   return (
-    <div>
+    <div className="ampliar-15">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-page-title text-gray-900">Alunos</h1>
         <Link
@@ -354,7 +357,7 @@ export default function Alunos() {
           <table className="w-full text-sm whitespace-nowrap">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
-                {COLUNAS.map(c => {
+                {COLUNAS.filter(c => c.id !== 'parcial' || temParcial).map(c => {
                   const ativa = ordem.coluna === c.id
                   return (
                     <th
@@ -432,13 +435,13 @@ export default function Alunos() {
                 <td className="px-2 py-2.5 text-gray-600">
                   {aluno.valor_total > 0 ? `R$ ${aluno.valor_total.toFixed(2).replace('.', ',')}` : '-'}
                 </td>
-                <td className="px-2 py-2.5 text-sm font-medium">
+                {temParcial && <td className="px-2 py-2.5 text-sm font-medium">
                   {aluno.parcial_mes > 0 ? (
                     <span className="text-yellow-600">R$ {aluno.parcial_mes.toFixed(2).replace('.', ',')}</span>
                   ) : (
                     <span className="text-gray-400">-</span>
                   )}
-                </td>
+                </td>}
                 <td className="px-2 py-2.5">
                   {aluno.asaas_customer_id ? (
                     <button
