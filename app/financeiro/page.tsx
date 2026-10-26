@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
+import { useUnidade } from '@/components/layout/UnidadeProvider'
 import Link from 'next/link'
 import { Trash2, Edit2, Check } from 'lucide-react'
 import { usePagination } from '@/lib/hooks/usePagination'
@@ -25,6 +26,7 @@ type Movimentacao = {
 }
 
 export default function Financeiro() {
+  const { unidadeId } = useUnidade()
   const [movimentacoes, setMovimentacoes] = useState<Movimentacao[]>([])
   const [loading, setLoading] = useState(true)
   const [filtroTipo, setFiltroTipo] = useState('Todos')
@@ -34,11 +36,13 @@ export default function Financeiro() {
   const [ordenacao, setOrdenacao] = useState<{ coluna: 'data' | 'valor' | 'status' | 'vencimento', direcao: 'asc' | 'desc' }>({ coluna: 'data', direcao: 'desc' })
 
   async function carregar() {
+    if (!unidadeId) return
     setLoading(true)
 
     const { data } = await supabase
       .from('movimentacoes')
       .select('*, categorias_financeiro(categoria, subcategoria), pessoas(nome), contas_bancarias(nome), professores(nome), alunos!movimentacoes_aluno_ref_id_fkey(nome)')
+      .eq('unidade_id', unidadeId)
       .order('data', { ascending: false })
       .limit(100)
 
@@ -94,7 +98,7 @@ export default function Financeiro() {
 
   useEffect(() => {
     carregar()
-  }, [])
+  }, [unidadeId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const { filtrados, totais } = useMemo(() => {
     let filtrados = movimentacoes.filter(m => {

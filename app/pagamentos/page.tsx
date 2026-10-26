@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
+import { useUnidade } from '@/components/layout/UnidadeProvider'
 import { registrarLog } from '@/lib/log'
 import { usePagination } from '@/lib/hooks/usePagination'
 import { Pagination } from '@/components/ui/pagination'
@@ -21,6 +22,7 @@ type Movimentacao = {
 }
 
 export default function Pagamentos() {
+  const { unidadeId } = useUnidade()
   const [alunos, setAlunos] = useState<{ id: string; nome: string }[]>([])
   const [allData, setAllData] = useState<Movimentacao[]>([])
   const [periodo, setPeriodo] = useState('semana')
@@ -41,11 +43,13 @@ export default function Pagamentos() {
   }
 
   async function carregar() {
+    if (!unidadeId) return
     setLoading(true)
 
     const { data } = await supabase
       .from('movimentacoes')
       .select('*, alunos!movimentacoes_aluno_ref_id_fkey(nome)')
+      .eq('unidade_id', unidadeId)
       .order('data_vencimento', { ascending: false })
       .limit(1000)
 
@@ -92,7 +96,7 @@ export default function Pagamentos() {
       setAlunos(data ?? [])
     })
     carregar()
-  }, [])
+  }, [unidadeId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const movimentacoes = useMemo(() => {
     const dataInicio = obterDatasFiltro(periodo)

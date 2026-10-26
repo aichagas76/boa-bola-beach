@@ -4,82 +4,55 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { registrarLog } from '@/lib/log'
-import { useFormValidation } from '@/lib/hooks/useFormValidation'
-import { FormInput, FormSelect, FormError } from '@/components/ui/form-error'
-import { validarCPF, validarCelular, VALIDATION_MESSAGES } from '@/lib/validators'
+import { validarDadosAluno } from '@/lib/aluno-validacao'
+import DadosPessoais, { cpfJaCadastrado, type FormAluno } from '@/components/alunos/DadosPessoais'
 import EsportesForm from '@/components/alunos/EsportesForm'
-import { carregarCatalogo, estadosIniciais, salvarMatriculas, type Unidade } from '@/lib/esportes-db'
+import { useUnidade } from '@/components/layout/UnidadeProvider'
+import { carregarCatalogo, estadosIniciais, salvarMatriculas } from '@/lib/esportes-db'
 import type { EstadoEsporte } from '@/lib/esportes'
 
 export default function NovoAluno() {
   const router = useRouter()
+  const { unidade, unidadeId } = useUnidade()
   const [loading, setLoading] = useState(false)
+  const [tentou, setTentou] = useState(false)
+  const [cpfDuplicado, setCpfDuplicado] = useState(false)
   const [professores, setProfessores] = useState<{ id: string; nome: string }[]>([])
-  const [unidades, setUnidades] = useState<Unidade[]>([])
   const [estados, setEstados] = useState<EstadoEsporte[]>([])
 
-  const rules = {
-    nome: { required: true, minLength: 3, message: 'Nome deve ter no mínimo 3 caracteres' },
-    cpf: {
-      validate: (v: string) => !v || validarCPF(v) ? true : 'CPF inválido',
-    },
-    celular: {
-      validate: (v: string) => !v || validarCelular(v) ? true : 'Celular inválido',
-    },
-    data_vencimento: { required: true, message: 'Data de vencimento é obrigatória' },
-  }
-
-  const validation = useFormValidation(rules)
-
-  useEffect(() => {
-    supabase.from('professores').select('id, nome').eq('ativo', true).order('nome')
-      .then(({ data }) => setProfessores(data ?? []))
-    carregarCatalogo(supabase).then(({ esportes, unidades }) => {
-      setUnidades(unidades)
-      const padrao = unidades[0]?.id ?? ''
-      setForm(f => ({ ...f, unidade_id: f.unidade_id || padrao }))
-      setEstados(estadosIniciais(esportes, padrao))
-    })
-  }, [])
-
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<FormAluno>({
     nome: '',
     celular: '',
     cpf: '',
     sexo: '',
     data_nascimento: '',
-    data_cadastro: new Date().toISOString().split('T')[0],
+    data_cadastro: new Date().toLocaleDateString('en-CA'),
     data_vencimento: '',
-    endereco: '',
     observacao: '',
     status: 'Ativo',
-    unidade_id: '',
   })
 
-  function mascaraCPF(v: string) {
-    v = v.replace(/\D/g, '').slice(0, 11)
-    if (v.length > 9) v = v.replace(/(\d{3})(\d{3})(\d{3})(\d{0,2})/, '$1.$2.$3-$4')
-    else if (v.length > 6) v = v.replace(/(\d{3})(\d{3})(\d{0,3})/, '$1.$2.$3')
-    else if (v.length > 3) v = v.replace(/(\d{3})(\d{0,3})/, '$1.$2')
-    return v
-  }
+  useEffect(() => {
+    supabase.from('professores').select('id, nome').eq('ativo', true).order('nome')
+      .then(({ data }) => setProfessores(data ?? []))
+    carregarCatalogo(supabase).then(({ esportes }) => setEstados(estadosIniciais(esportes, '')))
+  }, [])
 
-  function mascaraCelular(v: string) {
-    v = v.replace(/\D/g, '').slice(0, 11)
-    if (v.length > 6) v = v.replace(/(\d{2})(\d{5})(\d{0,4})/, '($1) $2-$3')
-    else if (v.length > 2) v = v.replace(/(\d{2})(\d{0,5})/, '($1) $2')
-    return v
-  }
+  const erros = validarDadosAluno(form, { cpfJaCadastrado: cpfDuplicado })
 
   async function salvar() {
-    if (!validation.validate(form)) return
-    if (!form.unidade_id) return alert('Seu login ainda não tem unidade liberada. Fale com quem administra o sistema.')
+    setTentou(true)
+    if (!unidadeId) return alert('Seu login ainda não tem unidade liberada. Fale com quem administra o sistema.')
+    // Confere o CPF de novo na hora de salvar (outra pessoa pode ter cadastrado enquanto isso)
+    const duplicado = form.cpf ? await cpfJaCadastrado(form.cpf) : false
+    setCpfDuplicado(duplicado)
+    if (Object.keys(validarDadosAluno(form, { cpfJaCadastrado: duplicado })).length > 0) return
 
     setLoading(true)
 
     const { data: aluno, error } = await supabase
       .from('alunos')
-      .insert({ ...form, unidade_id: form.unidade_id || undefined })
+      .insert({ ...form, unidade_id: unidadeId })
       .select()
       .single()
 
@@ -89,28 +62,25 @@ export default function NovoAluno() {
       return
     }
 
-    const erroMatriculas = await salvarMatriculas(supabase, aluno.id, estados, [])
+    const erroMatriculas = await salvarMatriculas(supabase, aluno.id, estados.map(e => ({ ...e, unidadeId })), [])
     if (erroMatriculas) alert('Aluno salvo, mas houve erro nas modalidades: ' + erroMatriculas)
 
     try {
-      console.log('📤 Criando cliente Asaas...', { nome: form.nome, cpf: form.cpf })
       const asaasRes = await fetch('/api/asaas/criar-cliente', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ nome: form.nome, celular: form.celular, cpf: form.cpf, aluno_id: aluno.id })
       })
       const asaasData = await asaasRes.json()
-      console.log('📥 Resposta Asaas:', asaasData)
 
       if (asaasData.id) {
-        console.log('✅ Cliente criado! ID:', asaasData.id)
         await supabase.from('alunos').update({ asaas_customer_id: asaasData.id }).eq('id', aluno.id)
       } else if (asaasData.error) {
-        console.error('❌ Erro Asaas:', asaasData.error)
+        console.error('Erro Asaas:', asaasData.error)
         alert('Erro ao criar cliente Asaas: ' + asaasData.error)
       }
     } catch (e) {
-      console.error('❌ Erro na requisição Asaas:', e)
+      console.error('Erro na requisição Asaas:', e)
       alert('Erro ao criar cliente Asaas')
     }
 
@@ -119,129 +89,18 @@ export default function NovoAluno() {
   }
 
   return (
-    <div className="max-w-2xl">
-      <div className="flex items-center gap-3 mb-6">
+    <div className="max-w-4xl">
+      <div className="flex items-center gap-3 mb-4">
         <button onClick={() => router.back()} className="text-sm text-gray-500 hover:text-gray-700">← Voltar</button>
         <h1 className="text-page-title text-gray-900">Novo aluno</h1>
+        {unidade && <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">{unidade.nome}</span>}
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-xl p-6 mb-4">
-        <div className="text-th text-gray-400 mb-4">Dados pessoais</div>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="col-span-2">
-            <FormInput
-              label="Nome completo"
-              placeholder="Nome completo do aluno"
-              value={form.nome}
-              error={validation.getFieldError('nome')}
-              touched={validation.touched.nome}
-              onChange={e => {
-                setForm({ ...form, nome: e.target.value })
-                validation.handleChange('nome', e.target.value)
-              }}
-              onBlur={() => validation.handleBlur('nome')}
-            />
-          </div>
-          <div>
-            <FormInput
-              label="Celular"
-              placeholder="(00) 9 0000-0000"
-              value={form.celular}
-              error={validation.getFieldError('celular')}
-              touched={validation.touched.celular}
-              onChange={e => {
-                const masked = mascaraCelular(e.target.value)
-                setForm({ ...form, celular: masked })
-                validation.handleChange('celular', masked)
-              }}
-              onBlur={() => validation.handleBlur('celular')}
-            />
-          </div>
-          <div>
-            <FormInput
-              label="CPF"
-              placeholder="000.000.000-00"
-              value={form.cpf}
-              error={validation.getFieldError('cpf')}
-              touched={validation.touched.cpf}
-              onChange={e => {
-                const masked = mascaraCPF(e.target.value)
-                setForm({ ...form, cpf: masked })
-                validation.handleChange('cpf', masked)
-              }}
-              onBlur={() => validation.handleBlur('cpf')}
-            />
-          </div>
-          <div>
-            <FormSelect
-              label="Sexo"
-              value={form.sexo}
-              onChange={e => setForm({ ...form, sexo: e.target.value })}
-            >
-              <option value="">Selecionar</option>
-              <option value="M">Masculino</option>
-              <option value="F">Feminino</option>
-            </FormSelect>
-          </div>
-          <div>
-            <label className="text-label text-gray-500 block mb-1">Data de nascimento</label>
-            <input type="date" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
-              value={form.data_nascimento} onChange={e => setForm({ ...form, data_nascimento: e.target.value })} />
-          </div>
-          <div>
-            <label className="text-label text-gray-500 block mb-1">Data de cadastro</label>
-            <input type="date" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
-              value={form.data_cadastro} onChange={e => setForm({ ...form, data_cadastro: e.target.value })} />
-          </div>
-          <div>
-            <FormInput
-              type="date"
-              label="Data de vencimento"
-              value={form.data_vencimento}
-              error={validation.getFieldError('data_vencimento')}
-              touched={validation.touched.data_vencimento}
-              onChange={e => {
-                setForm({ ...form, data_vencimento: e.target.value })
-                validation.handleChange('data_vencimento', e.target.value)
-              }}
-              onBlur={() => validation.handleBlur('data_vencimento')}
-            />
-          </div>
-          <div className="col-span-2 flex items-center justify-between">
-            <div>
-              <div className="text-label text-gray-500 mb-1">Status</div>
-              <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${form.status === 'Ativo' ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                {form.status}
-              </span>
-            </div>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <span className="text-sm text-gray-600">Ativo</span>
-              <div className="relative">
-                <input type="checkbox" className="sr-only" checked={form.status === 'Ativo'}
-                  onChange={e => setForm({ ...form, status: e.target.checked ? 'Ativo' : 'Inativo' })} />
-                <div className={`w-9 h-5 rounded-full transition-colors ${form.status === 'Ativo' ? 'bg-green-500' : 'bg-gray-300'}`}></div>
-                <div className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${form.status === 'Ativo' ? 'translate-x-4' : ''}`}></div>
-              </div>
-            </label>
-          </div>
-        </div>
-      </div>
+      <DadosPessoais form={form} onChange={setForm} erros={erros} mostrarErros={tentou} onCpfDuplicado={setCpfDuplicado} />
 
-      <div className="bg-white border border-gray-200 rounded-xl p-6 mb-6">
-        <div className="text-th text-gray-400 mb-4">Esportes e modalidades</div>
-        {unidades.length > 1 && (
-          <div className="mb-4">
-            <label className="text-label text-gray-500 block mb-1">Unidade principal (a cobrança sai por ela)</label>
-            <select
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"
-              value={form.unidade_id}
-              onChange={e => setForm({ ...form, unidade_id: e.target.value })}
-            >
-              {unidades.map(u => <option key={u.id} value={u.id}>{u.nome}</option>)}
-            </select>
-          </div>
-        )}
-        <EsportesForm estados={estados} onChange={setEstados} unidades={unidades} professores={professores} />
+      <div className="bg-white border border-gray-200 rounded-xl p-4 mb-4">
+        <div className="text-th text-gray-400 mb-3">Esportes e modalidades</div>
+        <EsportesForm estados={estados} onChange={setEstados} professores={professores} />
       </div>
 
       <div className="flex justify-end gap-3">

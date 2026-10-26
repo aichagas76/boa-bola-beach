@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { useUnidade } from '@/components/layout/UnidadeProvider'
 import { registrarLog } from '@/lib/log'
 
 type CategoriaFinanceiro = {
@@ -18,6 +19,7 @@ type AlunoRef = { id: string; nome: string }
 type Professor = { id: string; nome: string }
 
 export default function NovoFinanceiro() {
+  const { unidadeId } = useUnidade()
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [todasCategorias, setTodasCategorias] = useState<CategoriaFinanceiro[]>([])
@@ -57,7 +59,7 @@ export default function NovoFinanceiro() {
       const { data: pess } = await supabase.from('pessoas').select('*').order('nome')
       setPessoas(pess ?? [])
 
-      const { data: cont } = await supabase.from('contas_bancarias').select('*').order('nome')
+      const { data: cont } = await supabase.from('contas_bancarias').select('*').eq('unidade_id', unidadeId).order('nome')
       setContas(cont ?? [])
 
       const { data: alns } = await supabase.from('alunos').select('id, nome').order('nome')
@@ -67,7 +69,7 @@ export default function NovoFinanceiro() {
       setProfessores(profs ?? [])
     }
     carregar()
-  }, [])
+  }, [unidadeId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     setForm(f => ({
@@ -111,6 +113,7 @@ export default function NovoFinanceiro() {
     setLoading(true)
 
     const { error } = await supabase.from('movimentacoes').insert({
+      unidade_id: unidadeId,
       tipo: form.tipo,
       categoria_id: form.categoria_id,
       pessoa_id: form.pessoa_id || null,

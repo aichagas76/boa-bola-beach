@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { useUnidade } from '@/components/layout/UnidadeProvider'
 
 type Pagamento = {
   id: string
@@ -15,6 +16,7 @@ type Pagamento = {
 }
 
 export default function AtrasoPage() {
+  const { unidadeId } = useUnidade()
   const [pagamentos, setPagamentos] = useState<Pagamento[]>([])
   const [loading, setLoading] = useState(true)
   const [filtroMes, setFiltroMes] = useState('')
@@ -24,11 +26,11 @@ export default function AtrasoPage() {
 
     const { data } = await supabase
       .from('pagamentos')
-      .select('*, alunos(nome)')
+      .select('*, alunos(nome, unidade_id)')
       .eq('status', 'Atrasado')
       .order('data_vencimento', { ascending: false })
 
-    const lista = (data ?? []).map((p: any) => ({
+    const lista = (data ?? []).filter((p: any) => !unidadeId || p.alunos?.unidade_id === unidadeId).map((p: any) => ({
       ...p,
       aluno_nome: p.alunos?.nome ?? '-',
     }))
@@ -37,7 +39,7 @@ export default function AtrasoPage() {
     setLoading(false)
   }
 
-  useEffect(() => { carregar() }, [])
+  useEffect(() => { carregar() }, [unidadeId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const mesesDisponiveis = [...new Set(pagamentos.map(p => p.competencia).filter(Boolean))].sort().reverse()
 

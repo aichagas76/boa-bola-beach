@@ -2,12 +2,14 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { useUnidade } from '@/components/layout/UnidadeProvider'
 import Link from 'next/link'
 import { ChartReceita } from '@/components/dashboard/chart-receita'
 import { ChartPagamentos } from '@/components/dashboard/chart-pagamentos'
 import { ChartCrescimento } from '@/components/dashboard/chart-crescimento'
 
 export default function Dashboard() {
+  const { unidadeId } = useUnidade()
   const [totalAtivos, setTotalAtivos] = useState(0)
   const [totalInativos, setTotalInativos] = useState(0)
   const [receitaMensal, setReceitaMensal] = useState(0)
@@ -19,9 +21,11 @@ export default function Dashboard() {
 
   useEffect(() => {
     async function carregar() {
+      if (!unidadeId) return
       const { data: alunos } = await supabase
         .from('alunos')
         .select('id, status, data_cadastro')
+        .eq('unidade_id', unidadeId)
 
       const { data: matriculas } = await supabase
         .from('matriculas')
@@ -30,6 +34,7 @@ export default function Dashboard() {
       const { data: movimentacoes } = await supabase
         .from('movimentacoes')
         .select('status, valor, tipo')
+        .eq('unidade_id', unidadeId)
 
       const ativos = (alunos ?? []).filter(a => a.status === 'Ativo')
       const inativos = (alunos ?? []).filter(a => a.status === 'Inativo')
@@ -108,7 +113,7 @@ export default function Dashboard() {
       setLoading(false)
     }
     carregar()
-  }, [])
+  }, [unidadeId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const cards = [
     {

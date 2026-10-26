@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { LayoutDashboard, Users, CreditCard, AlertCircle, Settings, Menu, X, TrendingUp, Folder, Tags, Banknote, ChevronDown, ArrowUp, ArrowDown, LogOut, ClipboardList, LucideIcon } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { useUnidade } from '@/components/layout/UnidadeProvider'
 
 type SubItem = { href: string; label: string; icon: LucideIcon; color?: string }
 
@@ -39,6 +40,8 @@ export default function Sidebar() {
       setUserEmail(user?.email ?? '')
     })
   }, [])
+
+  const { unidades, unidadeId, trocar } = useUnidade()
 
   async function sair() {
     await supabase.auth.signOut()
@@ -86,6 +89,23 @@ export default function Sidebar() {
         <div className="p-6 border-b border-[#1a1a1a] flex items-center justify-center">
           <img src="/BB logo.jpg" alt="Boa Bola Beach" style={{ height: '120px', width: 'auto', objectFit: 'contain' }} />
         </div>
+
+        {unidades.length > 0 && (
+          <div className="px-3 pt-3">
+            <label className="block text-[11px] uppercase tracking-wide text-gray-500 mb-1">Unidade</label>
+            {unidades.length > 1 ? (
+              <select
+                value={unidadeId ?? ''}
+                onChange={e => trocar(e.target.value)}
+                className="w-full bg-[#1a1a1a] text-white text-sm rounded-md px-2 py-1.5 border border-[#2a2a2a] focus:outline-none focus:ring-1 focus:ring-[#7DC421]"
+              >
+                {unidades.map(u => <option key={u.id} value={u.id}>{u.nome}</option>)}
+              </select>
+            ) : (
+              <div className="text-sm text-white px-2 py-1.5 rounded-md bg-[#1a1a1a]">{unidades[0].nome}</div>
+            )}
+          </div>
+        )}
 
         <nav className="flex-1 p-2 space-y-1">
           {navItems.map((item) => {

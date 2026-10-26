@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { useUnidade } from '@/components/layout/UnidadeProvider'
 import { Trash2, Edit2, Check, X } from 'lucide-react'
 
 type ContaBancaria = {
@@ -10,6 +11,7 @@ type ContaBancaria = {
 }
 
 export default function Contas() {
+  const { unidadeId } = useUnidade()
   const [contas, setContas] = useState<ContaBancaria[]>([])
   const [loading, setLoading] = useState(true)
   const [novaNome, setNovaNome] = useState('')
@@ -18,21 +20,23 @@ export default function Contas() {
   const [editandoNome, setEditandoNome] = useState('')
 
   async function carregar() {
+    if (!unidadeId) return
     setLoading(true)
-    const { data } = await supabase.from('contas_bancarias').select('*').order('nome')
+    const { data } = await supabase.from('contas_bancarias').select('*').eq('unidade_id', unidadeId).order('nome')
     setContas(data ?? [])
     setLoading(false)
   }
 
   useEffect(() => {
     carregar()
-  }, [])
+  }, [unidadeId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function adicionar() {
     if (!novaNome.trim()) return
 
     const { error } = await supabase.from('contas_bancarias').insert({
       nome: novaNome,
+      unidade_id: unidadeId,
     })
 
     if (error) {

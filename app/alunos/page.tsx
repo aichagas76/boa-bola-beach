@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { useUnidade } from '@/components/layout/UnidadeProvider'
 import { registrarLog } from '@/lib/log'
 import Link from 'next/link'
 import { usePagination } from '@/lib/hooks/usePagination'
@@ -33,6 +34,7 @@ type Matricula = {
 }
 
 export default function Alunos() {
+  const { unidadeId } = useUnidade()
   const [alunos, setAlunos] = useState<Aluno[]>([])
   const [busca, setBusca] = useState('')
   const [filtro, setFiltro] = useState('Todos')
@@ -89,7 +91,7 @@ export default function Alunos() {
 
     const { data: alunosData } = await supabase
       .from('alunos')
-      .select('id, nome, celular, cpf, status, data_vencimento, asaas_customer_id')
+      .select('id, nome, celular, cpf, status, data_vencimento, asaas_customer_id, unidade_id')
       .order('nome')
 
     const { data: pagamentosLinkData } = await supabase
@@ -102,7 +104,7 @@ export default function Alunos() {
 
     const { data: matriculasData } = await supabase
       .from('matriculas')
-      .select('aluno_id, tipo, valor, professor_nome, esportes(nome)')
+      .select('aluno_id, tipo, valor, professor_nome, unidade_id, esportes(nome)')
 
     const { data: pagamentosData } = await supabase
       .from('movimentacoes')
@@ -138,7 +140,9 @@ export default function Alunos() {
       }
     }
 
-    const alunos = (alunosData ?? []).map(a => {
+    // Aluno aparece na unidade escolhida se for dela (principal) ou se tiver matrícula nela (integração)
+    const alunos = (alunosData ?? []).filter(a => !unidadeId || a.unidade_id === unidadeId ||
+      (matriculasData ?? []).some(m => m.aluno_id === a.id && m.unidade_id === unidadeId)).map(a => {
       const mats = (matriculasData ?? []).filter(m => m.aluno_id === a.id)
       const valor_total = mats.reduce((acc, m) => acc + (m.valor ?? 0), 0)
       const modalidades = mats.map(m => m.tipo)
@@ -157,7 +161,7 @@ export default function Alunos() {
     setLoading(false)
   }
 
-  useEffect(() => { carregar() }, [])
+  useEffect(() => { carregar() }, [unidadeId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function abrirModal(aluno: Aluno) {
     const { data } = await supabase

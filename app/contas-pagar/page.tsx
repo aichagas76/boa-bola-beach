@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { useUnidade } from '@/components/layout/UnidadeProvider'
 import { Check } from 'lucide-react'
 
 type Movimentacao = {
@@ -15,14 +16,17 @@ type Movimentacao = {
 }
 
 export default function ContasPagar() {
+  const { unidadeId } = useUnidade()
   const [contas, setContas] = useState<Movimentacao[]>([])
   const [loading, setLoading] = useState(true)
 
   async function carregar() {
+    if (!unidadeId) return
     setLoading(true)
     const { data, error } = await supabase
       .from('movimentacoes')
       .select('*, categorias_financeiro(categoria, subcategoria), pessoas(nome), contas_bancarias(nome)')
+      .eq('unidade_id', unidadeId)
       .eq('tipo', 'Saída')
       .eq('status', 'Pendente')
       .order('data_vencimento', { ascending: true })
@@ -36,7 +40,7 @@ export default function ContasPagar() {
 
   useEffect(() => {
     carregar()
-  }, [])
+  }, [unidadeId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function darBaixa(id: string) {
     if (!confirm('Confirmar baixa desta movimentação?')) return
