@@ -11,7 +11,7 @@ import IconeEsporte from '@/components/alunos/IconeEsporte'
 import { ordenar, proximaOrdem, type Direcao, type Valor } from '@/lib/ordenacao'
 import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react'
 import IconeModalidade from '@/components/alunos/IconeModalidade'
-import { BadgeCheck, Copy, ShoppingBag, X } from 'lucide-react'
+import { BadgeCheck, Copy, CreditCard, Link2, Pencil, ShoppingBag, Trash2, Wallet, X } from 'lucide-react'
 import { VendaDoAluno } from '@/components/estoque/FormVenda'
 
 type Aluno = {
@@ -59,6 +59,14 @@ const CHAVES: Record<ColunaId, (a: Aluno) => Valor> = {
   link: a => (a.link_pagamento ? 1 : 0),
   status: a => a.status,
 }
+
+type Alinha = 'left' | 'center' | 'right'
+const ALINHA: Record<ColunaId, Alinha> = {
+  nome: 'left', celular: 'left', vencimento: 'center', ultimo: 'center', esporte: 'left', professor: 'left',
+  valor: 'right', parcial: 'right', asaas: 'center', link: 'center', status: 'center',
+}
+const CLASSE_ALINHA: Record<Alinha, string> = { left: 'text-left', center: 'text-center', right: 'text-right' }
+const JUSTIFICA: Record<Alinha, string> = { left: 'justify-start', center: 'justify-center', right: 'justify-end' }
 
 const COLUNAS: { id: ColunaId; titulo: string; dica?: string }[] = [
   { id: 'nome', titulo: 'Nome' },
@@ -330,37 +338,36 @@ export default function Alunos() {
         </Link>
       </div>
 
-      <div className="flex items-center gap-3 mb-4">
+      <div className="flex flex-wrap items-center gap-3 mb-4">
         <input
           type="text"
           placeholder="Buscar por nome, CPF ou celular..."
           value={busca}
           onChange={e => setBusca(e.target.value)}
-          className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#7DC421]"
+          className="flex-1 min-w-[16rem] h-10 border border-gray-200 rounded-lg px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#7DC421]/40 focus:border-[#7DC421]"
         />
+        <div className="flex gap-2">
+          {(['Todos', 'Ativo', 'Inativo'] as const).map(f => (
+            <button
+              key={f}
+              onClick={() => setFiltro(f)}
+              className={`h-10 px-4 rounded-full text-sm font-medium border transition-colors ${
+                filtro === f
+                  ? 'bg-[#7DC421] text-white border-[#7DC421] shadow-sm'
+                  : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
+              }`}
+            >
+              {f} ({contadores[f as keyof typeof contadores] ?? alunos.length})
+            </button>
+          ))}
+        </div>
       </div>
 
-      <div className="flex gap-2 mb-4">
-        {(['Todos', 'Ativo', 'Inativo'] as const).map(f => (
-          <button
-            key={f}
-            onClick={() => setFiltro(f)}
-            className={`px-4 py-1.5 rounded-full text-sm font-medium border transition-colors ${
-              filtro === f
-                ? 'bg-[#7DC421] text-white border-[#7DC421]'
-                : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
-            }`}
-          >
-            {f} ({contadores[f as keyof typeof contadores] ?? alunos.length})
-          </button>
-        ))}
-      </div>
-
-      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-sm whitespace-nowrap">
             <thead>
-              <tr className="bg-gray-50 border-b border-gray-200">
+              <tr className="bg-gray-50/80 border-b border-gray-200">
                 {COLUNAS.filter(c => c.id !== 'parcial' || temParcial).map(c => {
                   const ativa = ordem.coluna === c.id
                   return (
@@ -369,7 +376,7 @@ export default function Alunos() {
                       onClick={() => setOrdem(o => proximaOrdem(o, c.id))}
                       title={`${c.dica ?? c.titulo} — clique para ordenar`}
                       aria-sort={ativa ? (ordem.direcao === 'asc' ? 'ascending' : 'descending') : 'none'}
-                      className="text-left px-2 py-2.5 text-th text-gray-500 cursor-pointer select-none hover:bg-gray-100 transition-colors"
+                      className={`${CLASSE_ALINHA[ALINHA[c.id]]} px-2 h-11 text-th text-gray-500 cursor-pointer select-none hover:bg-gray-100 hover:text-gray-700 transition-colors`}
                     >
                       <span className="inline-flex items-center gap-1">
                         {c.titulo}
@@ -380,7 +387,7 @@ export default function Alunos() {
                     </th>
                   )
                 })}
-                <th className="text-left px-2 py-2.5 text-th text-gray-500">Ações</th>
+                <th className="text-center px-2 h-11 text-th text-gray-500">Ações</th>
               </tr>
           </thead>
           <tbody>
@@ -391,40 +398,40 @@ export default function Alunos() {
               <tr><td colSpan={12} className="text-center py-8 text-gray-400">Nenhum aluno encontrado.</td></tr>
             )}
             {pagination.paginatedItems.map((aluno, i) => (
-              <tr key={aluno.id} className={`border-b border-gray-100 hover:bg-gray-50 ${i === pagination.paginatedItems.length - 1 && pagination.currentPage === pagination.totalPages ? 'border-0' : ''}`}>
-                <td className="px-2 py-2.5 font-medium text-gray-900 whitespace-normal min-w-[10rem]">
+              <tr key={aluno.id} className={`h-14 border-b border-gray-100 hover:bg-[#7DC421]/[0.06] transition-colors ${i === pagination.paginatedItems.length - 1 && pagination.currentPage === pagination.totalPages ? 'border-0' : ''}`}>
+                <td className="px-2 font-semibold text-gray-900 min-w-[13rem]">
                   <div className="flex items-center justify-between gap-2">
                     <span>{aluno.nome}</span>
                     <span className="flex shrink-0 items-center gap-1">
                     {aluno.combo ? (
-                      <span title="Combo: treina nas duas unidades (Boa Bola 1 e 2)" className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-green-100 text-[11px] font-bold text-green-700">C</span>
+                      <span title="Combo: treina nas duas unidades (Boa Bola 1 e 2)" className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-green-100 text-[11px] font-bold text-green-700 ring-1 ring-green-200">C</span>
                     ) : <span className="inline-block h-5 w-5 shrink-0" />}
                     {aluno.responsavel_nome ? (
                       <button
                         onClick={() => setResponsavelAberto(aluno)}
                         title="Este aluno tem responsável — clique para ver"
                         aria-label={`Ver responsável de ${aluno.nome}`}
-                        className="shrink-0 inline-flex h-5 w-5 items-center justify-center rounded-full bg-blue-100 text-[11px] font-bold text-blue-700 hover:bg-blue-200"
+                        className="shrink-0 inline-flex h-5 w-5 items-center justify-center rounded-full bg-blue-100 text-[11px] font-bold text-blue-700 ring-1 ring-blue-200 hover:bg-blue-200"
                       >R</button>
                     ) : <span className="inline-block h-5 w-5 shrink-0" />}
                     </span>
                   </div>
                 </td>
-                <td className="px-2 py-2.5 text-gray-600">
-                  <a href={`https://wa.me/55${aluno.celular.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" className="shrink-0" viewBox="0 0 24 24" fill="#25D366">
+                <td className="px-2 text-gray-700 tabular-nums">
+                  <a href={`https://wa.me/55${aluno.celular.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 hover:text-[#1f9d4d] transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" className="shrink-0" viewBox="0 0 24 24" fill="#25D366">
                       <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
                     </svg>
                     {mascaraCelular(aluno.celular)}
                   </a>
                 </td>
-                <td className="px-2 py-2.5 text-gray-600">
+                <td className="px-2 text-center text-gray-700 tabular-nums">
                   {dataCurta(aluno.data_vencimento)}
                 </td>
-                <td className="px-2 py-2.5 text-gray-600 text-sm">
+                <td className="px-2 text-center text-gray-700 tabular-nums">
                   {dataCurta(aluno.ultimo_pagamento)}
                 </td>
-                <td className="px-2 py-2">
+                <td className="px-2 py-1.5">
                   {aluno.esportesMod.length === 0 ? (
                     <span className="text-gray-400">-</span>
                   ) : (
@@ -440,73 +447,72 @@ export default function Alunos() {
                     </div>
                   )}
                 </td>
-                <td className="px-2 py-2.5 text-gray-600 text-sm max-w-[7rem] truncate" title={aluno.professores_nomes}>{aluno.professores_nomes}</td>
-                <td className="px-2 py-2.5 text-gray-600">
+                <td className="px-2 text-gray-700 max-w-[9rem] truncate" title={aluno.professores_nomes}>{aluno.professores_nomes}</td>
+                <td className="px-2 text-right font-medium text-gray-900 tabular-nums">
                   {aluno.valor_total > 0 ? `R$ ${aluno.valor_total.toFixed(2).replace('.', ',')}` : '-'}
                 </td>
-                {temParcial && <td className="px-2 py-2.5 text-sm font-medium">
+                {temParcial && <td className="px-2 text-right font-medium tabular-nums">
                   {aluno.parcial_mes > 0 ? (
                     <span className="text-yellow-600">R$ {aluno.parcial_mes.toFixed(2).replace('.', ',')}</span>
                   ) : (
                     <span className="text-gray-400">-</span>
                   )}
                 </td>}
-                <td className="px-2 py-2.5">
+                <td className="px-2 text-center">
                   {aluno.asaas_customer_id ? (
                     <button
                       onClick={() => { setCopiado(false); setIdAsaasAberto({ nome: aluno.nome, id: aluno.asaas_customer_id! }) }}
                       title="Cadastrado no Asaas — clique para ver o número"
-                      className="text-green-600 hover:text-green-800"
+                      className="inline-flex h-8 w-7 items-center justify-center rounded-lg text-green-600 hover:bg-green-50 hover:text-green-800 transition-colors"
                     >
-                      <BadgeCheck size={18} />
+                      <BadgeCheck size={20} />
                     </button>
                   ) : (
                     <span className="text-gray-300" title="Ainda não cadastrado no Asaas">-</span>
                   )}
                 </td>
-                <td className="px-2 py-2.5 text-sm">
+                <td className="px-2 text-center">
                   {aluno.link_pagamento ? (
-                    <a href={aluno.link_pagamento} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">🔗 Pagar</a>
+                    <a href={aluno.link_pagamento} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 h-8 px-2 rounded-lg bg-blue-50 text-blue-700 text-sm font-medium hover:bg-blue-100 transition-colors"><Link2 size={14} />Pagar</a>
                   ) : (
                     <button
                       onClick={() => gerarCobranca(aluno)}
                       title="Gerar cobrança"
                       disabled={gerandoId === aluno.id}
-                      className="text-blue-600 hover:underline disabled:text-gray-400"
+                      className="inline-flex items-center gap-1 h-8 px-2 rounded-lg border border-gray-200 text-gray-700 text-sm font-medium hover:bg-gray-50 hover:border-[#7DC421] transition-colors disabled:text-gray-400"
                     >
-                      {gerandoId === aluno.id ? 'Gerando...' : '💳 Gerar'}
+                      {gerandoId === aluno.id ? 'Gerando...' : <><CreditCard size={14} />Gerar</>}
                     </button>
                   )}
                 </td>
-                <td className="px-2 py-2.5">
-                  <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${
+                <td className="px-2 text-center">
+                  <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-semibold ${
                     aluno.status === 'Ativo' ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'
                   }`}>
+                    <span className={`h-1.5 w-1.5 rounded-full ${aluno.status === 'Ativo' ? 'bg-green-500' : 'bg-gray-400'}`} />
                     {aluno.status}
                   </span>
                 </td>
-                <td className="px-2 py-2.5"><div className="flex items-center gap-2">
+                <td className="px-2"><div className="flex items-center justify-center gap-0.5">
                   <button
                     onClick={() => abrirModal(aluno)}
                     title="Registrar pagamento"
-                    className="text-lg hover:scale-110 transition-transform"
-                  >
-                    💰
-                  </button>
+                    aria-label={`Registrar pagamento de ${aluno.nome}`}
+                    className="inline-flex h-8 w-7 items-center justify-center rounded-lg transition-colors text-[#5a9217] hover:bg-green-50"
+                  ><Wallet size={18} /></button>
                   <button
                     onClick={() => setRetiradaAluno(aluno)}
                     title="Retirar produto (estoque)"
                     aria-label={`Retirar produto para ${aluno.nome}`}
-                    className="text-gray-500 hover:text-[#5a9217] hover:scale-110 transition-transform"
+                    className="inline-flex h-8 w-7 items-center justify-center rounded-lg transition-colors text-gray-500 hover:bg-gray-100 hover:text-gray-800"
                   ><ShoppingBag size={18} /></button>
-                  <Link href={`/alunos/${aluno.id}/editar`} className="text-gray-500 hover:text-blue-600" title="Editar">✏️</Link>
+                  <Link href={`/alunos/${aluno.id}/editar`} className="inline-flex h-8 w-7 items-center justify-center rounded-lg transition-colors text-gray-500 hover:bg-blue-50 hover:text-blue-600" title="Editar" aria-label={`Editar ${aluno.nome}`}><Pencil size={18} /></Link>
                   <button
                     onClick={() => excluirAluno(aluno.id, aluno.nome)}
                     title="Excluir aluno"
-                    className="text-lg hover:scale-110 transition-transform"
-                  >
-                    🗑️
-                  </button>
+                    aria-label={`Excluir ${aluno.nome}`}
+                    className="inline-flex h-8 w-7 items-center justify-center rounded-lg transition-colors text-gray-400 hover:bg-red-50 hover:text-red-600"
+                  ><Trash2 size={18} /></button>
                 </div></td>
               </tr>
             ))}
