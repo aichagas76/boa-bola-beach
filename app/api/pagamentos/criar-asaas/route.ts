@@ -32,6 +32,21 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Valor inválido' }, { status: 400 })
       }
       const venc: string = body.dataVencimento || new Date().toLocaleDateString('en-CA')
+      // Já existe pagamento deste aluno para este vencimento? Reaproveita em vez de duplicar
+      const { data: existente } = await db
+        .from('pagamentos')
+        .select('id, status')
+        .eq('aluno_id', body.alunoId)
+        .eq('data_vencimento', venc)
+        .order('created_at', { ascending: false })
+      if (existente && existente.length > 0) {
+        if (existente.every(e => e.status === 'Pago')) {
+          return NextResponse.json({ error: 'Este vencimento já está pago' }, { status: 409 })
+        }
+        const aberto = existente.find(e => e.status !== 'Pago')!
+        const { paymentId, paymentUrl } = await criarCobrancaAsaas(db, aberto.id)
+        return NextResponse.json({ success: true, paymentId, paymentUrl, reaproveitado: true })
+      }
       const { data: novo, error: novoError } = await db
         .from('pagamentos')
         .insert({

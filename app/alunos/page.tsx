@@ -187,117 +187,20 @@ export default function Alunos() {
   async function confirmarPagamento() {
     if (!alunoModal) return
     if (matriculasModal.length === 0) return alert('Este aluno não tem matrículas cadastradas.')
+    const valorPago = parseFloat(valorParcial.replace(',', '.') || '0')
     setSalvandoPgto(true)
 
-    // Busca categorias (subcategoria IS NULL para pegar a categoria raiz)
-    const { data: catClubinho } = await supabase
-      .from('categorias_financeiro')
-      .select('id')
-      .eq('categoria', 'Clubinho')
-      .eq('tipo', 'Entrada')
-      .is('subcategoria', null)
-      .limit(1)
-
-    const { data: catAula } = await supabase
-      .from('categorias_financeiro')
-      .select('id')
-      .eq('categoria', 'Aula BT')
-      .eq('tipo', 'Entrada')
-      .is('subcategoria', null)
-      .limit(1)
-
-    const catClubinhoId = catClubinho?.[0]?.id ?? null
-    const catAulaId = catAula?.[0]?.id ?? null
-
-    const totalMats = matriculasModal.reduce((acc, m) => acc + (m.valor ?? 0), 0)
-    const valorPago = parseFloat(valorParcial.replace(',', '.') || '0')
-
-    if (valorPago > totalMats) {
-      alert('Valor pago não pode ser maior que R$ ' + totalMats.toFixed(2).replace('.', ','))
-      setSalvandoPgto(false)
-      return
-    }
-
-    const isParcial = valorPago < totalMats
-
-    if (isParcial) {
-      // Pagamento parcial — um único lançamento com o valor digitado
-      const { error } = await supabase.from('movimentacoes').insert({
-        tipo: 'Entrada',
-        descricao: `Pagamento parcial - ${alunoModal.nome}`,
-        valor: valorPago,
-        forma_pagamento: formPgto.forma_pagamento,
-        data_pagamento: formPgto.data_pagamento,
-        data_vencimento: alunoModal.data_vencimento || null,
-        data: formPgto.data_pagamento,
-        status: 'Recebido',
-        aluno_ref_id: alunoModal.id,
-        professor_id: null,
-        origem: 'Manual',
-        categoria_id: catClubinhoId ?? catAulaId,
-      })
-      if (error) { alert('Erro ao lançar: ' + error.message); setSalvandoPgto(false); return }
-    } else {
-      // Pagamento total — lançamento por matrícula
-      for (const mat of matriculasModal) {
-        let professor_id: string | null = null
-        if (mat.professor_nome) {
-          const { data: prof } = await supabase
-            .from('professores').select('id').eq('nome', mat.professor_nome).limit(1)
-          professor_id = prof?.[0]?.id ?? null
-        }
-
-        const isClubinho = mat.tipo === 'Clubinho'
-        const categoria_id = isClubinho ? catClubinhoId : catAulaId
-        const descricao = isClubinho ? 'Clubinho' : 'Aula'
-
-        const { error } = await supabase.from('movimentacoes').insert({
-          tipo: 'Entrada',
-          descricao,
-          valor: mat.valor,
-          forma_pagamento: formPgto.forma_pagamento,
-          data_pagamento: formPgto.data_pagamento,
-          data_vencimento: alunoModal.data_vencimento || null,
-          data: formPgto.data_pagamento,
-          status: 'Recebido',
-          aluno_ref_id: alunoModal.id,
-          professor_id,
-          origem: 'Manual',
-          categoria_id,
-        })
-        if (error) { alert('Erro ao lançar: ' + error.message); setSalvandoPgto(false); return }
-      }
-
-      // Deleta pagamentos parciais do mês atual deste aluno (já foi pago o total)
-      const mesAtual = new Date().toLocaleDateString('en-CA').substring(0, 7)
-      await supabase
-        .from('movimentacoes')
-        .delete()
-        .eq('aluno_ref_id', alunoModal.id)
-        .ilike('descricao', '%Pagamento parcial%')
-        .gte('data_pagamento', `${mesAtual}-01`)
-        .lte('data_pagamento', `${mesAtual}-31`)
-    }
-
-    // Avança data_vencimento +1 mês apenas no pagamento total
-    if (!isParcial && alunoModal.data_vencimento) {
-      const venc = new Date(alunoModal.data_vencimento + 'T00:00:00')
-      venc.setMonth(venc.getMonth() + 1)
-      const novaData = venc.toISOString().split('T')[0]
-      await supabase.from('alunos').update({ data_vencimento: novaData }).eq('id', alunoModal.id)
-    }
-
-    // Pagamento total: baixa as cobranças em aberto do aluno (some o link "Pagar")
-    if (!isParcial) {
-      await supabase
-        .from('pagamentos')
-        .update({ status: 'Pago', data_pagamento: formPgto.data_pagamento })
-        .eq('aluno_id', alunoModal.id)
-        .neq('status', 'Pago')
-    }
-
-    await registrarLog('Pagamento manual', 'alunos', alunoModal.id, alunoModal.nome)
+    // Tudo (lançamentos, vencimento, baixa e log) acontece numa operação só no banco: ou entra tudo, ou nada
+    const { error } = await supabase.rpc('baixar_pagamento_manual', {
+      p_aluno_id: alunoModal.id,
+      p_forma: formPgto.forma_pagamento,
+      p_data: formPgto.data_pagamento,
+      p_valor: valorPago,
+      p_vencimento: alunoModal.data_vencimento,
+    })
     setSalvandoPgto(false)
+    if (error) { alert(error.message); return }
+
     setModalAberto(false)
     setAlunoModal(null)
     carregar()

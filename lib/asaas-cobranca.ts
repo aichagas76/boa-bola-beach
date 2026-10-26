@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { getAsaasClient } from '@/lib/asaas-client'
+import { dataSaoPaulo, vencimentoNoAsaas } from '@/lib/cobranca-regras'
 
 export class CobrancaError extends Error {
   status: number
@@ -52,7 +53,7 @@ export async function criarCobrancaAsaas(db: SupabaseClient, pagamentoId: string
   const payment = await asaas.createPayment({
     customerId,
     value: Number(pag.valor),
-    dueDate: pag.data_vencimento,
+    dueDate: vencimentoNoAsaas(pag.data_vencimento, dataSaoPaulo()),
     description: `Boa Bola - ${aluno.nome}${pag.competencia ? ` (${pag.competencia})` : ''}`,
     reference: pag.id,
   })

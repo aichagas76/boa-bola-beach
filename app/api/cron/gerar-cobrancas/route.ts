@@ -2,20 +2,19 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/supabase-admin'
 import { bearerValido } from '@/lib/seguranca'
 import { criarCobrancaAsaas } from '@/lib/asaas-cobranca'
+import { dataSaoPaulo, situacaoVencimento, jaTemCobranca, MAX_DIAS_ATRASO_AUTOMATICO } from '@/lib/cobranca-regras'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
 
 const DIAS_ANTECEDENCIA = 10
 
-function dataSaoPaulo(somarDias = 0) {
-  const d = new Date(Date.now() + somarDias * 86400000)
-  return d.toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' })
-}
-
 /**
- * Roda 1x por dia (Vercel Cron). Gera a cobrança Asaas dos alunos ativos cujo
- * vencimento cai nos próximos 10 dias e que ainda não têm cobrança desse vencimento.
+ * Roda 1x por dia (Vercel Cron). Faz duas coisas:
+ *  1) marca como "Atrasado" os pagamentos pendentes já vencidos;
+ *  2) gera a cobrança Asaas dos alunos ativos cujo vencimento cai nos próximos 10 dias
+ *     OU que já venceram (até 90 dias) e ainda não têm cobrança em aberto.
+ * Com ?simular=1 só mostra o que faria, sem gravar nada nem chamar o Asaas.
  * Autenticação: header Authorization: Bearer CRON_SECRET (a Vercel envia sozinha).
  */
 export async function GET(request: NextRequest) {
@@ -23,34 +22,62 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
   }
 
+  const simular = request.nextUrl.searchParams.get('simular') === '1'
   const db = getSupabaseAdmin()
   const hoje = dataSaoPaulo()
   const limite = dataSaoPaulo(DIAS_ANTECEDENCIA)
 
+  // 1) Pagamentos pendentes vencidos viram "Atrasado" (a tela Em atraso lê este status)
+  let marcadosAtrasados = 0
+  if (simular) {
+    const { count } = await db
+      .from('pagamentos')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'Pendente')
+      .lt('data_vencimento', hoje)
+    marcadosAtrasados = count ?? 0
+  } else {
+    const { data, error } = await db
+      .from('pagamentos')
+      .update({ status: 'Atrasado' })
+      .eq('status', 'Pendente')
+      .lt('data_vencimento', hoje)
+      .select('id')
+    if (error) console.error('[cron] erro ao marcar atrasados:', error)
+    marcadosAtrasados = data?.length ?? 0
+  }
+
+  // 2) Alunos ativos com vencimento até o limite (inclui os já vencidos)
   const { data: alunos, error } = await db
     .from('alunos')
     .select('id, nome, cpf, data_vencimento')
     .eq('status', 'Ativo')
-    .gte('data_vencimento', hoje)
+    .not('data_vencimento', 'is', null)
     .lte('data_vencimento', limite)
   if (error) {
     console.error('[cron] erro ao listar alunos:', error)
     return NextResponse.json({ error: 'Erro ao listar alunos' }, { status: 500 })
   }
 
-  const geradas: string[] = []
+  const geradas: { aluno: string; vencimento: string; atrasado: boolean }[] = []
   const ignorados: { aluno: string; motivo: string }[] = []
   const falhas: { aluno: string; erro: string }[] = []
 
   for (const aluno of alunos ?? []) {
     try {
-      const { data: existente } = await db
+      const situacao = situacaoVencimento(aluno.data_vencimento, hoje, limite)
+      if (situacao === 'fora_da_janela') continue
+      if (situacao === 'atrasado_demais') {
+        ignorados.push({ aluno: aluno.nome, motivo: `atrasado há mais de ${MAX_DIAS_ATRASO_AUTOMATICO} dias: conferir na mão` })
+        continue
+      }
+      const atrasado = situacao === 'atrasado'
+
+      const { data: pagamentos } = await db
         .from('pagamentos')
-        .select('id')
+        .select('data_vencimento, status')
         .eq('aluno_id', aluno.id)
-        .eq('data_vencimento', aluno.data_vencimento)
-        .limit(1)
-      if (existente && existente.length > 0) continue
+      if (jaTemCobranca(pagamentos ?? [], aluno.data_vencimento, atrasado)) continue
 
       const { data: mats } = await db.from('matriculas').select('valor').eq('aluno_id', aluno.id)
       const total = (mats ?? []).reduce((acc, m) => acc + (m.valor ?? 0), 0)
@@ -63,6 +90,11 @@ export async function GET(request: NextRequest) {
         continue
       }
 
+      if (simular) {
+        geradas.push({ aluno: aluno.nome, vencimento: aluno.data_vencimento, atrasado })
+        continue
+      }
+
       const { data: novo, error: insError } = await db
         .from('pagamentos')
         .insert({
@@ -70,7 +102,7 @@ export async function GET(request: NextRequest) {
           valor: total,
           data_vencimento: aluno.data_vencimento,
           competencia: String(aluno.data_vencimento).slice(0, 7),
-          status: 'Pendente',
+          status: atrasado ? 'Atrasado' : 'Pendente',
         })
         .select('id')
         .single()
@@ -94,13 +126,13 @@ export async function GET(request: NextRequest) {
         })
         .eq('id', aluno.id)
 
-      geradas.push(aluno.nome)
+      geradas.push({ aluno: aluno.nome, vencimento: aluno.data_vencimento, atrasado })
     } catch (e) {
       console.error('[cron] falha ao gerar cobrança de', aluno.nome, e)
       falhas.push({ aluno: aluno.nome, erro: e instanceof Error ? e.message : String(e) })
     }
   }
 
-  console.log(`[cron] cobranças geradas: ${geradas.length}, ignorados: ${ignorados.length}, falhas: ${falhas.length}`)
-  return NextResponse.json({ success: true, hoje, limite, geradas, ignorados, falhas })
+  console.log(`[cron] simular=${simular} atrasados marcados: ${marcadosAtrasados}, geradas: ${geradas.length}, ignorados: ${ignorados.length}, falhas: ${falhas.length}`)
+  return NextResponse.json({ success: true, simular, hoje, limite, marcadosAtrasados, geradas, ignorados, falhas })
 }
