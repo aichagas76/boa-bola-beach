@@ -90,28 +90,32 @@ export default function Sidebar() {
           isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
         } md:relative md:translate-x-0`}
       >
-        <div className="p-6 border-b border-[#1a1a1a] flex items-center justify-center">
-          <img src="/BB logo.jpg" alt="Boa Bola Beach" style={{ height: '120px', width: 'auto', objectFit: 'contain' }} />
+        {/* Logo e, logo abaixo, a unidade em destaque (separada do menu) */}
+        <div className="px-3 pt-4 pb-3 border-b border-[#1a1a1a]">
+          <div className="flex items-center justify-center">
+            <img src="/BB logo.jpg" alt="Boa Bola Beach" style={{ height: '104px', width: 'auto', objectFit: 'contain' }} />
+          </div>
+
+          {unidades.length > 0 && (
+            <div className="mt-2 rounded-lg border border-[#7DC421] bg-[#7DC421]/15 px-2.5 py-2">
+              <label className="block text-[10px] font-semibold uppercase tracking-wider text-[#9BE23A] mb-1">Unidade</label>
+              {unidades.length > 1 ? (
+                <select
+                  value={unidadeId ?? ''}
+                  onChange={e => trocar(e.target.value)}
+                  className="w-full bg-[#0a0a0a] text-white text-sm font-semibold rounded-md px-2 py-1.5 border border-[#7DC421]/60 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#7DC421]"
+                  aria-label="Unidade"
+                >
+                  {unidades.map(u => <option key={u.id} value={u.id}>{u.nome}</option>)}
+                </select>
+              ) : (
+                <div className="text-sm font-semibold text-white px-0.5">{unidades[0].nome}</div>
+              )}
+            </div>
+          )}
         </div>
 
-        {unidades.length > 0 && (
-          <div className="px-3 pt-3">
-            <label className="block text-[11px] uppercase tracking-wide text-gray-500 mb-1">Unidade</label>
-            {unidades.length > 1 ? (
-              <select
-                value={unidadeId ?? ''}
-                onChange={e => trocar(e.target.value)}
-                className="w-full bg-[#1a1a1a] text-white text-sm rounded-md px-2 py-1.5 border border-[#2a2a2a] focus:outline-none focus:ring-1 focus:ring-[#7DC421]"
-              >
-                {unidades.map(u => <option key={u.id} value={u.id}>{u.nome}</option>)}
-              </select>
-            ) : (
-              <div className="text-sm text-white px-2 py-1.5 rounded-md bg-[#1a1a1a]">{unidades[0].nome}</div>
-            )}
-          </div>
-        )}
-
-        <nav className="flex-1 p-2 space-y-1">
+        <nav className="flex-1 p-2 pt-3 space-y-1">
           {navItems.map((item) => {
             const Icon = item.icon
             const active = pathname === item.href
