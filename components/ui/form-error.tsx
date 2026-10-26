@@ -27,7 +27,7 @@ export function FormInput({ label, error, touched, className = '', ...props }: F
 
   return (
     <div>
-      {label && <label className="text-xs text-gray-500 block mb-1">{label}</label>}
+      {label && <label className="text-label text-gray-500 block mb-1">{label}</label>}
       <input
         {...props}
         className={`w-full border rounded-lg px-3 py-2 text-sm transition-colors focus:outline-none focus:ring-1 ${
@@ -53,7 +53,7 @@ export function FormSelect({ label, error, touched, className = '', children, ..
 
   return (
     <div>
-      {label && <label className="text-xs text-gray-500 block mb-1">{label}</label>}
+      {label && <label className="text-label text-gray-500 block mb-1">{label}</label>}
       <select
         {...props}
         className={`w-full border rounded-lg px-3 py-2 text-sm bg-white transition-colors focus:outline-none focus:ring-1 ${

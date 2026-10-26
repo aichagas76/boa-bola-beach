@@ -153,17 +153,17 @@ export default function Pagamentos() {
       />
 
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-xl font-medium text-gray-900">Pagamentos</h1>
+        <h1 className="text-page-title text-gray-900">Pagamentos</h1>
       </div>
 
       <div className="bg-white border border-gray-200 rounded-xl p-4 mb-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="text-xs text-gray-500 block mb-2">Período</label>
+            <label className="text-label text-gray-500 block mb-2">Período</label>
             <div className="flex gap-2">
               <button
                 onClick={() => setPeriodo('dia')}
-                className={`px-3 py-1.5 text-xs font-medium rounded-lg transition ${
+                className={`px-3 py-1.5 text-sm font-medium rounded-lg transition ${
                   periodo === 'dia'
                     ? 'bg-blue-600 text-white'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -173,7 +173,7 @@ export default function Pagamentos() {
               </button>
               <button
                 onClick={() => setPeriodo('semana')}
-                className={`px-3 py-1.5 text-xs font-medium rounded-lg transition ${
+                className={`px-3 py-1.5 text-sm font-medium rounded-lg transition ${
                   periodo === 'semana'
                     ? 'bg-blue-600 text-white'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -183,7 +183,7 @@ export default function Pagamentos() {
               </button>
               <button
                 onClick={() => setPeriodo('mes')}
-                className={`px-3 py-1.5 text-xs font-medium rounded-lg transition ${
+                className={`px-3 py-1.5 text-sm font-medium rounded-lg transition ${
                   periodo === 'mes'
                     ? 'bg-blue-600 text-white'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -194,11 +194,11 @@ export default function Pagamentos() {
             </div>
           </div>
           <div>
-            <label className="text-xs text-gray-500 block mb-2">Aluno</label>
+            <label className="text-label text-gray-500 block mb-2">Aluno</label>
             <select
               value={alunoFiltro}
               onChange={e => setAlunoFiltro(e.target.value)}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs bg-white"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"
             >
               <option value="">Todos</option>
               {alunos.map(a => (
@@ -212,20 +212,20 @@ export default function Pagamentos() {
       <>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
             <div className="bg-white border border-gray-200 rounded-xl p-4">
-              <div className="text-xs text-gray-500 mb-1">Total pago</div>
-              <div className="text-lg font-semibold text-green-700">
+              <div className="text-label text-gray-500 mb-1">Total pago</div>
+              <div className="text-kpi text-green-700">
                 R$ {totalPago.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
               </div>
             </div>
             <div className="bg-white border border-gray-200 rounded-xl p-4">
-              <div className="text-xs text-gray-500 mb-1">Total pendente</div>
-              <div className="text-lg font-semibold text-yellow-700">
+              <div className="text-label text-gray-500 mb-1">Total pendente</div>
+              <div className="text-kpi text-yellow-700">
                 R$ {totalPendente.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
               </div>
             </div>
             <div className="bg-white border border-gray-200 rounded-xl p-4">
-              <div className="text-xs text-gray-500 mb-1">Último pagamento</div>
-              <div className="text-lg font-semibold text-gray-700">
+              <div className="text-label text-gray-500 mb-1">Último pagamento</div>
+              <div className="text-kpi text-gray-700">
                 {ultimoPagamento?.data_pagamento
                   ? new Date(ultimoPagamento.data_pagamento + 'T00:00:00').toLocaleDateString('pt-BR')
                   : '-'}
@@ -238,12 +238,12 @@ export default function Pagamentos() {
               <table className="w-full text-sm min-w-full">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-200">
-                    <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Competência</th>
-                    <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Aluno</th>
-                    <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Valor</th>
-                    <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Status</th>
-                    <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Data Pagamento</th>
-                    <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Forma Pagamento</th>
+                    <th className="text-left px-4 py-3 text-th text-gray-500">Competência</th>
+                    <th className="text-left px-4 py-3 text-th text-gray-500">Aluno</th>
+                    <th className="text-left px-4 py-3 text-th text-gray-500">Valor</th>
+                    <th className="text-left px-4 py-3 text-th text-gray-500">Status</th>
+                    <th className="text-left px-4 py-3 text-th text-gray-500">Data Pagamento</th>
+                    <th className="text-left px-4 py-3 text-th text-gray-500">Forma Pagamento</th>
                     <th className="px-4 py-3"></th>
                   </tr>
                 </thead>
@@ -256,9 +256,9 @@ export default function Pagamentos() {
                   )}
                   {pagination.paginatedItems.map((m, i) => (
                     <tr key={m.id} className={`border-b border-gray-100 hover:bg-gray-50 ${i === pagination.paginatedItems.length - 1 && pagination.currentPage === pagination.totalPages ? 'border-0' : ''}`}>
-                    <td className="px-4 py-3 text-gray-600 text-xs">{formatarCompetencia(m.data_vencimento)}</td>
-                    <td className="px-4 py-3 text-gray-600 text-xs">{m.alunos?.nome || '-'}</td>
-                    <td className="px-4 py-3 text-gray-800 font-medium text-xs">
+                    <td className="px-4 py-3 text-gray-600 text-sm">{formatarCompetencia(m.data_vencimento)}</td>
+                    <td className="px-4 py-3 text-gray-600 text-sm">{m.alunos?.nome || '-'}</td>
+                    <td className="px-4 py-3 text-gray-800 font-medium text-sm">
                       R$ {m.valor?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) ?? '0,00'}
                     </td>
                     <td className="px-4 py-3">
@@ -266,18 +266,18 @@ export default function Pagamentos() {
                         {m.status}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-gray-600 text-xs">
+                    <td className="px-4 py-3 text-gray-600 text-sm">
                       {m.data_pagamento
                         ? new Date(m.data_pagamento + 'T00:00:00').toLocaleDateString('pt-BR')
                         : '-'}
                     </td>
-                    <td className="px-4 py-3 text-gray-600 text-xs">{m.forma_pagamento || '-'}</td>
+                    <td className="px-4 py-3 text-gray-600 text-sm">{m.forma_pagamento || '-'}</td>
                     <td className="px-4 py-3 flex gap-2">
                       {m.status === 'Não recebido' && (
                         <button
                           onClick={() => darBaixa(m)}
                           disabled={baixandoId === m.id}
-                          className="px-3 py-1 text-xs bg-[#7DC421] text-white rounded-lg hover:bg-[#6ab01a] disabled:opacity-50"
+                          className="px-3 py-1 text-sm bg-[#7DC421] text-white rounded-lg hover:bg-[#6ab01a] disabled:opacity-50"
                         >
                           {baixandoId === m.id ? '...' : 'Dar baixa'}
                         </button>
@@ -285,7 +285,7 @@ export default function Pagamentos() {
                       <button
                         onClick={() => abrirConfirmDelete(m.id)}
                         disabled={baixandoId === m.id}
-                        className="px-3 py-1 text-xs bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50"
+                        className="px-3 py-1 text-sm bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50"
                       >
                         {baixandoId === m.id ? '...' : 'Deletar'}
                       </button>

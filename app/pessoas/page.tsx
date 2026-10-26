@@ -80,13 +80,13 @@ export default function Pessoas() {
 
   return (
     <div className="max-w-2xl">
-      <h1 className="text-3xl font-bold text-gray-900 mb-8">Fornecedores/Clientes</h1>
+      <h1 className="text-page-title text-gray-900 mb-8">Fornecedores/Clientes</h1>
 
       <div className="bg-white border border-gray-200 rounded-xl p-6 mb-6">
         <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label className="text-xs text-gray-500 block mb-1">Nome</label>
+              <label className="text-label text-gray-500 block mb-1">Nome</label>
               <input
                 type="text"
                 value={novaNome}
@@ -97,7 +97,7 @@ export default function Pessoas() {
               />
             </div>
             <div>
-              <label className="text-xs text-gray-500 block mb-1">Tipo</label>
+              <label className="text-label text-gray-500 block mb-1">Tipo</label>
               <select
                 value={novoTipo}
                 onChange={e => setNovoTipo(e.target.value as 'Fornecedor' | 'Cliente' | 'Ambos')}
@@ -130,9 +130,9 @@ export default function Pessoas() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200">
-                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Nome</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Tipo</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Ações</th>
+                  <th className="text-left px-4 py-3 text-th text-gray-500">Nome</th>
+                  <th className="text-left px-4 py-3 text-th text-gray-500">Tipo</th>
+                  <th className="text-left px-4 py-3 text-th text-gray-500">Ações</th>
                 </tr>
               </thead>
               <tbody>
@@ -145,7 +145,7 @@ export default function Pessoas() {
                             type="text"
                             value={editandoNome}
                             onChange={e => setEditandoNome(e.target.value)}
-                            className="w-full border border-gray-200 rounded px-2 py-1 text-xs"
+                            className="w-full border border-gray-200 rounded px-2 py-1 text-sm"
                             autoFocus
                           />
                         </td>
@@ -153,7 +153,7 @@ export default function Pessoas() {
                           <select
                             value={editandoTipo}
                             onChange={e => setEditandoTipo(e.target.value as 'Fornecedor' | 'Cliente' | 'Ambos')}
-                            className="border border-gray-200 rounded px-2 py-1 text-xs bg-white"
+                            className="border border-gray-200 rounded px-2 py-1 text-sm bg-white"
                           >
                             <option value="Cliente">Cliente</option>
                             <option value="Fornecedor">Fornecedor</option>

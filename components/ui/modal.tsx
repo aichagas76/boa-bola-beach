@@ -27,7 +27,7 @@ export function Modal({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
       <div className="bg-white rounded-lg shadow-lg max-w-sm w-full mx-4">
         <div className="p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-2">{title}</h2>
+          <h2 className="text-section-title text-gray-900 mb-2">{title}</h2>
           <p className="text-sm text-gray-600 mb-6">{message}</p>
           <div className="flex gap-3 justify-end">
             <button

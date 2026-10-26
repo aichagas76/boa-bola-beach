@@ -129,46 +129,46 @@ export default function DetalheAluno() {
     <div className="max-w-2xl">
       <div className="flex items-center gap-3 mb-6">
         <button onClick={() => router.back()} className="text-sm text-gray-500 hover:text-gray-700">← Voltar</button>
-        <h1 className="text-xl font-medium text-gray-900">{aluno.nome}</h1>
+        <h1 className="text-page-title text-gray-900">{aluno.nome}</h1>
         <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${aluno.status === 'Ativo' ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
           {aluno.status}
         </span>
       </div>
 
       <div className="bg-white border border-gray-200 rounded-xl p-6 mb-4">
-        <div className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-4">Dados pessoais</div>
+        <div className="text-th text-gray-400r mb-4">Dados pessoais</div>
         <div className="grid grid-cols-2 gap-4 text-sm">
           <div>
-            <div className="text-xs text-gray-500 mb-1">Celular</div>
+            <div className="text-label text-gray-500 mb-1">Celular</div>
             <div className="text-gray-900">{aluno.celular || '-'}</div>
           </div>
           <div>
-            <div className="text-xs text-gray-500 mb-1">CPF</div>
+            <div className="text-label text-gray-500 mb-1">CPF</div>
             <div className="text-gray-900">{aluno.cpf || '-'}</div>
           </div>
           <div>
-            <div className="text-xs text-gray-500 mb-1">Sexo</div>
+            <div className="text-label text-gray-500 mb-1">Sexo</div>
             <div className="text-gray-900">{aluno.sexo === 'M' ? 'Masculino' : aluno.sexo === 'F' ? 'Feminino' : '-'}</div>
           </div>
           <div>
-            <div className="text-xs text-gray-500 mb-1">Data de nascimento</div>
+            <div className="text-label text-gray-500 mb-1">Data de nascimento</div>
             <div className="text-gray-900">{formataData(aluno.data_nascimento)}</div>
           </div>
           <div>
-            <div className="text-xs text-gray-500 mb-1">Data de cadastro</div>
+            <div className="text-label text-gray-500 mb-1">Data de cadastro</div>
             <div className="text-gray-900">{formataData(aluno.data_cadastro)}</div>
           </div>
           <div>
-            <div className="text-xs text-gray-500 mb-1">Data de vencimento</div>
+            <div className="text-label text-gray-500 mb-1">Data de vencimento</div>
             <div className="text-gray-900">{formataData(aluno.data_vencimento)}</div>
           </div>
           <div>
-            <div className="text-xs text-gray-500 mb-1">ID Asaas</div>
-            <div className="text-gray-900 font-mono text-xs">{aluno.asaas_customer_id ?? '-'}</div>
+            <div className="text-label text-gray-500 mb-1">ID Asaas</div>
+            <div className="text-gray-900 font-mono text-sm">{aluno.asaas_customer_id ?? '-'}</div>
           </div>
           <div>
-            <div className="text-xs text-gray-500 mb-1">Link Pagamento</div>
-            <div className="text-gray-900 text-xs">
+            <div className="text-label text-gray-500 mb-1">Link Pagamento</div>
+            <div className="text-gray-900 text-sm">
               {pagamentoComLink?.link_pagamento ? (
                 <button
                   onClick={() => copiarLink(pagamentoComLink.link_pagamento!, 'header')}
@@ -191,7 +191,7 @@ export default function DetalheAluno() {
       </div>
 
       <div className="bg-white border border-gray-200 rounded-xl p-6 mb-4">
-        <div className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-4">Modalidades</div>
+        <div className="text-th text-gray-400r mb-4">Modalidades</div>
 
         {!clubinho && aulasList.length === 0 && (
           <div className="text-sm text-gray-400">Nenhuma modalidade cadastrada.</div>
@@ -217,7 +217,7 @@ export default function DetalheAluno() {
 
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden mb-4">
         <div className="px-6 py-4 border-b border-gray-100">
-          <div className="text-xs font-medium text-gray-400 uppercase tracking-wider">Pagamentos</div>
+          <div className="text-th text-gray-400r">Pagamentos</div>
         </div>
         {pagamentos.length === 0 ? (
           <div className="px-6 py-4 text-sm text-gray-400">Nenhum pagamento encontrado.</div>
@@ -226,25 +226,25 @@ export default function DetalheAluno() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200">
-                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Competência</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Vencimento</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Valor</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Status</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Link</th>
+                  <th className="text-left px-4 py-3 text-th text-gray-500">Competência</th>
+                  <th className="text-left px-4 py-3 text-th text-gray-500">Vencimento</th>
+                  <th className="text-left px-4 py-3 text-th text-gray-500">Valor</th>
+                  <th className="text-left px-4 py-3 text-th text-gray-500">Status</th>
+                  <th className="text-left px-4 py-3 text-th text-gray-500">Link</th>
                 </tr>
               </thead>
               <tbody>
                 {pagamentos.map((p, i) => (
                   <tr key={p.id} className={`border-b border-gray-100 hover:bg-gray-50 ${i === pagamentos.length - 1 ? 'border-0' : ''}`}>
-                    <td className="px-4 py-3 text-gray-600 text-xs">
+                    <td className="px-4 py-3 text-gray-600 text-sm">
                       {p.data_vencimento
                         ? new Date(p.data_vencimento + 'T00:00:00').toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' })
                         : '-'}
                     </td>
-                    <td className="px-4 py-3 text-gray-600 text-xs">
+                    <td className="px-4 py-3 text-gray-600 text-sm">
                       {p.data_vencimento ? formataData(p.data_vencimento) : '-'}
                     </td>
-                    <td className="px-4 py-3 text-gray-800 font-medium text-xs">
+                    <td className="px-4 py-3 text-gray-800 font-medium text-sm">
                       R$ {p.valor?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) ?? '0,00'}
                     </td>
                     <td className="px-4 py-3">
@@ -252,7 +252,7 @@ export default function DetalheAluno() {
                         {p.status}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-xs">
+                    <td className="px-4 py-3 text-sm">
                       {p.link_pagamento ? (
                         <button
                           onClick={() => copiarLink(p.link_pagamento!, p.id)}

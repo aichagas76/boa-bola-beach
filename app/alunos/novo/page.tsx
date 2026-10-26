@@ -152,11 +152,11 @@ export default function NovoAluno() {
     <div className="max-w-2xl">
       <div className="flex items-center gap-3 mb-6">
         <button onClick={() => router.back()} className="text-sm text-gray-500 hover:text-gray-700">← Voltar</button>
-        <h1 className="text-xl font-medium text-gray-900">Novo aluno</h1>
+        <h1 className="text-page-title text-gray-900">Novo aluno</h1>
       </div>
 
       <div className="bg-white border border-gray-200 rounded-xl p-6 mb-4">
-        <div className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-4">Dados pessoais</div>
+        <div className="text-th text-gray-400r mb-4">Dados pessoais</div>
         <div className="grid grid-cols-2 gap-4">
           <div className="col-span-2">
             <FormInput
@@ -214,12 +214,12 @@ export default function NovoAluno() {
             </FormSelect>
           </div>
           <div>
-            <label className="text-xs text-gray-500 block mb-1">Data de nascimento</label>
+            <label className="text-label text-gray-500 block mb-1">Data de nascimento</label>
             <input type="date" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
               value={form.data_nascimento} onChange={e => setForm({ ...form, data_nascimento: e.target.value })} />
           </div>
           <div>
-            <label className="text-xs text-gray-500 block mb-1">Data de cadastro</label>
+            <label className="text-label text-gray-500 block mb-1">Data de cadastro</label>
             <input type="date" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
               value={form.data_cadastro} onChange={e => setForm({ ...form, data_cadastro: e.target.value })} />
           </div>
@@ -239,7 +239,7 @@ export default function NovoAluno() {
           </div>
           <div className="col-span-2 flex items-center justify-between">
             <div>
-              <div className="text-xs text-gray-500 mb-1">Status</div>
+              <div className="text-label text-gray-500 mb-1">Status</div>
               <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${form.status === 'Ativo' ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
                 {form.status}
               </span>
@@ -258,7 +258,7 @@ export default function NovoAluno() {
       </div>
 
       <div className="bg-white border border-gray-200 rounded-xl p-6 mb-6">
-        <div className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-4">Modalidades</div>
+        <div className="text-th text-gray-400r mb-4">Modalidades</div>
 
         <div className="flex items-center justify-between py-3 border-b border-gray-100">
           <span className="text-sm font-medium text-gray-900">🏆 Clubinho</span>
@@ -272,7 +272,7 @@ export default function NovoAluno() {
         </div>
         {clubinho && (
           <div className="mt-3 p-3 bg-gray-50 rounded-lg">
-            <label className="text-xs text-gray-500 block mb-1">Valor mensal</label>
+            <label className="text-label text-gray-500 block mb-1">Valor mensal</label>
             <div className="flex items-center border border-gray-200 rounded-lg bg-white">
               <span className="px-3 py-2 text-sm text-gray-600 font-semibold">R$</span>
               <input className="flex-1 border-0 px-0 py-2 text-sm bg-transparent" placeholder="150,00"
@@ -295,13 +295,13 @@ export default function NovoAluno() {
           <div className="space-y-3 mt-1">
             {aulasList.map((aula, i) => (
               <div key={i} className="p-3 bg-gray-50 rounded-lg relative">
-                <div className="text-xs font-medium text-gray-400 uppercase mb-3">Aula {i + 1}</div>
+                <div className="text-th text-gray-400 mb-3">Aula {i + 1}</div>
                 {i > 0 && (
-                  <button onClick={() => removeAula(i)} className="absolute top-3 right-3 text-red-400 hover:text-red-600 text-xs">✕</button>
+                  <button onClick={() => removeAula(i)} className="absolute top-3 right-3 text-red-400 hover:text-red-600 text-sm">✕</button>
                 )}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-xs text-gray-500 block mb-1">Professor</label>
+                    <label className="text-label text-gray-500 block mb-1">Professor</label>
                     <select className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"
                       value={aula.professor} onChange={e => updateAula(i, 'professor', e.target.value)}>
                       <option value="">Selecionar professor</option>
@@ -309,7 +309,7 @@ export default function NovoAluno() {
                     </select>
                   </div>
                   <div>
-                    <label className="text-xs text-gray-500 block mb-1">Valor mensal</label>
+                    <label className="text-label text-gray-500 block mb-1">Valor mensal</label>
                     <div className="flex items-center border border-gray-200 rounded-lg bg-white">
                       <span className="px-3 py-2 text-sm text-gray-600 font-semibold">R$</span>
                       <input className="flex-1 border-0 px-0 py-2 text-sm bg-transparent" placeholder="180,00"

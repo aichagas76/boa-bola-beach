@@ -181,14 +181,14 @@ export default function Sidebar() {
         </nav>
 
         <div className="p-4 border-t border-[#1a1a1a] space-y-2">
-          {userEmail && <div className="text-xs text-gray-400 truncate px-2">{userEmail}</div>}
-          <Link href="/logs" className="flex items-center gap-3 text-xs text-gray-500 hover:text-[#7DC421] transition-colors">
+          {userEmail && <div className="text-sm text-gray-400 truncate px-2">{userEmail}</div>}
+          <Link href="/logs" className="flex items-center gap-3 text-sm text-gray-500 hover:text-[#7DC421] transition-colors">
             <ClipboardList size={16} />
             <span>Logs</span>
           </Link>
           <button
             onClick={sair}
-            className="w-full flex items-center gap-3 text-xs text-gray-500 hover:text-red-400 transition-colors"
+            className="w-full flex items-center gap-3 text-sm text-gray-500 hover:text-red-400 transition-colors"
           >
             <LogOut size={16} />
             <span>Sair</span>

@@ -41,10 +41,10 @@ export default function Login() {
         </div>
 
         <form onSubmit={entrar} className="bg-[#111] border border-[#1a1a1a] rounded-xl p-8 space-y-4">
-          <h1 className="text-lg font-semibold text-white mb-6">Entrar</h1>
+          <h1 className="text-section-title text-white mb-6">Entrar</h1>
 
           <div>
-            <label className="text-xs text-gray-400 block mb-1">Email</label>
+            <label className="text-label text-gray-400 block mb-1">Email</label>
             <input
               type="email"
               value={email}
@@ -56,7 +56,7 @@ export default function Login() {
           </div>
 
           <div>
-            <label className="text-xs text-gray-400 block mb-1">Senha</label>
+            <label className="text-label text-gray-400 block mb-1">Senha</label>
             <input
               type="password"
               value={senha}
@@ -67,7 +67,7 @@ export default function Login() {
             />
           </div>
 
-          {erro && <p className="text-xs text-red-400">{erro}</p>}
+          {erro && <p className="text-sm text-red-400">{erro}</p>}
 
           <button
             type="submit"

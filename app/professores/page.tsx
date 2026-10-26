@@ -104,7 +104,7 @@ export default function Professores() {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">Professores</h1>
+        <h1 className="text-page-title text-gray-900">Professores</h1>
         {!mostraForm && (
           <button
             onClick={iniciarNovo}
@@ -122,7 +122,7 @@ export default function Professores() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label className="text-xs text-gray-500 block mb-1">Nome <span className="text-red-500">*</span></label>
+              <label className="text-label text-gray-500 block mb-1">Nome <span className="text-red-500">*</span></label>
               <input
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
                 placeholder="Nome completo"
@@ -131,7 +131,7 @@ export default function Professores() {
               />
             </div>
             <div>
-              <label className="text-xs text-gray-500 block mb-1">Celular</label>
+              <label className="text-label text-gray-500 block mb-1">Celular</label>
               <input
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
                 placeholder="(00) 00000-0000"
@@ -140,7 +140,7 @@ export default function Professores() {
               />
             </div>
             <div>
-              <label className="text-xs text-gray-500 block mb-1">Comissão (%)</label>
+              <label className="text-label text-gray-500 block mb-1">Comissão (%)</label>
               <input
                 type="number"
                 min="0"
@@ -173,9 +173,9 @@ export default function Professores() {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Nome</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Celular</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Comissão %</th>
+                <th className="text-left px-4 py-3 text-th text-gray-500">Nome</th>
+                <th className="text-left px-4 py-3 text-th text-gray-500">Celular</th>
+                <th className="text-left px-4 py-3 text-th text-gray-500">Comissão %</th>
                 <th className="px-4 py-3"></th>
               </tr>
             </thead>

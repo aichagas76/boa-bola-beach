@@ -135,7 +135,7 @@ export default function Categorias() {
 
   return (
     <div>
-      <h1 className="text-3xl font-bold text-gray-900 mb-8">Categorias</h1>
+      <h1 className="text-page-title text-gray-900 mb-8">Categorias</h1>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* COLUNA 1: TIPO */}
@@ -181,7 +181,7 @@ export default function Categorias() {
             <>
               <div className="space-y-2 mb-4 max-h-96 overflow-y-auto">
                 {categoriasFiltradas.length === 0 ? (
-                  <div className="text-xs text-gray-400 py-4">Nenhuma</div>
+                  <div className="text-sm text-gray-400 py-4">Nenhuma</div>
                 ) : (
                   categoriasFiltradas.map(cat => {
                     const item = dados.find(d => d.tipo === tipo && d.categoria === cat && !d.subcategoria)
@@ -195,7 +195,7 @@ export default function Categorias() {
                               type="text"
                               value={editandoValor}
                               onChange={e => setEditandoValor(e.target.value)}
-                              className="flex-1 border border-gray-200 rounded px-2 py-1 text-xs"
+                              className="flex-1 border border-gray-200 rounded px-2 py-1 text-sm"
                               autoFocus
                             />
                             <button
@@ -252,12 +252,12 @@ export default function Categorias() {
                   value={novaCategoria}
                   onChange={e => setNovaCategoria(e.target.value)}
                   placeholder="Nova"
-                  className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-xs"
+                  className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm"
                   onKeyPress={e => e.key === 'Enter' && adicionarCategoria()}
                 />
                 <button
                   onClick={adicionarCategoria}
-                  className="px-3 py-2 text-xs bg-[#7DC421] text-white rounded-lg hover:bg-[#6ab01a]"
+                  className="px-3 py-2 text-sm bg-[#7DC421] text-white rounded-lg hover:bg-[#6ab01a]"
                 >
                   +
                 </button>
@@ -271,12 +271,12 @@ export default function Categorias() {
           <div className="text-sm font-semibold text-gray-900 mb-4">Subcategorias</div>
 
           {!categoriaSelecionada ? (
-            <div className="text-xs text-gray-400 py-8 text-center">Selecione uma categoria</div>
+            <div className="text-sm text-gray-400 py-8 text-center">Selecione uma categoria</div>
           ) : (
             <>
               <div className="space-y-2 mb-4 max-h-96 overflow-y-auto">
                 {subcategoriasFiltradas.length === 0 ? (
-                  <div className="text-xs text-gray-400 py-4">Nenhuma</div>
+                  <div className="text-sm text-gray-400 py-4">Nenhuma</div>
                 ) : (
                   subcategoriasFiltradas.map(sub => (
                     <div key={sub.id} className="flex items-center gap-2">
@@ -286,7 +286,7 @@ export default function Categorias() {
                             type="text"
                             value={editandoValor}
                             onChange={e => setEditandoValor(e.target.value)}
-                            className="flex-1 border border-gray-200 rounded px-2 py-1 text-xs"
+                            className="flex-1 border border-gray-200 rounded px-2 py-1 text-sm"
                             autoFocus
                           />
                           <button
@@ -335,12 +335,12 @@ export default function Categorias() {
                   value={novaSubcategoria}
                   onChange={e => setNovaSubcategoria(e.target.value)}
                   placeholder="Nova"
-                  className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-xs"
+                  className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm"
                   onKeyPress={e => e.key === 'Enter' && adicionarSubcategoria()}
                 />
                 <button
                   onClick={adicionarSubcategoria}
-                  className="px-3 py-2 text-xs bg-[#7DC421] text-white rounded-lg hover:bg-[#6ab01a]"
+                  className="px-3 py-2 text-sm bg-[#7DC421] text-white rounded-lg hover:bg-[#6ab01a]"
                 >
                   +
                 </button>

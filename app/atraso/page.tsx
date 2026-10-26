@@ -49,7 +49,7 @@ export default function AtrasoPage() {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-xl font-medium text-gray-900">Pagamentos em Atraso</h1>
+        <h1 className="text-page-title text-gray-900">Pagamentos em Atraso</h1>
       </div>
 
       <div className="flex flex-wrap gap-3 mb-4">
@@ -57,7 +57,7 @@ export default function AtrasoPage() {
           <select
             value={filtroMes}
             onChange={e => setFiltroMes(e.target.value)}
-            className="border border-gray-200 rounded-lg px-3 py-1.5 text-xs bg-white text-gray-600"
+            className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-white text-gray-600"
           >
             <option value="">Todos os meses</option>
             {mesesDisponiveis.map(m => (
@@ -71,12 +71,12 @@ export default function AtrasoPage() {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200">
-              <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Aluno</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Competência</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Vencimento</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Valor</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Pagamento</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Status</th>
+              <th className="text-left px-4 py-3 text-th text-gray-500">Aluno</th>
+              <th className="text-left px-4 py-3 text-th text-gray-500">Competência</th>
+              <th className="text-left px-4 py-3 text-th text-gray-500">Vencimento</th>
+              <th className="text-left px-4 py-3 text-th text-gray-500">Valor</th>
+              <th className="text-left px-4 py-3 text-th text-gray-500">Pagamento</th>
+              <th className="text-left px-4 py-3 text-th text-gray-500">Status</th>
             </tr>
           </thead>
           <tbody>

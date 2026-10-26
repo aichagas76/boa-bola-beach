@@ -43,12 +43,12 @@ export default function Logs() {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-xl font-medium text-gray-900">Logs de ações</h1>
+        <h1 className="text-page-title text-gray-900">Logs de ações</h1>
       </div>
 
       <div className="bg-white border border-gray-200 rounded-xl p-4 mb-4 flex gap-4">
         <div>
-          <label className="text-xs text-gray-500 block mb-1">Usuário</label>
+          <label className="text-label text-gray-500 block mb-1">Usuário</label>
           <select
             value={filtroUsuario}
             onChange={e => setFiltroUsuario(e.target.value)}
@@ -59,7 +59,7 @@ export default function Logs() {
           </select>
         </div>
         <div>
-          <label className="text-xs text-gray-500 block mb-1">Ação</label>
+          <label className="text-label text-gray-500 block mb-1">Ação</label>
           <select
             value={filtroAcao}
             onChange={e => setFiltroAcao(e.target.value)}
@@ -75,11 +75,11 @@ export default function Logs() {
         <table className="w-full text-sm min-w-full">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200">
-              <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Data/Hora</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Usuário</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Ação</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Tabela</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Detalhes</th>
+              <th className="text-left px-4 py-3 text-th text-gray-500">Data/Hora</th>
+              <th className="text-left px-4 py-3 text-th text-gray-500">Usuário</th>
+              <th className="text-left px-4 py-3 text-th text-gray-500">Ação</th>
+              <th className="text-left px-4 py-3 text-th text-gray-500">Tabela</th>
+              <th className="text-left px-4 py-3 text-th text-gray-500">Detalhes</th>
             </tr>
           </thead>
           <tbody>
@@ -91,17 +91,17 @@ export default function Logs() {
             )}
             {filtrados.map((log, i) => (
               <tr key={log.id} className={`border-b border-gray-100 hover:bg-gray-50 ${i === filtrados.length - 1 ? 'border-0' : ''}`}>
-                <td className="px-4 py-3 text-gray-600 text-xs whitespace-nowrap">
+                <td className="px-4 py-3 text-gray-600 text-sm whitespace-nowrap">
                   {new Date(log.created_at).toLocaleString('pt-BR')}
                 </td>
-                <td className="px-4 py-3 text-gray-600 text-xs">{log.usuario_email}</td>
+                <td className="px-4 py-3 text-gray-600 text-sm">{log.usuario_email}</td>
                 <td className="px-4 py-3">
                   <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700">
                     {log.acao}
                   </span>
                 </td>
-                <td className="px-4 py-3 text-gray-500 text-xs">{log.tabela ?? '-'}</td>
-                <td className="px-4 py-3 text-gray-600 text-xs">{log.detalhes ?? '-'}</td>
+                <td className="px-4 py-3 text-gray-500 text-sm">{log.tabela ?? '-'}</td>
+                <td className="px-4 py-3 text-gray-600 text-sm">{log.detalhes ?? '-'}</td>
               </tr>
             ))}
           </tbody>

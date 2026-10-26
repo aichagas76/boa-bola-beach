@@ -131,7 +131,7 @@ export default function Financeiro() {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">Financeiro</h1>
+        <h1 className="text-page-title text-gray-900">Financeiro</h1>
         <Link
           href="/financeiro/novo"
           className="px-4 py-2.5 text-sm bg-[#7DC421] text-white font-medium rounded-lg hover:bg-[#6ab01a] transition-colors"
@@ -143,21 +143,21 @@ export default function Financeiro() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <div className="bg-white border border-[#7DC421] rounded-xl p-6">
           <div className="text-sm font-medium text-gray-600 mb-2">Total Entradas</div>
-          <div className="text-3xl font-bold text-green-600">
+          <div className="text-kpi text-green-600">
             R$ {totais.entradas.toFixed(2).replace('.', ',')}
           </div>
         </div>
 
         <div className="bg-white border border-[#7DC421] rounded-xl p-6">
           <div className="text-sm font-medium text-gray-600 mb-2">Total Saídas</div>
-          <div className="text-3xl font-bold text-red-600">
+          <div className="text-kpi text-red-600">
             R$ {totais.saidas.toFixed(2).replace('.', ',')}
           </div>
         </div>
 
         <div className="bg-white border border-[#7DC421] rounded-xl p-6">
           <div className="text-sm font-medium text-gray-600 mb-2">Saldo</div>
-          <div className={`text-3xl font-bold ${totais.saldo >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+          <div className={`text-kpi ${totais.saldo >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
             R$ {totais.saldo.toFixed(2).replace('.', ',')}
           </div>
         </div>
@@ -166,7 +166,7 @@ export default function Financeiro() {
       <div className="bg-white border border-gray-200 rounded-xl p-6 mb-6">
         <div className="flex gap-4">
           <div>
-            <label className="text-xs text-gray-500 block mb-1">Mês</label>
+            <label className="text-label text-gray-500 block mb-1">Mês</label>
             <select
               value={filtroMes}
               onChange={e => setFiltroMes(e.target.value)}
@@ -188,7 +188,7 @@ export default function Financeiro() {
             </select>
           </div>
           <div>
-            <label className="text-xs text-gray-500 block mb-1">Ano</label>
+            <label className="text-label text-gray-500 block mb-1">Ano</label>
             <select
               value={filtroAno}
               onChange={e => setFiltroAno(e.target.value)}
@@ -202,7 +202,7 @@ export default function Financeiro() {
             </select>
           </div>
           <div>
-            <label className="text-xs text-gray-500 block mb-1">Tipo</label>
+            <label className="text-label text-gray-500 block mb-1">Tipo</label>
             <select
               value={filtroTipo}
               onChange={e => setFiltroTipo(e.target.value)}
@@ -223,37 +223,37 @@ export default function Financeiro() {
               <tr className="bg-gray-50 border-b border-gray-200">
                 <th
                   onClick={() => alternarOrdenacao('data')}
-                  className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide cursor-pointer hover:bg-gray-100"
+                  className="text-left px-4 py-3 text-th text-gray-500 cursor-pointer hover:bg-gray-100"
                 >
                   Data {ordenacao.coluna === 'data' && (ordenacao.direcao === 'asc' ? '↑' : '↓')}
                 </th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Tipo</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Categoria</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Subcategoria</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Descrição</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Professor</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Aluno</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Competência</th>
+              <th className="text-left px-4 py-3 text-th text-gray-500">Tipo</th>
+              <th className="text-left px-4 py-3 text-th text-gray-500">Categoria</th>
+              <th className="text-left px-4 py-3 text-th text-gray-500">Subcategoria</th>
+              <th className="text-left px-4 py-3 text-th text-gray-500">Descrição</th>
+              <th className="text-left px-4 py-3 text-th text-gray-500">Professor</th>
+              <th className="text-left px-4 py-3 text-th text-gray-500">Aluno</th>
+              <th className="text-left px-4 py-3 text-th text-gray-500">Competência</th>
               <th
                 onClick={() => alternarOrdenacao('status')}
-                className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide cursor-pointer hover:bg-gray-100"
+                className="text-left px-4 py-3 text-th text-gray-500 cursor-pointer hover:bg-gray-100"
               >
                 Status {ordenacao.coluna === 'status' && (ordenacao.direcao === 'asc' ? '↑' : '↓')}
               </th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Pagamento</th>
+              <th className="text-left px-4 py-3 text-th text-gray-500">Pagamento</th>
               <th
                 onClick={() => alternarOrdenacao('vencimento')}
-                className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide cursor-pointer hover:bg-gray-100"
+                className="text-left px-4 py-3 text-th text-gray-500 cursor-pointer hover:bg-gray-100"
               >
                 Vencimento {ordenacao.coluna === 'vencimento' && (ordenacao.direcao === 'asc' ? '↑' : '↓')}
               </th>
               <th
                 onClick={() => alternarOrdenacao('valor')}
-                className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide cursor-pointer hover:bg-gray-100"
+                className="text-left px-4 py-3 text-th text-gray-500 cursor-pointer hover:bg-gray-100"
               >
                 Valor {ordenacao.coluna === 'valor' && (ordenacao.direcao === 'asc' ? '↑' : '↓')}
               </th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Ações</th>
+              <th className="text-left px-4 py-3 text-th text-gray-500">Ações</th>
               </tr>
             </thead>
             <tbody>

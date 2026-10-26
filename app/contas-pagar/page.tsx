@@ -65,26 +65,26 @@ export default function ContasPagar() {
 
   return (
     <div>
-      <h1 className="text-3xl font-bold text-gray-900 mb-8">Contas a Pagar</h1>
+      <h1 className="text-page-title text-gray-900 mb-8">Contas a Pagar</h1>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <div className="bg-white border border-red-500 rounded-xl p-6">
           <div className="text-sm font-medium text-gray-600 mb-2">Total a Pagar</div>
-          <div className="text-3xl font-bold text-red-600">
+          <div className="text-kpi text-red-600">
             R$ {totalPagar.toFixed(2).replace('.', ',')}
           </div>
         </div>
 
         <div className="bg-white border border-red-500 rounded-xl p-6">
           <div className="text-sm font-medium text-gray-600 mb-2">Vencido</div>
-          <div className="text-3xl font-bold text-red-600">
+          <div className="text-kpi text-red-600">
             R$ {vencido.toFixed(2).replace('.', ',')}
           </div>
         </div>
 
         <div className="bg-white border border-blue-500 rounded-xl p-6">
           <div className="text-sm font-medium text-gray-600 mb-2">A Vencer</div>
-          <div className="text-3xl font-bold text-blue-600">
+          <div className="text-kpi text-blue-600">
             R$ {aVencer.toFixed(2).replace('.', ',')}
           </div>
         </div>
@@ -94,13 +94,13 @@ export default function ContasPagar() {
         <table className="w-full text-sm min-w-full">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200">
-              <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Vencimento</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Fornecedor</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Categoria</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Descrição</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Valor</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Status</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Ações</th>
+              <th className="text-left px-4 py-3 text-th text-gray-500">Vencimento</th>
+              <th className="text-left px-4 py-3 text-th text-gray-500">Fornecedor</th>
+              <th className="text-left px-4 py-3 text-th text-gray-500">Categoria</th>
+              <th className="text-left px-4 py-3 text-th text-gray-500">Descrição</th>
+              <th className="text-left px-4 py-3 text-th text-gray-500">Valor</th>
+              <th className="text-left px-4 py-3 text-th text-gray-500">Status</th>
+              <th className="text-left px-4 py-3 text-th text-gray-500">Ações</th>
             </tr>
           </thead>
           <tbody>

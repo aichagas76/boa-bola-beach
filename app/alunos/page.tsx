@@ -278,7 +278,7 @@ export default function Alunos() {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-xl font-medium text-gray-900">Alunos</h1>
+        <h1 className="text-page-title text-gray-900">Alunos</h1>
         <Link
           href="/alunos/novo"
           className="flex items-center gap-2 bg-[#7DC421] text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-[#6ab01a] transition-colors"
@@ -302,7 +302,7 @@ export default function Alunos() {
           <button
             key={f}
             onClick={() => setFiltro(f)}
-            className={`px-4 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+            className={`px-4 py-1.5 rounded-full text-sm font-medium border transition-colors ${
               filtro === f
                 ? 'bg-[#7DC421] text-white border-[#7DC421]'
                 : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
@@ -318,24 +318,24 @@ export default function Alunos() {
           <table className="w-full text-sm min-w-full">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
-              <th onClick={() => handleSort('nome')} className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide cursor-pointer hover:bg-gray-100 transition-colors">
+              <th onClick={() => handleSort('nome')} className="text-left px-4 py-3 text-th text-gray-500 cursor-pointer hover:bg-gray-100 transition-colors">
                 Nome {sortConfig.column === 'nome' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
               </th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Celular</th>
-              <th onClick={() => handleSort('data_vencimento')} className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide cursor-pointer hover:bg-gray-100 transition-colors">
+              <th className="text-left px-4 py-3 text-th text-gray-500">Celular</th>
+              <th onClick={() => handleSort('data_vencimento')} className="text-left px-4 py-3 text-th text-gray-500 cursor-pointer hover:bg-gray-100 transition-colors">
                 Vencimento {sortConfig.column === 'data_vencimento' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
               </th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Últ. Pagamento</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Modalidade</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Professor</th>
-              <th onClick={() => handleSort('valor_total')} className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide cursor-pointer hover:bg-gray-100 transition-colors">
+              <th className="text-left px-4 py-3 text-th text-gray-500">Últ. Pagamento</th>
+              <th className="text-left px-4 py-3 text-th text-gray-500">Modalidade</th>
+              <th className="text-left px-4 py-3 text-th text-gray-500">Professor</th>
+              <th onClick={() => handleSort('valor_total')} className="text-left px-4 py-3 text-th text-gray-500 cursor-pointer hover:bg-gray-100 transition-colors">
                 Valor {sortConfig.column === 'valor_total' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
               </th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Parcial</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">ID Asaas</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Link</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Status</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Ações</th>
+              <th className="text-left px-4 py-3 text-th text-gray-500">Parcial</th>
+              <th className="text-left px-4 py-3 text-th text-gray-500">ID Asaas</th>
+              <th className="text-left px-4 py-3 text-th text-gray-500">Link</th>
+              <th className="text-left px-4 py-3 text-th text-gray-500">Status</th>
+              <th className="text-left px-4 py-3 text-th text-gray-500">Ações</th>
             </tr>
           </thead>
           <tbody>
@@ -359,25 +359,25 @@ export default function Alunos() {
                 <td className="px-4 py-3 text-gray-600">
                   {aluno.data_vencimento ? new Date(aluno.data_vencimento + 'T00:00:00').toLocaleDateString('pt-BR') : '-'}
                 </td>
-                <td className="px-4 py-3 text-gray-600 text-xs">
+                <td className="px-4 py-3 text-gray-600 text-sm">
                   {aluno.ultimo_pagamento ? new Date(aluno.ultimo_pagamento + 'T00:00:00').toLocaleDateString('pt-BR') : '-'}
                 </td>
                 <td className="px-4 py-3 text-lg">{iconeModalidade(aluno.modalidades)}</td>
-                <td className="px-4 py-3 text-gray-600 text-xs">{aluno.professores_nomes}</td>
+                <td className="px-4 py-3 text-gray-600 text-sm">{aluno.professores_nomes}</td>
                 <td className="px-4 py-3 text-gray-600">
                   {aluno.valor_total > 0 ? `R$ ${aluno.valor_total.toFixed(2).replace('.', ',')}` : '-'}
                 </td>
-                <td className="px-4 py-3 text-xs font-medium">
+                <td className="px-4 py-3 text-sm font-medium">
                   {aluno.parcial_mes > 0 ? (
                     <span className="text-yellow-600">R$ {aluno.parcial_mes.toFixed(2).replace('.', ',')}</span>
                   ) : (
                     <span className="text-gray-400">-</span>
                   )}
                 </td>
-                <td className="px-4 py-3 text-gray-500 text-xs font-mono">
+                <td className="px-4 py-3 text-gray-500 text-sm font-mono">
                   {aluno.asaas_customer_id ?? '-'}
                 </td>
-                <td className="px-4 py-3 text-xs">
+                <td className="px-4 py-3 text-sm">
                   {aluno.link_pagamento ? (
                     <a href={aluno.link_pagamento} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">🔗 Pagar</a>
                   ) : (
@@ -434,14 +434,14 @@ export default function Alunos() {
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
             <div className="p-6 border-b border-gray-100">
-              <h2 className="text-lg font-semibold text-gray-900">Registrar pagamento</h2>
+              <h2 className="text-section-title text-gray-900">Registrar pagamento</h2>
               <p className="text-sm text-gray-500 mt-1">{alunoModal.nome}</p>
             </div>
 
             <div className="p-6 space-y-4">
               {/* Matrículas */}
               <div>
-                <div className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-2">Matrículas</div>
+                <div className="text-th text-gray-400r mb-2">Matrículas</div>
                 {matriculasModal.length === 0 ? (
                   <p className="text-sm text-gray-400">Nenhuma matrícula encontrada.</p>
                 ) : (
@@ -451,7 +451,7 @@ export default function Alunos() {
                         <div>
                           <span className="text-sm font-medium text-gray-800">{m.tipo}</span>
                           {m.professor_nome && (
-                            <span className="text-xs text-gray-500 ml-2">— {m.professor_nome}</span>
+                            <span className="text-sm text-gray-500 ml-2">— {m.professor_nome}</span>
                           )}
                         </div>
                         <span className="text-sm font-semibold text-[#7DC421]">
@@ -460,7 +460,7 @@ export default function Alunos() {
                       </div>
                     ))}
                     <div className="flex justify-between pt-1 border-t border-gray-100">
-                      <span className="text-xs font-medium text-gray-500">Total</span>
+                      <span className="text-sm font-medium text-gray-500">Total</span>
                       <span className="text-sm font-bold text-gray-900">
                         R$ {matriculasModal.reduce((acc, m) => acc + m.valor, 0).toFixed(2).replace('.', ',')}
                       </span>
@@ -472,7 +472,7 @@ export default function Alunos() {
               {/* Valor pago */}
               {matriculasModal.length > 0 && (
                 <div>
-                  <label className="text-xs text-gray-500 block mb-1">Valor pago</label>
+                  <label className="text-label text-gray-500 block mb-1">Valor pago</label>
                   <input
                     type="text"
                     value={valorParcial}
@@ -505,7 +505,7 @@ export default function Alunos() {
 
               {/* Forma de pagamento */}
               <div>
-                <label className="text-xs text-gray-500 block mb-1">Meio de pagamento</label>
+                <label className="text-label text-gray-500 block mb-1">Meio de pagamento</label>
                 <select
                   value={formPgto.forma_pagamento}
                   onChange={e => setFormPgto({ ...formPgto, forma_pagamento: e.target.value })}
@@ -521,7 +521,7 @@ export default function Alunos() {
 
               {/* Data de pagamento */}
               <div>
-                <label className="text-xs text-gray-500 block mb-1">Data de pagamento</label>
+                <label className="text-label text-gray-500 block mb-1">Data de pagamento</label>
                 <input
                   type="date"
                   value={formPgto.data_pagamento}

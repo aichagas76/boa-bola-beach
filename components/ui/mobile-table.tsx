@@ -20,7 +20,7 @@ export function MobileTable({ columns, data, renderCell }: MobileTableProps) {
         >
           {mobileColumns.map((col) => (
             <div key={col.key} className="flex justify-between items-start gap-4">
-              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide flex-shrink-0">
+              <label className="text-th text-gray-500 flex-shrink-0">
                 {col.label}
               </label>
               <div className="text-sm text-gray-900 text-right flex-1">

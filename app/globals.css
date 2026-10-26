@@ -128,3 +128,53 @@
     @apply font-sans;
   }
 }
+
+/* ===== Escala tipográfica do Boa Bola (usar estas classes; nada de tamanhos soltos) =====
+   Título da página ........ text-page-title   24px (20px no celular), semibold
+   Título de seção/modal .... text-section-title 18px, semibold
+   Indicador / total (R$) ... text-kpi          24px, semibold, números alinhados
+   Cabeçalho de tabela ...... text-th           13px, caixa alta, medium
+   Rótulo de campo .......... text-label        13px, medium
+   Corpo, tabelas, campos,
+   botões .................. text-sm           14px
+   Auxiliar (ajuda, selos) .. text-xs           12px (mínimo permitido)                    */
+@utility text-page-title {
+  font-size: 1.25rem;
+  line-height: 1.75rem;
+  font-weight: 600;
+  @media (min-width: 768px) {
+    font-size: 1.5rem;
+    line-height: 2rem;
+  }
+}
+@utility text-section-title {
+  font-size: 1.125rem;
+  line-height: 1.75rem;
+  font-weight: 600;
+}
+@utility text-kpi {
+  font-size: 1.5rem;
+  line-height: 2rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+@utility text-th {
+  font-size: 0.8125rem;
+  line-height: 1.25rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+@utility text-label {
+  font-size: 0.8125rem;
+  line-height: 1.25rem;
+  font-weight: 500;
+}
+
+/* Valores em colunas alinhados */
+td, th { font-variant-numeric: tabular-nums; }
+
+/* Celular: campos com 16px evitam o zoom automático do iPhone ao digitar */
+@media (max-width: 767px) {
+  input, select, textarea { font-size: 16px; }
+}

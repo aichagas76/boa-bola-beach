@@ -178,24 +178,24 @@ export default function EditarAluno() {
     <div className="max-w-2xl">
       <div className="flex items-center gap-3 mb-6">
         <button onClick={() => router.back()} className="text-sm text-gray-500 hover:text-gray-700">← Voltar</button>
-        <h1 className="text-xl font-medium text-gray-900">Editar aluno</h1>
+        <h1 className="text-page-title text-gray-900">Editar aluno</h1>
       </div>
 
       <div className="bg-white border border-gray-200 rounded-xl p-6 mb-4">
-        <div className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-4">Dados pessoais</div>
+        <div className="text-th text-gray-400r mb-4">Dados pessoais</div>
         <div className="grid grid-cols-2 gap-4">
           <div className="col-span-2">
-            <label className="text-xs text-gray-500 block mb-1">Nome completo</label>
+            <label className="text-label text-gray-500 block mb-1">Nome completo</label>
             <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" placeholder="Nome completo do aluno"
               value={form.nome} onChange={e => setForm({ ...form, nome: e.target.value })} />
           </div>
           <div>
-            <label className="text-xs text-gray-500 block mb-1">Celular</label>
+            <label className="text-label text-gray-500 block mb-1">Celular</label>
             <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" placeholder="(00) 9 0000-0000"
               value={form.celular} onChange={e => setForm({ ...form, celular: mascaraCelular(e.target.value) })} />
           </div>
           <div>
-            <label className="text-xs text-gray-500 block mb-1">CPF</label>
+            <label className="text-label text-gray-500 block mb-1">CPF</label>
             <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" placeholder="000.000.000-00"
               value={form.cpf} onChange={e => {
                 const masked = mascaraCPF(e.target.value)
@@ -210,7 +210,7 @@ export default function EditarAluno() {
             {cpfValido === false && <p className="text-xs text-red-600 mt-1">✗ CPF inválido</p>}
           </div>
           <div>
-            <label className="text-xs text-gray-500 block mb-1">Sexo</label>
+            <label className="text-label text-gray-500 block mb-1">Sexo</label>
             <select className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"
               value={form.sexo} onChange={e => setForm({ ...form, sexo: e.target.value })}>
               <option value="">Selecionar</option>
@@ -219,23 +219,23 @@ export default function EditarAluno() {
             </select>
           </div>
           <div>
-            <label className="text-xs text-gray-500 block mb-1">Data de nascimento</label>
+            <label className="text-label text-gray-500 block mb-1">Data de nascimento</label>
             <input type="date" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
               value={form.data_nascimento} onChange={e => setForm({ ...form, data_nascimento: e.target.value })} />
           </div>
           <div>
-            <label className="text-xs text-gray-500 block mb-1">Data de cadastro</label>
+            <label className="text-label text-gray-500 block mb-1">Data de cadastro</label>
             <input type="date" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
               value={form.data_cadastro} onChange={e => setForm({ ...form, data_cadastro: e.target.value })} />
           </div>
           <div>
-            <label className="text-xs text-gray-500 block mb-1">Data de vencimento</label>
+            <label className="text-label text-gray-500 block mb-1">Data de vencimento</label>
             <input type="date" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
               value={form.data_vencimento} onChange={e => setForm({ ...form, data_vencimento: e.target.value })} />
           </div>
           <div className="col-span-2 flex items-center justify-between">
             <div>
-              <div className="text-xs text-gray-500 mb-1">Status</div>
+              <div className="text-label text-gray-500 mb-1">Status</div>
               <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${form.status === 'Ativo' ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
                 {form.status}
               </span>
@@ -254,7 +254,7 @@ export default function EditarAluno() {
       </div>
 
       <div className="bg-white border border-gray-200 rounded-xl p-6 mb-6">
-        <div className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-4">Modalidades</div>
+        <div className="text-th text-gray-400r mb-4">Modalidades</div>
 
         <div className="flex items-center justify-between py-3 border-b border-gray-100">
           <span className="text-sm font-medium text-gray-900">🏆 Clubinho</span>
@@ -268,7 +268,7 @@ export default function EditarAluno() {
         </div>
         {clubinho && (
           <div className="mt-3 p-3 bg-gray-50 rounded-lg">
-            <label className="text-xs text-gray-500 block mb-1">Valor mensal</label>
+            <label className="text-label text-gray-500 block mb-1">Valor mensal</label>
             <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white" placeholder="150,00"
               value={valorClubinho} onChange={e => setValorClubinho(mascaraValor(e.target.value))} />
           </div>
@@ -288,13 +288,13 @@ export default function EditarAluno() {
           <div className="space-y-3 mt-1">
             {aulasList.map((aula, i) => (
               <div key={i} className="p-3 bg-gray-50 rounded-lg relative">
-                <div className="text-xs font-medium text-gray-400 uppercase mb-3">Aula {i + 1}</div>
+                <div className="text-th text-gray-400 mb-3">Aula {i + 1}</div>
                 {i > 0 && (
-                  <button onClick={() => removeAula(i)} className="absolute top-3 right-3 text-red-400 hover:text-red-600 text-xs">✕</button>
+                  <button onClick={() => removeAula(i)} className="absolute top-3 right-3 text-red-400 hover:text-red-600 text-sm">✕</button>
                 )}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-xs text-gray-500 block mb-1">Professor</label>
+                    <label className="text-label text-gray-500 block mb-1">Professor</label>
                     <select className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"
                       value={aula.professor} onChange={e => updateAula(i, 'professor', e.target.value)}>
                       <option value="">Selecionar professor</option>
@@ -302,7 +302,7 @@ export default function EditarAluno() {
                     </select>
                   </div>
                   <div>
-                    <label className="text-xs text-gray-500 block mb-1">Valor mensal</label>
+                    <label className="text-label text-gray-500 block mb-1">Valor mensal</label>
                     <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white" placeholder="180,00"
                       value={aula.valor} onChange={e => updateAula(i, 'valor', mascaraValor(e.target.value))} />
                   </div>

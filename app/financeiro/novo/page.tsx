@@ -140,13 +140,13 @@ export default function NovoFinanceiro() {
     <div className="max-w-2xl">
       <div className="flex items-center gap-3 mb-6">
         <button onClick={() => router.back()} className="text-sm text-gray-500 hover:text-gray-700">← Voltar</button>
-        <h1 className="text-xl font-medium text-gray-900">Nova Movimentação</h1>
+        <h1 className="text-page-title text-gray-900">Nova Movimentação</h1>
       </div>
 
       <div className="bg-white border border-gray-200 rounded-xl p-6 mb-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="text-xs text-gray-500 block mb-1">Tipo</label>
+            <label className="text-label text-gray-500 block mb-1">Tipo</label>
             <select
               value={form.tipo}
               onChange={e => setForm({ ...form, tipo: e.target.value as 'Entrada' | 'Saída', categoria_id: '' })}
@@ -158,7 +158,7 @@ export default function NovoFinanceiro() {
           </div>
 
           <div>
-            <label className="text-xs text-gray-500 block mb-1">Categoria</label>
+            <label className="text-label text-gray-500 block mb-1">Categoria</label>
             <select
               value={form.categoria_id}
               onChange={e => setForm({ ...form, categoria_id: e.target.value })}
@@ -172,7 +172,7 @@ export default function NovoFinanceiro() {
           </div>
 
           <div>
-            <label className="text-xs text-gray-500 block mb-1">Subcategoria (opcional)</label>
+            <label className="text-label text-gray-500 block mb-1">Subcategoria (opcional)</label>
             <select
               value={form.categoria_id && subcategoriasDA.some(s => s.id === form.categoria_id) ? form.categoria_id : ''}
               onChange={e => e.target.value && setForm({ ...form, categoria_id: e.target.value })}
@@ -187,7 +187,7 @@ export default function NovoFinanceiro() {
           </div>
 
           <div>
-            <label className="text-xs text-gray-500 block mb-1">{form.tipo === 'Entrada' ? 'Cliente' : 'Fornecedor'}</label>
+            <label className="text-label text-gray-500 block mb-1">{form.tipo === 'Entrada' ? 'Cliente' : 'Fornecedor'}</label>
             <select
               value={form.pessoa_id}
               onChange={e => setForm({ ...form, pessoa_id: e.target.value })}
@@ -201,7 +201,7 @@ export default function NovoFinanceiro() {
           </div>
 
           <div>
-            <label className="text-xs text-gray-500 block mb-1">Aluno (opcional)</label>
+            <label className="text-label text-gray-500 block mb-1">Aluno (opcional)</label>
             <select
               value={form.aluno_ref_id}
               onChange={e => setForm({ ...form, aluno_ref_id: e.target.value })}
@@ -215,7 +215,7 @@ export default function NovoFinanceiro() {
           </div>
 
           <div>
-            <label className="text-xs text-gray-500 block mb-1">Professor (opcional)</label>
+            <label className="text-label text-gray-500 block mb-1">Professor (opcional)</label>
             <select
               value={form.professor_id}
               onChange={e => setForm({ ...form, professor_id: e.target.value })}
@@ -229,7 +229,7 @@ export default function NovoFinanceiro() {
           </div>
 
           <div>
-            <label className="text-xs text-gray-500 block mb-1">Conta bancária (opcional)</label>
+            <label className="text-label text-gray-500 block mb-1">Conta bancária (opcional)</label>
             <select
               value={form.conta_bancaria_id}
               onChange={e => setForm({ ...form, conta_bancaria_id: e.target.value })}
@@ -243,14 +243,14 @@ export default function NovoFinanceiro() {
           </div>
 
           <div>
-            <label className="text-xs text-gray-500 block mb-1">Status</label>
+            <label className="text-label text-gray-500 block mb-1">Status</label>
             <div className="flex gap-2">
               {form.tipo === 'Entrada' ? (
                 <>
                   <button
                     type="button"
                     onClick={() => setForm({ ...form, status: 'Recebido' })}
-                    className={`flex-1 px-3 py-2 text-xs rounded-lg font-medium ${
+                    className={`flex-1 px-3 py-2 text-sm rounded-lg font-medium ${
                       form.status === 'Recebido'
                         ? 'bg-[#7DC421] text-white'
                         : 'bg-gray-100 text-gray-600'
@@ -261,7 +261,7 @@ export default function NovoFinanceiro() {
                   <button
                     type="button"
                     onClick={() => setForm({ ...form, status: 'Não recebido' })}
-                    className={`flex-1 px-3 py-2 text-xs rounded-lg font-medium ${
+                    className={`flex-1 px-3 py-2 text-sm rounded-lg font-medium ${
                       form.status === 'Não recebido'
                         ? 'bg-[#7DC421] text-white'
                         : 'bg-gray-100 text-gray-600'
@@ -275,7 +275,7 @@ export default function NovoFinanceiro() {
                   <button
                     type="button"
                     onClick={() => setForm({ ...form, status: 'Pago' })}
-                    className={`flex-1 px-3 py-2 text-xs rounded-lg font-medium ${
+                    className={`flex-1 px-3 py-2 text-sm rounded-lg font-medium ${
                       form.status === 'Pago'
                         ? 'bg-[#7DC421] text-white'
                         : 'bg-gray-100 text-gray-600'
@@ -286,7 +286,7 @@ export default function NovoFinanceiro() {
                   <button
                     type="button"
                     onClick={() => setForm({ ...form, status: 'Pendente' })}
-                    className={`flex-1 px-3 py-2 text-xs rounded-lg font-medium ${
+                    className={`flex-1 px-3 py-2 text-sm rounded-lg font-medium ${
                       form.status === 'Pendente'
                         ? 'bg-[#7DC421] text-white'
                         : 'bg-gray-100 text-gray-600'
@@ -300,7 +300,7 @@ export default function NovoFinanceiro() {
           </div>
 
           <div>
-            <label className="text-xs text-gray-500 block mb-1">Data</label>
+            <label className="text-label text-gray-500 block mb-1">Data</label>
             <input
               type="date"
               value={form.data}
@@ -310,7 +310,7 @@ export default function NovoFinanceiro() {
           </div>
 
           <div>
-            <label className="text-xs text-gray-500 block mb-1">Data de vencimento</label>
+            <label className="text-label text-gray-500 block mb-1">Data de vencimento</label>
             <input
               type="date"
               value={form.data_vencimento}
@@ -321,7 +321,7 @@ export default function NovoFinanceiro() {
           </div>
 
           <div>
-            <label className="text-xs text-gray-500 block mb-1">Data de pagamento (opcional)</label>
+            <label className="text-label text-gray-500 block mb-1">Data de pagamento (opcional)</label>
             <input
               type="date"
               value={form.data_pagamento}
@@ -331,7 +331,7 @@ export default function NovoFinanceiro() {
           </div>
 
           <div className="md:col-span-2">
-            <label className="text-xs text-gray-500 block mb-1">Descrição</label>
+            <label className="text-label text-gray-500 block mb-1">Descrição</label>
             <input
               type="text"
               value={form.descricao}
@@ -343,7 +343,7 @@ export default function NovoFinanceiro() {
           </div>
 
           <div>
-            <label className="text-xs text-gray-500 block mb-1">Valor</label>
+            <label className="text-label text-gray-500 block mb-1">Valor</label>
             <input
               type="text"
               value={form.valor ? `R$ ${formatarValor(form.valor)}` : ''}
@@ -354,7 +354,7 @@ export default function NovoFinanceiro() {
           </div>
 
           <div>
-            <label className="text-xs text-gray-500 block mb-1">Forma de Pagamento</label>
+            <label className="text-label text-gray-500 block mb-1">Forma de Pagamento</label>
             <select
               value={form.forma_pagamento}
               onChange={e => setForm({ ...form, forma_pagamento: e.target.value })}

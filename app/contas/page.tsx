@@ -75,7 +75,7 @@ export default function Contas() {
 
   return (
     <div className="max-w-2xl">
-      <h1 className="text-3xl font-bold text-gray-900 mb-8">Contas Bancárias</h1>
+      <h1 className="text-page-title text-gray-900 mb-8">Contas Bancárias</h1>
 
       <div className="bg-white border border-gray-200 rounded-xl p-6 mb-6">
         <div className="flex gap-4">
@@ -106,8 +106,8 @@ export default function Contas() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200">
-                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Nome</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">Ações</th>
+                  <th className="text-left px-4 py-3 text-th text-gray-500">Nome</th>
+                  <th className="text-left px-4 py-3 text-th text-gray-500">Ações</th>
                 </tr>
               </thead>
               <tbody>
@@ -120,7 +120,7 @@ export default function Contas() {
                             type="text"
                             value={editandoNome}
                             onChange={e => setEditandoNome(e.target.value)}
-                            className="w-full border border-gray-200 rounded px-2 py-1 text-xs"
+                            className="w-full border border-gray-200 rounded px-2 py-1 text-sm"
                             autoFocus
                           />
                         </td>
