@@ -2,7 +2,7 @@
 
 import { mascaraValor, ESPORTE_COM_COMBO, MAX_AULAS_POR_ESPORTE, type EstadoEsporte } from '@/lib/esportes'
 
-const ICONE_ESPORTE: Record<string, string> = { 'Tênis': '🎾', 'Beach Tênis': '🏖️', Pickleball: '🏓', Padel: '🎾' }
+import IconeEsporte from '@/components/alunos/IconeEsporte'
 
 function CampoValor({ valor, onChange, placeholder }: { valor: string; onChange: (v: string) => void; placeholder: string }) {
   return (
@@ -52,7 +52,8 @@ export default function EsportesForm({ estados, onChange, professores }: Props) 
           >
             <input type="checkbox" className="h-4 w-4 accent-[#7DC421]" checked={e.ativo}
               onChange={ev => atualizar(i, x => ({ ...x, ativo: ev.target.checked }))} />
-            <span>{ICONE_ESPORTE[e.nome] ?? '🎾'} {e.nome}</span>
+            <IconeEsporte nome={e.nome} tamanho={20} />
+            <span>{e.nome}</span>
           </label>
         ))}
       </div>

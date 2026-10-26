@@ -27,9 +27,9 @@ function Erro({ texto }: { texto?: string | null }) {
   return texto ? <div className="text-xs text-red-600 mt-0.5">{texto}</div> : null
 }
 
-/** Pergunta ao banco se o CPF já existe em qualquer unidade (sem mostrar de quem é). Se a consulta falhar, não bloqueia. */
-export async function cpfJaCadastrado(cpf: string, ignorarAlunoId?: string) {
-  const { data, error } = await supabase.rpc('cpf_ja_cadastrado', { p_cpf: cpf, p_ignorar: ignorarAlunoId ?? null })
+/** Pergunta ao banco se já existe aluno com este nome em qualquer unidade (CPF pode repetir; nome não). Se a consulta falhar, não bloqueia: o banco também recusa. */
+export async function nomeJaCadastrado(nome: string, ignorarAlunoId?: string) {
+  const { data, error } = await supabase.rpc('nome_ja_cadastrado', { p_nome: nome, p_ignorar: ignorarAlunoId ?? null })
   return error ? false : data === true
 }
 
@@ -39,22 +39,20 @@ type Props = {
   erros: ErrosAluno
   mostrarErros: boolean // true depois da primeira tentativa de salvar
   alunoId?: string
-  onCpfDuplicado?: (duplicado: boolean) => void
+  onNomeDuplicado?: (duplicado: boolean) => void
 }
 
 /** Dados pessoais em poucas linhas: Nome/CPF/Celular, depois Nascimento/Sexo/Cadastro/Vencimento. */
-export default function DadosPessoais({ form, onChange, erros, mostrarErros, alunoId, onCpfDuplicado }: Props) {
+export default function DadosPessoais({ form, onChange, erros, mostrarErros, alunoId, onNomeDuplicado }: Props) {
   const [tocados, setTocados] = useState<Record<string, boolean>>({})
   const [erroCpfLocal, setErroCpfLocal] = useState<string | null>(null)
   const set = (p: Partial<FormAluno>) => onChange({ ...form, ...p })
   const marca = (k: string) => setTocados(t => ({ ...t, [k]: true }))
   const ver = (k: keyof ErrosAluno) => (mostrarErros || tocados[k]) ? erros[k] : undefined
 
-  async function aoSairDoCpf() {
+  function aoSairDoCpf() {
     marca('cpf')
-    const e = erroCPF(form.cpf)
-    setErroCpfLocal(e)
-    if (!e) onCpfDuplicado?.(await cpfJaCadastrado(form.cpf, alunoId))
+    setErroCpfLocal(erroCPF(form.cpf))
   }
 
   const erroDoCpf = ver('cpf') ?? (tocados.cpf ? erroCpfLocal : undefined)
@@ -78,13 +76,14 @@ export default function DadosPessoais({ form, onChange, erros, mostrarErros, alu
         <div className="col-span-2 md:col-span-6">
           <Rotulo>Nome completo</Rotulo>
           <input className={`${campo} ${ver('nome') ? ruim : ok}`} placeholder="Nome completo do aluno" value={form.nome}
-            onChange={e => set({ nome: e.target.value })} onBlur={() => marca('nome')} />
+            onChange={e => { set({ nome: e.target.value }); onNomeDuplicado?.(false) }}
+            onBlur={async () => { marca('nome'); if (form.nome.trim().length >= 3) onNomeDuplicado?.(await nomeJaCadastrado(form.nome, alunoId)) }} />
           <Erro texto={ver('nome')} />
         </div>
         <div className="col-span-1 md:col-span-3">
           <Rotulo>CPF</Rotulo>
           <input className={`${campo} ${erroDoCpf ? ruim : ok}`} placeholder="000.000.000-00" inputMode="numeric" value={form.cpf}
-            onChange={e => { set({ cpf: mascaraCPF(e.target.value) }); setErroCpfLocal(null); onCpfDuplicado?.(false) }}
+            onChange={e => { set({ cpf: mascaraCPF(e.target.value) }); setErroCpfLocal(null) }}
             onBlur={aoSairDoCpf} />
           <Erro texto={erroDoCpf} />
         </div>

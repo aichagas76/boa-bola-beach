@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { registrarLog } from '@/lib/log'
 import { validarDadosAluno } from '@/lib/aluno-validacao'
-import DadosPessoais, { cpfJaCadastrado, type FormAluno } from '@/components/alunos/DadosPessoais'
+import DadosPessoais, { nomeJaCadastrado, type FormAluno } from '@/components/alunos/DadosPessoais'
 import EsportesForm from '@/components/alunos/EsportesForm'
 import { useUnidade } from '@/components/layout/UnidadeProvider'
 import { carregarCatalogo, estadosIniciais, salvarMatriculas } from '@/lib/esportes-db'
@@ -16,7 +16,7 @@ export default function NovoAluno() {
   const { unidade, unidadeId } = useUnidade()
   const [loading, setLoading] = useState(false)
   const [tentou, setTentou] = useState(false)
-  const [cpfDuplicado, setCpfDuplicado] = useState(false)
+  const [nomeDuplicado, setNomeDuplicado] = useState(false)
   const [professores, setProfessores] = useState<{ id: string; nome: string }[]>([])
   const [estados, setEstados] = useState<EstadoEsporte[]>([])
 
@@ -38,15 +38,15 @@ export default function NovoAluno() {
     carregarCatalogo(supabase).then(({ esportes }) => setEstados(estadosIniciais(esportes, '')))
   }, [])
 
-  const erros = validarDadosAluno(form, { cpfJaCadastrado: cpfDuplicado })
+  const erros = validarDadosAluno(form, { nomeJaCadastrado: nomeDuplicado })
 
   async function salvar() {
     setTentou(true)
     if (!unidadeId) return alert('Seu login ainda não tem unidade liberada. Fale com quem administra o sistema.')
     // Confere o CPF de novo na hora de salvar (outra pessoa pode ter cadastrado enquanto isso)
-    const duplicado = form.cpf ? await cpfJaCadastrado(form.cpf) : false
-    setCpfDuplicado(duplicado)
-    if (Object.keys(validarDadosAluno(form, { cpfJaCadastrado: duplicado })).length > 0) return
+    const duplicado = await nomeJaCadastrado(form.nome)
+    setNomeDuplicado(duplicado)
+    if (Object.keys(validarDadosAluno(form, { nomeJaCadastrado: duplicado })).length > 0) return
 
     setLoading(true)
 
@@ -57,7 +57,7 @@ export default function NovoAluno() {
       .single()
 
     if (error || !aluno) {
-      alert('Erro ao salvar aluno: ' + error?.message)
+      alert(error?.code === '23505' ? 'Já existe um aluno com este nome.' : 'Erro ao salvar aluno: ' + error?.message)
       setLoading(false)
       return
     }
@@ -96,7 +96,7 @@ export default function NovoAluno() {
         {unidade && <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">{unidade.nome}</span>}
       </div>
 
-      <DadosPessoais form={form} onChange={setForm} erros={erros} mostrarErros={tentou} onCpfDuplicado={setCpfDuplicado} />
+      <DadosPessoais form={form} onChange={setForm} erros={erros} mostrarErros={tentou} onNomeDuplicado={setNomeDuplicado} />
 
       <div className="bg-white border border-gray-200 rounded-xl p-4 mb-4">
         <div className="text-th text-gray-400 mb-3">Esportes e modalidades</div>

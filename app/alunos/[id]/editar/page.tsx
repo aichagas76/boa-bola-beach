@@ -5,7 +5,7 @@ import { useRouter, useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { registrarLog } from '@/lib/log'
 import { validarDadosAluno } from '@/lib/aluno-validacao'
-import DadosPessoais, { cpfJaCadastrado, type FormAluno } from '@/components/alunos/DadosPessoais'
+import DadosPessoais, { nomeJaCadastrado, type FormAluno } from '@/components/alunos/DadosPessoais'
 import EsportesForm from '@/components/alunos/EsportesForm'
 import { carregarCatalogo, estadosDoAluno, salvarMatriculas } from '@/lib/esportes-db'
 import type { EstadoEsporte, MatriculaBanco } from '@/lib/esportes'
@@ -18,7 +18,7 @@ export default function EditarAluno() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [tentou, setTentou] = useState(false)
-  const [cpfDuplicado, setCpfDuplicado] = useState(false)
+  const [nomeDuplicado, setNomeDuplicado] = useState(false)
 
   const [form, setForm] = useState<FormAluno>({
     nome: '',
@@ -67,19 +67,19 @@ export default function EditarAluno() {
     carregar()
   }, [id])
 
-  const erros = validarDadosAluno(form, { cpfJaCadastrado: cpfDuplicado })
+  const erros = validarDadosAluno(form, { nomeJaCadastrado: nomeDuplicado })
 
   async function salvar() {
     setTentou(true)
-    const duplicado = form.cpf ? await cpfJaCadastrado(form.cpf, id) : false
-    setCpfDuplicado(duplicado)
-    if (Object.keys(validarDadosAluno(form, { cpfJaCadastrado: duplicado })).length > 0) return
+    const duplicado = await nomeJaCadastrado(form.nome, id)
+    setNomeDuplicado(duplicado)
+    if (Object.keys(validarDadosAluno(form, { nomeJaCadastrado: duplicado })).length > 0) return
 
     setSaving(true)
 
     const { error } = await supabase.from('alunos').update(form).eq('id', id)
     if (error) {
-      alert('Erro ao salvar aluno: ' + error.message)
+      alert(error.code === '23505' ? 'Já existe um aluno com este nome.' : 'Erro ao salvar aluno: ' + error.message)
       setSaving(false)
       return
     }
@@ -104,7 +104,7 @@ export default function EditarAluno() {
         <h1 className="text-page-title text-gray-900">Editar aluno</h1>
       </div>
 
-      <DadosPessoais form={form} onChange={setForm} erros={erros} mostrarErros={tentou} alunoId={id} onCpfDuplicado={setCpfDuplicado} />
+      <DadosPessoais form={form} onChange={setForm} erros={erros} mostrarErros={tentou} alunoId={id} onNomeDuplicado={setNomeDuplicado} />
 
       <div className="bg-white border border-gray-200 rounded-xl p-4 mb-4">
         <div className="text-th text-gray-400 mb-3">Esportes e modalidades</div>

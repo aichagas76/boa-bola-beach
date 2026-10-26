@@ -26,19 +26,19 @@ export function mascaraCelular(v: string) {
 }
 
 /** Mensagem de erro do CPF, ou null se estiver certo. Dígitos verificadores incluídos. */
-export function erroCPF(cpf: string, jaCadastrado = false): string | null {
+export function erroCPF(cpf: string): string | null {
   const nums = cpf.replace(/\D/g, '')
   if (!nums) return 'CPF é obrigatório (a cobrança precisa dele)'
   if (nums.length < 11) return 'CPF incompleto'
   if (!validarCPF(cpf)) return 'CPF inválido: confira os números'
-  if (jaCadastrado) return 'Este CPF já está cadastrado'
   return null
 }
 
-export function validarDadosAluno(d: DadosAluno, opcoes: { cpfJaCadastrado?: boolean } = {}): ErrosAluno {
+export function validarDadosAluno(d: DadosAluno, opcoes: { nomeJaCadastrado?: boolean } = {}): ErrosAluno {
   const erros: ErrosAluno = {}
   if (d.nome.trim().length < 3) erros.nome = 'Nome deve ter no mínimo 3 caracteres'
-  const ec = erroCPF(d.cpf, opcoes.cpfJaCadastrado)
+  else if (opcoes.nomeJaCadastrado) erros.nome = 'Já existe um aluno com este nome'
+  const ec = erroCPF(d.cpf)
   if (ec) erros.cpf = ec
   if (d.celular && !validarCelular(d.celular)) erros.celular = 'Celular inválido: use DDD + 9 dígitos'
   if (!d.data_vencimento) erros.data_vencimento = 'Informe o vencimento'

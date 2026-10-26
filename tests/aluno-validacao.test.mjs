@@ -17,7 +17,12 @@ test('CPF incompleto ou vazio', () => {
   assert.match(erroCPF('529.982'), /incompleto/)
   assert.match(erroCPF(''), /obrigatório/)
 })
-test('CPF repetido é recusado', () => assert.match(erroCPF('529.982.247-25', true), /já está cadastrado/))
+test('CPF repetido é permitido (só o nome não pode repetir)', () => assert.equal(erroCPF('529.982.247-25'), null))
+test('nome repetido é recusado', () => {
+  const base = { nome: 'Maria Souza', cpf: '529.982.247-25', celular: '', data_vencimento: '2026-11-10' }
+  assert.match(validarDadosAluno(base, { nomeJaCadastrado: true }).nome, /Já existe um aluno/)
+  assert.equal(validarDadosAluno(base).nome, undefined)
+})
 test('formulário completo e correto não tem erros', () => {
   const e = validarDadosAluno({ nome: 'Maria Souza', cpf: '529.982.247-25', celular: '(19) 99999-8888', data_vencimento: '2026-11-10' })
   assert.deepEqual(e, {})

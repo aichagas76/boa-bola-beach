@@ -7,6 +7,7 @@ import { registrarLog } from '@/lib/log'
 import Link from 'next/link'
 import { usePagination } from '@/lib/hooks/usePagination'
 import { Pagination } from '@/components/ui/pagination'
+import IconeEsporte from '@/components/alunos/IconeEsporte'
 
 type Aluno = {
   id: string
@@ -17,6 +18,7 @@ type Aluno = {
   data_vencimento: string
   valor_total: number
   modalidades: string[]
+  esportes: string[]
   professores_nomes: string
   ultimo_pagamento: string | null
   pago_mes: number
@@ -146,9 +148,10 @@ export default function Alunos() {
       const mats = (matriculasData ?? []).filter(m => m.aluno_id === a.id)
       const valor_total = mats.reduce((acc, m) => acc + (m.valor ?? 0), 0)
       const modalidades = mats.map(m => m.tipo)
+      const esportes = Array.from(new Set(mats.map(m => (m.esportes as unknown as { nome: string } | null)?.nome).filter(Boolean))) as string[]
       const professores_nomes = mats.filter(m => m.tipo === 'Aula' && m.professor_nome).map(m => m.professor_nome).join(' / ') || '-'
       return {
-        ...a, valor_total, modalidades, professores_nomes,
+        ...a, valor_total, modalidades, esportes, professores_nomes,
         ultimo_pagamento: ultimoPorAluno[a.id] ?? null,
         pago_mes: pagoMesPorAluno[a.id] ?? 0,
         parcial_mes: parcialMesPorAluno[a.id] ?? 0,
@@ -334,6 +337,7 @@ export default function Alunos() {
                 Vencimento {sortConfig.column === 'data_vencimento' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
               </th>
               <th className="text-left px-2 py-2.5 text-th text-gray-500">Últ. Pag.</th>
+              <th className="text-left px-2 py-2.5 text-th text-gray-500">Esporte</th>
               <th className="text-left px-2 py-2.5 text-th text-gray-500" title="Modalidade">Mod.</th>
               <th className="text-left px-2 py-2.5 text-th text-gray-500">Professor</th>
               <th onClick={() => handleSort('valor_total')} className="text-left px-2 py-2.5 text-th text-gray-500 cursor-pointer hover:bg-gray-100 transition-colors">
@@ -348,10 +352,10 @@ export default function Alunos() {
           </thead>
           <tbody>
             {loading && (
-              <tr><td colSpan={12} className="text-center py-8 text-gray-400">Carregando...</td></tr>
+              <tr><td colSpan={13} className="text-center py-8 text-gray-400">Carregando...</td></tr>
             )}
             {!loading && filtrados.length === 0 && (
-              <tr><td colSpan={12} className="text-center py-8 text-gray-400">Nenhum aluno encontrado.</td></tr>
+              <tr><td colSpan={13} className="text-center py-8 text-gray-400">Nenhum aluno encontrado.</td></tr>
             )}
             {pagination.paginatedItems.map((aluno, i) => (
               <tr key={aluno.id} className={`border-b border-gray-100 hover:bg-gray-50 ${i === pagination.paginatedItems.length - 1 && pagination.currentPage === pagination.totalPages ? 'border-0' : ''}`}>
@@ -369,6 +373,11 @@ export default function Alunos() {
                 </td>
                 <td className="px-2 py-2.5 text-gray-600 text-sm">
                   {dataCurta(aluno.ultimo_pagamento)}
+                </td>
+                <td className="px-2 py-2.5">
+                  <div className="flex items-center gap-1">
+                    {aluno.esportes.length ? aluno.esportes.map(e => <IconeEsporte key={e} nome={e} tamanho={20} />) : <span className="text-gray-400">-</span>}
+                  </div>
                 </td>
                 <td className="px-2 py-2.5 text-lg">{iconeModalidade(aluno.modalidades)}</td>
                 <td className="px-2 py-2.5 text-gray-600 text-sm max-w-[7rem] truncate" title={aluno.professores_nomes}>{aluno.professores_nomes}</td>
