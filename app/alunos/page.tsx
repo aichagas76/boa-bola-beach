@@ -9,6 +9,7 @@ import { usePagination } from '@/lib/hooks/usePagination'
 import { Pagination } from '@/components/ui/pagination'
 import IconeEsporte from '@/components/alunos/IconeEsporte'
 import IconeModalidade from '@/components/alunos/IconeModalidade'
+import { BadgeCheck, Copy, X } from 'lucide-react'
 
 type Aluno = {
   id: string
@@ -55,6 +56,16 @@ export default function Alunos() {
   const [salvandoPgto, setSalvandoPgto] = useState(false)
   const [valorParcial, setValorParcial] = useState('')
   const [gerandoId, setGerandoId] = useState<string | null>(null)
+  const [idAsaasAberto, setIdAsaasAberto] = useState<{ nome: string; id: string } | null>(null)
+  const [copiado, setCopiado] = useState(false)
+
+  async function copiarId(id: string) {
+    try {
+      await navigator.clipboard.writeText(id)
+      setCopiado(true)
+      setTimeout(() => setCopiado(false), 1500)
+    } catch { /* sem permissão para copiar: o número continua visível para copiar à mão */ }
+  }
 
   async function gerarCobranca(aluno: Aluno) {
     const txt = window.prompt(
@@ -345,7 +356,7 @@ export default function Alunos() {
                 Valor {sortConfig.column === 'valor_total' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
               </th>
               <th className="text-left px-2 py-2.5 text-th text-gray-500">Parcial</th>
-              <th className="text-left px-2 py-2.5 text-th text-gray-500">ID Asaas</th>
+              <th className="text-left px-2 py-2.5 text-th text-gray-500" title="Cadastro do aluno no Asaas">Asaas</th>
               <th className="text-left px-2 py-2.5 text-th text-gray-500">Link</th>
               <th className="text-left px-2 py-2.5 text-th text-gray-500">Status</th>
               <th className="text-left px-2 py-2.5 text-th text-gray-500">Ações</th>
@@ -392,8 +403,18 @@ export default function Alunos() {
                     <span className="text-gray-400">-</span>
                   )}
                 </td>
-                <td className="px-2 py-2.5 text-gray-500 text-sm font-mono" title={aluno.asaas_customer_id ?? undefined}>
-                  {aluno.asaas_customer_id ? `…${aluno.asaas_customer_id.slice(-6)}` : '-'}
+                <td className="px-2 py-2.5">
+                  {aluno.asaas_customer_id ? (
+                    <button
+                      onClick={() => { setCopiado(false); setIdAsaasAberto({ nome: aluno.nome, id: aluno.asaas_customer_id! }) }}
+                      title="Cadastrado no Asaas — clique para ver o número"
+                      className="text-green-600 hover:text-green-800"
+                    >
+                      <BadgeCheck size={18} />
+                    </button>
+                  ) : (
+                    <span className="text-gray-300" title="Ainda não cadastrado no Asaas">-</span>
+                  )}
                 </td>
                 <td className="px-2 py-2.5 text-sm">
                   {aluno.link_pagamento ? (
@@ -447,6 +468,27 @@ export default function Alunos() {
           onPageChange={pagination.goToPage}
         />
       </div>
+
+      {/* Número do cadastro no Asaas (só aparece quando o operador clica no ícone) */}
+      {idAsaasAberto && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => setIdAsaasAberto(null)}>
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-5" onClick={e => e.stopPropagation()}>
+            <div className="flex items-start justify-between gap-3 mb-3">
+              <div>
+                <div className="text-section-title text-gray-900">Cadastro no Asaas</div>
+                <div className="text-sm text-gray-500">{idAsaasAberto.nome}</div>
+              </div>
+              <button onClick={() => setIdAsaasAberto(null)} className="text-gray-400 hover:text-gray-600" title="Fechar"><X size={18} /></button>
+            </div>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 rounded-lg bg-gray-100 px-3 py-2 text-sm text-gray-900 select-all break-all">{idAsaasAberto.id}</code>
+              <button onClick={() => copiarId(idAsaasAberto.id)} className="inline-flex items-center gap-1.5 h-9 px-3 text-sm border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-50">
+                <Copy size={14} /> {copiado ? 'Copiado!' : 'Copiar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal pagamento */}
       {modalAberto && alunoModal && (
