@@ -8,6 +8,8 @@ import Link from 'next/link'
 import { usePagination } from '@/lib/hooks/usePagination'
 import { Pagination } from '@/components/ui/pagination'
 import IconeEsporte from '@/components/alunos/IconeEsporte'
+import { ordenar, proximaOrdem, type Direcao, type Valor } from '@/lib/ordenacao'
+import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react'
 import IconeModalidade from '@/components/alunos/IconeModalidade'
 import { BadgeCheck, Copy, X } from 'lucide-react'
 
@@ -36,13 +38,44 @@ type Matricula = {
   professor_id: string | null
 }
 
+type ColunaId = 'nome' | 'celular' | 'vencimento' | 'ultimo' | 'esporte' | 'professor' | 'valor' | 'parcial' | 'asaas' | 'link' | 'status'
+
+// O que cada coluna usa para ordenar (vazio vai sempre para o fim)
+const CHAVES: Record<ColunaId, (a: Aluno) => Valor> = {
+  nome: a => a.nome,
+  celular: a => (a.celular ?? '').replace(/\D/g, ''),
+  vencimento: a => a.data_vencimento,
+  ultimo: a => a.ultimo_pagamento,
+  esporte: a => a.esportesMod[0]?.esporte ?? null,
+  professor: a => (a.professores_nomes && a.professores_nomes !== '-' ? a.professores_nomes : null),
+  valor: a => (a.valor_total > 0 ? a.valor_total : null),
+  parcial: a => (a.parcial_mes > 0 ? a.parcial_mes : null),
+  asaas: a => (a.asaas_customer_id ? 1 : 0),
+  link: a => (a.link_pagamento ? 1 : 0),
+  status: a => a.status,
+}
+
+const COLUNAS: { id: ColunaId; titulo: string; dica?: string }[] = [
+  { id: 'nome', titulo: 'Nome' },
+  { id: 'celular', titulo: 'Celular' },
+  { id: 'vencimento', titulo: 'Vencimento' },
+  { id: 'ultimo', titulo: 'Últ. Pag.', dica: 'Último pagamento' },
+  { id: 'esporte', titulo: 'Esporte', dica: 'Esporte (bola) e modalidades (símbolos pequenos)' },
+  { id: 'professor', titulo: 'Professor' },
+  { id: 'valor', titulo: 'Valor' },
+  { id: 'parcial', titulo: 'Parcial' },
+  { id: 'asaas', titulo: 'Asaas', dica: 'Cadastro do aluno no Asaas' },
+  { id: 'link', titulo: 'Link' },
+  { id: 'status', titulo: 'Status' },
+]
+
 export default function Alunos() {
   const { unidadeId } = useUnidade()
   const [alunos, setAlunos] = useState<Aluno[]>([])
   const [busca, setBusca] = useState('')
   const [filtro, setFiltro] = useState('Todos')
   const [loading, setLoading] = useState(true)
-  const [sortConfig, setSortConfig] = useState<{ column: 'nome' | 'data_vencimento' | 'valor_total', direction: 'asc' | 'desc' }>({ column: 'nome', direction: 'asc' })
+  const [ordem, setOrdem] = useState<{ coluna: ColunaId; direcao: Direcao }>({ coluna: 'nome', direcao: 'asc' })
 
   // Modal pagamento
   const [modalAberto, setModalAberto] = useState(false)
@@ -245,13 +278,13 @@ export default function Alunos() {
     carregar()
   }
 
-  const filtrados = sortAlunos(alunos.filter(a => {
+  const filtrados = ordenar(alunos.filter(a => {
     const matchBusca = a.nome?.toLowerCase().includes(busca.toLowerCase()) ||
       a.cpf?.includes(busca) ||
       a.celular?.includes(busca)
     const matchFiltro = filtro === 'Todos' || a.status === filtro
     return matchBusca && matchFiltro
-  }))
+  }), CHAVES[ordem.coluna], ordem.direcao)
 
   const pagination = usePagination(filtrados, 15)
 
@@ -272,27 +305,6 @@ export default function Alunos() {
     if (v.length > 6) v = v.replace(/(\d{2})(\d{5})(\d{0,4})/, '($1) $2-$3')
     else if (v.length > 2) v = v.replace(/(\d{2})(\d{0,5})/, '($1) $2')
     return v
-  }
-
-  function handleSort(column: 'nome' | 'data_vencimento' | 'valor_total') {
-    setSortConfig(prev => ({
-      column,
-      direction: prev.column === column && prev.direction === 'asc' ? 'desc' : 'asc'
-    }))
-  }
-
-  function sortAlunos(lista: Aluno[]) {
-    return [...lista].sort((a, b) => {
-      let aVal: any = a[sortConfig.column]
-      let bVal: any = b[sortConfig.column]
-      if (sortConfig.column === 'nome') {
-        aVal = (aVal || '').toLowerCase()
-        bVal = (bVal || '').toLowerCase()
-      }
-      if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1
-      if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1
-      return 0
-    })
   }
 
   return (
@@ -338,25 +350,27 @@ export default function Alunos() {
           <table className="w-full text-sm whitespace-nowrap">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
-              <th onClick={() => handleSort('nome')} className="text-left px-2 py-2.5 text-th text-gray-500 cursor-pointer hover:bg-gray-100 transition-colors">
-                Nome {sortConfig.column === 'nome' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-              </th>
-              <th className="text-left px-2 py-2.5 text-th text-gray-500">Celular</th>
-              <th onClick={() => handleSort('data_vencimento')} className="text-left px-2 py-2.5 text-th text-gray-500 cursor-pointer hover:bg-gray-100 transition-colors">
-                Vencimento {sortConfig.column === 'data_vencimento' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-              </th>
-              <th className="text-left px-2 py-2.5 text-th text-gray-500">Últ. Pag.</th>
-              <th className="text-left px-2 py-2.5 text-th text-gray-500" title="Esporte (bola) e modalidades (símbolos pequenos)">Esporte</th>
-              <th className="text-left px-2 py-2.5 text-th text-gray-500">Professor</th>
-              <th onClick={() => handleSort('valor_total')} className="text-left px-2 py-2.5 text-th text-gray-500 cursor-pointer hover:bg-gray-100 transition-colors">
-                Valor {sortConfig.column === 'valor_total' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-              </th>
-              <th className="text-left px-2 py-2.5 text-th text-gray-500">Parcial</th>
-              <th className="text-left px-2 py-2.5 text-th text-gray-500" title="Cadastro do aluno no Asaas">Asaas</th>
-              <th className="text-left px-2 py-2.5 text-th text-gray-500">Link</th>
-              <th className="text-left px-2 py-2.5 text-th text-gray-500">Status</th>
-              <th className="text-left px-2 py-2.5 text-th text-gray-500">Ações</th>
-            </tr>
+                {COLUNAS.map(c => {
+                  const ativa = ordem.coluna === c.id
+                  return (
+                    <th
+                      key={c.id}
+                      onClick={() => setOrdem(o => proximaOrdem(o, c.id))}
+                      title={`${c.dica ?? c.titulo} — clique para ordenar`}
+                      aria-sort={ativa ? (ordem.direcao === 'asc' ? 'ascending' : 'descending') : 'none'}
+                      className="text-left px-2 py-2.5 text-th text-gray-500 cursor-pointer select-none hover:bg-gray-100 transition-colors"
+                    >
+                      <span className="inline-flex items-center gap-1">
+                        {c.titulo}
+                        {ativa
+                          ? (ordem.direcao === 'asc' ? <ArrowUp size={13} className="text-blue-600" /> : <ArrowDown size={13} className="text-blue-600" />)
+                          : <ArrowUpDown size={12} className="text-gray-300" />}
+                      </span>
+                    </th>
+                  )
+                })}
+                <th className="text-left px-2 py-2.5 text-th text-gray-500">Ações</th>
+              </tr>
           </thead>
           <tbody>
             {loading && (
