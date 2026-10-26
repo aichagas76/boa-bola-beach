@@ -19,8 +19,7 @@ type Aluno = {
   status: string
   data_vencimento: string
   valor_total: number
-  modalidades: string[]
-  esportes: string[]
+  esportesMod: { esporte: string; modalidades: string[] }[] // cada esporte do aluno e as modalidades dele nele
   professores_nomes: string
   ultimo_pagamento: string | null
   pago_mes: number
@@ -159,11 +158,15 @@ export default function Alunos() {
       (matriculasData ?? []).some(m => m.aluno_id === a.id && m.unidade_id === unidadeId)).map(a => {
       const mats = (matriculasData ?? []).filter(m => m.aluno_id === a.id)
       const valor_total = mats.reduce((acc, m) => acc + (m.valor ?? 0), 0)
-      const modalidades = mats.map(m => m.tipo)
-      const esportes = Array.from(new Set(mats.map(m => (m.esportes as unknown as { nome: string } | null)?.nome).filter(Boolean))) as string[]
+      const porEsporte = new Map<string, Set<string>>()
+      for (const m of mats) {
+        const nome = (m.esportes as unknown as { nome: string } | null)?.nome ?? 'Sem esporte'
+        porEsporte.set(nome, (porEsporte.get(nome) ?? new Set<string>()).add(m.tipo))
+      }
+      const esportesMod = Array.from(porEsporte.entries()).map(([esporte, tipos]) => ({ esporte, modalidades: Array.from(tipos) }))
       const professores_nomes = mats.filter(m => m.tipo === 'Aula' && m.professor_nome).map(m => m.professor_nome).join(' / ') || '-'
       return {
-        ...a, valor_total, modalidades, esportes, professores_nomes,
+        ...a, valor_total, esportesMod, professores_nomes,
         ultimo_pagamento: ultimoPorAluno[a.id] ?? null,
         pago_mes: pagoMesPorAluno[a.id] ?? 0,
         parcial_mes: parcialMesPorAluno[a.id] ?? 0,
@@ -258,12 +261,6 @@ export default function Alunos() {
     Inativo: alunos.filter(a => a.status === 'Inativo').length,
   }
 
-  function iconeModalidade(modalidades: string[]) {
-    const unicos = Array.from(new Set(modalidades))
-    if (!unicos.length) return '-'
-    return <span className="flex items-center gap-1">{unicos.map(m => <IconeModalidade key={m} tipo={m} />)}</span>
-  }
-
   function dataCurta(iso: string | null) {
     if (!iso) return '-'
     const [y, m, d] = iso.split('-')
@@ -349,8 +346,7 @@ export default function Alunos() {
                 Vencimento {sortConfig.column === 'data_vencimento' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
               </th>
               <th className="text-left px-2 py-2.5 text-th text-gray-500">Últ. Pag.</th>
-              <th className="text-left px-2 py-2.5 text-th text-gray-500">Esporte</th>
-              <th className="text-left px-2 py-2.5 text-th text-gray-500" title="Modalidade">Mod.</th>
+              <th className="text-left px-2 py-2.5 text-th text-gray-500" title="Esporte (bola) e modalidades (símbolos pequenos)">Esporte</th>
               <th className="text-left px-2 py-2.5 text-th text-gray-500">Professor</th>
               <th onClick={() => handleSort('valor_total')} className="text-left px-2 py-2.5 text-th text-gray-500 cursor-pointer hover:bg-gray-100 transition-colors">
                 Valor {sortConfig.column === 'valor_total' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
@@ -364,10 +360,10 @@ export default function Alunos() {
           </thead>
           <tbody>
             {loading && (
-              <tr><td colSpan={13} className="text-center py-8 text-gray-400">Carregando...</td></tr>
+              <tr><td colSpan={12} className="text-center py-8 text-gray-400">Carregando...</td></tr>
             )}
             {!loading && filtrados.length === 0 && (
-              <tr><td colSpan={13} className="text-center py-8 text-gray-400">Nenhum aluno encontrado.</td></tr>
+              <tr><td colSpan={12} className="text-center py-8 text-gray-400">Nenhum aluno encontrado.</td></tr>
             )}
             {pagination.paginatedItems.map((aluno, i) => (
               <tr key={aluno.id} className={`border-b border-gray-100 hover:bg-gray-50 ${i === pagination.paginatedItems.length - 1 && pagination.currentPage === pagination.totalPages ? 'border-0' : ''}`}>
@@ -386,12 +382,22 @@ export default function Alunos() {
                 <td className="px-2 py-2.5 text-gray-600 text-sm">
                   {dataCurta(aluno.ultimo_pagamento)}
                 </td>
-                <td className="px-2 py-2.5">
-                  <div className="flex items-center gap-1">
-                    {aluno.esportes.length ? aluno.esportes.map(e => <IconeEsporte key={e} nome={e} tamanho={20} />) : <span className="text-gray-400">-</span>}
-                  </div>
+                <td className="px-2 py-2">
+                  {aluno.esportesMod.length === 0 ? (
+                    <span className="text-gray-400">-</span>
+                  ) : (
+                    <div className="flex items-start gap-2.5">
+                      {aluno.esportesMod.map(g => (
+                        <div key={g.esporte} className="flex flex-col items-center gap-0.5" title={`${g.esporte}: ${g.modalidades.map(m => (m === 'Aula' ? 'Aulas' : m)).join(', ')}`}>
+                          <IconeEsporte nome={g.esporte} tamanho={22} />
+                          <span className="flex items-center gap-0.5">
+                            {g.modalidades.map(m => <IconeModalidade key={m} tipo={m} tamanho={12} />)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </td>
-                <td className="px-2 py-2.5">{iconeModalidade(aluno.modalidades)}</td>
                 <td className="px-2 py-2.5 text-gray-600 text-sm max-w-[7rem] truncate" title={aluno.professores_nomes}>{aluno.professores_nomes}</td>
                 <td className="px-2 py-2.5 text-gray-600">
                   {aluno.valor_total > 0 ? `R$ ${aluno.valor_total.toFixed(2).replace('.', ',')}` : '-'}
