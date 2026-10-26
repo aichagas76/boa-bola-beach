@@ -44,6 +44,16 @@ export default function NovoFinanceiro() {
     forma_pagamento: 'Pix',
   })
 
+  // Ao escolher o aluno, o valor já vem preenchido com a soma de todas as modalidades dele
+  // (em centavos, como o campo guarda). Só preenche se ainda não foi digitado nada.
+  async function escolherAluno(alunoId: string) {
+    setForm(f => ({ ...f, aluno_ref_id: alunoId }))
+    if (!alunoId) return
+    const { data } = await supabase.from('matriculas').select('valor').eq('aluno_id', alunoId)
+    const centavos = Math.round((data ?? []).reduce((acc, m) => acc + (m.valor ?? 0), 0) * 100)
+    if (centavos > 0) setForm(f => (f.aluno_ref_id === alunoId && !f.valor ? { ...f, valor: String(centavos) } : f))
+  }
+
   function formatarValor(valor: string) {
     const numeros = valor.replace(/\D/g, '')
     if (!numeros) return ''
@@ -207,7 +217,7 @@ export default function NovoFinanceiro() {
             <label className="text-label text-gray-500 block mb-1">Aluno (opcional)</label>
             <select
               value={form.aluno_ref_id}
-              onChange={e => setForm({ ...form, aluno_ref_id: e.target.value })}
+              onChange={e => escolherAluno(e.target.value)}
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"
             >
               <option value="">Nenhum</option>
