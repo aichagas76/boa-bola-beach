@@ -1,5 +1,6 @@
 'use client'
 
+import IconeModalidade from '@/components/alunos/IconeModalidade'
 import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
@@ -201,7 +202,7 @@ export default function DetalheAluno() {
         {matriculas.map(m => (
           <div key={m.id} className="flex items-center justify-between gap-3 py-2 border-b border-gray-100 last:border-0">
             <div className="text-sm font-medium text-gray-900">
-              {m.tipo === 'Clubinho' ? '🏆' : m.tipo === 'Ranking' ? '🥇' : '🎓'} {m.esportes?.nome ?? 'Beach Tênis'} · {m.tipo === 'Aula' ? 'Aula' : m.tipo}
+              <span className="inline-flex align-middle mr-1"><IconeModalidade tipo={m.tipo} /></span>{m.esportes?.nome ?? 'Beach Tênis'} · {m.tipo === 'Aula' ? 'Aula' : m.tipo}
               {m.professor_nome && <span className="text-gray-400 font-normal ml-1">· {m.professor_nome}</span>}
               {m.unidades?.nome && <span className="text-gray-400 font-normal ml-1">· {m.unidades.nome}</span>}
               {m.acesso_duas_unidades && <span className="ml-2 inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700">Combo 2 unidades</span>}

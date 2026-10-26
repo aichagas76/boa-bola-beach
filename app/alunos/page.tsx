@@ -8,6 +8,7 @@ import Link from 'next/link'
 import { usePagination } from '@/lib/hooks/usePagination'
 import { Pagination } from '@/components/ui/pagination'
 import IconeEsporte from '@/components/alunos/IconeEsporte'
+import IconeModalidade from '@/components/alunos/IconeModalidade'
 
 type Aluno = {
   id: string
@@ -247,9 +248,9 @@ export default function Alunos() {
   }
 
   function iconeModalidade(modalidades: string[]) {
-    const icone: Record<string, string> = { Clubinho: '🏆', Aula: '🎓', Ranking: '🥇' }
     const unicos = Array.from(new Set(modalidades))
-    return unicos.length ? unicos.map(m => icone[m] ?? '').join('') : '-'
+    if (!unicos.length) return '-'
+    return <span className="flex items-center gap-1">{unicos.map(m => <IconeModalidade key={m} tipo={m} />)}</span>
   }
 
   function dataCurta(iso: string | null) {
@@ -379,7 +380,7 @@ export default function Alunos() {
                     {aluno.esportes.length ? aluno.esportes.map(e => <IconeEsporte key={e} nome={e} tamanho={20} />) : <span className="text-gray-400">-</span>}
                   </div>
                 </td>
-                <td className="px-2 py-2.5 text-lg">{iconeModalidade(aluno.modalidades)}</td>
+                <td className="px-2 py-2.5">{iconeModalidade(aluno.modalidades)}</td>
                 <td className="px-2 py-2.5 text-gray-600 text-sm max-w-[7rem] truncate" title={aluno.professores_nomes}>{aluno.professores_nomes}</td>
                 <td className="px-2 py-2.5 text-gray-600">
                   {aluno.valor_total > 0 ? `R$ ${aluno.valor_total.toFixed(2).replace('.', ',')}` : '-'}

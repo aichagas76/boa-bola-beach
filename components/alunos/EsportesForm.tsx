@@ -3,6 +3,7 @@
 import { mascaraValor, ESPORTE_COM_COMBO, MAX_AULAS_POR_ESPORTE, type EstadoEsporte } from '@/lib/esportes'
 
 import IconeEsporte from '@/components/alunos/IconeEsporte'
+import IconeModalidade from '@/components/alunos/IconeModalidade'
 
 function CampoValor({ valor, onChange, placeholder }: { valor: string; onChange: (v: string) => void; placeholder: string }) {
   return (
@@ -65,7 +66,7 @@ export default function EsportesForm({ estados, onChange, professores }: Props) 
           <div className="space-y-2">
             {/* Clubinho */}
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
-              <Marca marcado={e.clubinho.ativo} onChange={v => atualizar(i, x => ({ ...x, clubinho: { ...x.clubinho, ativo: v } }))}>🏆 Clubinho</Marca>
+              <Marca marcado={e.clubinho.ativo} onChange={v => atualizar(i, x => ({ ...x, clubinho: { ...x.clubinho, ativo: v } }))}><IconeModalidade tipo="Clubinho" /> Clubinho</Marca>
               {e.clubinho.ativo && (
                 <>
                   <CampoValor valor={e.clubinho.valor} placeholder="150,00"
@@ -83,7 +84,7 @@ export default function EsportesForm({ estados, onChange, professores }: Props) 
 
             {/* Aulas */}
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
-              <Marca marcado={e.aulas.ativo} onChange={v => atualizar(i, x => ({ ...x, aulas: { ...x.aulas, ativo: v } }))}>🎓 Aulas</Marca>
+              <Marca marcado={e.aulas.ativo} onChange={v => atualizar(i, x => ({ ...x, aulas: { ...x.aulas, ativo: v } }))}><IconeModalidade tipo="Aula" /> Aulas</Marca>
               {e.aulas.ativo && (
                 <div className="flex flex-col gap-1.5">
                   {e.aulas.lista.map((aula, k) => (
@@ -113,7 +114,7 @@ export default function EsportesForm({ estados, onChange, professores }: Props) 
 
             {/* Ranking */}
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
-              <Marca marcado={e.ranking.ativo} onChange={v => atualizar(i, x => ({ ...x, ranking: { ...x.ranking, ativo: v } }))}>🥇 Ranking</Marca>
+              <Marca marcado={e.ranking.ativo} onChange={v => atualizar(i, x => ({ ...x, ranking: { ...x.ranking, ativo: v } }))}><IconeModalidade tipo="Ranking" /> Ranking</Marca>
               {e.ranking.ativo && (
                 <CampoValor valor={e.ranking.valor} placeholder="50,00"
                   onChange={v => atualizar(i, x => ({ ...x, ranking: { ...x.ranking, valor: v } }))} />
