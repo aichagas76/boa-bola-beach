@@ -7,6 +7,7 @@ import Link from 'next/link'
 import { ChartReceita } from '@/components/dashboard/chart-receita'
 import { ChartPagamentos } from '@/components/dashboard/chart-pagamentos'
 import { ChartCrescimento } from '@/components/dashboard/chart-crescimento'
+import IndicadoresPainel from '@/components/dashboard/IndicadoresPainel'
 
 export default function Dashboard() {
   const { unidadeId } = useUnidade()
@@ -159,6 +160,8 @@ export default function Dashboard() {
           </Link>
         ))}
       </div>
+
+      <IndicadoresPainel />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         <div className="bg-white border border-[#e5e5e5] rounded-xl p-6">

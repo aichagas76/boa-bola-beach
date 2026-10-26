@@ -26,6 +26,7 @@ export default function NovoFinanceiro() {
   const [pessoas, setPessoas] = useState<Pessoa[]>([])
   const [contas, setContas] = useState<ContaBancaria[]>([])
   const [bancos, setBancos] = useState<{ id: string; nome: string }[]>([])
+  const [esportes, setEsportes] = useState<{ id: string; nome: string }[]>([])
   const [alunos, setAlunos] = useState<AlunoRef[]>([])
   const [professores, setProfessores] = useState<Professor[]>([])
 
@@ -37,6 +38,7 @@ export default function NovoFinanceiro() {
     professor_id: '',
     conta_bancaria_id: '',
     banco_id: '',
+    esporte_id: '',
     status: 'Não recebido' as 'Recebido' | 'Não recebido' | 'Pago' | 'Pendente',
     data: new Date().toLocaleDateString('en-CA'),
     data_vencimento: '',
@@ -76,6 +78,9 @@ export default function NovoFinanceiro() {
 
       const { data: bcs } = await supabase.from('bancos').select('id, nome').eq('ativo', true).order('nome')
       setBancos(bcs ?? [])
+
+      const { data: esps } = await supabase.from('esportes').select('id, nome').eq('ativo', true).order('nome')
+      setEsportes(esps ?? [])
 
       const { data: alns } = await supabase.from('alunos').select('id, nome').order('nome')
       setAlunos(alns ?? [])
@@ -136,6 +141,7 @@ export default function NovoFinanceiro() {
       professor_id: form.professor_id || null,
       conta_bancaria_id: form.conta_bancaria_id || null,
       banco_id: form.banco_id || null,
+      esporte_id: form.esporte_id || null,
       status: form.status,
       data: form.data,
       data_vencimento: form.data_vencimento || null,
@@ -258,6 +264,18 @@ export default function NovoFinanceiro() {
               {contas.map(c => (
                 <option key={c.id} value={c.id}>{c.nome}</option>
               ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="text-label text-gray-500 block mb-1">Esporte (opcional — para o gráfico por professor)</label>
+            <select
+              value={form.esporte_id}
+              onChange={e => setForm({ ...form, esporte_id: e.target.value })}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"
+            >
+              <option value="">Nenhum</option>
+              {esportes.map(x => <option key={x.id} value={x.id}>{x.nome}</option>)}
             </select>
           </div>
 

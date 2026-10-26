@@ -21,6 +21,7 @@ export default function EditarMovimentacao() {
   const [pessoas, setPessoas] = useState<Pessoa[]>([])
   const [contas, setContas] = useState<ContaBancaria[]>([])
   const [bancos, setBancos] = useState<{ id: string; nome: string }[]>([])
+  const [esportes, setEsportes] = useState<{ id: string; nome: string }[]>([])
   const [alunos, setAlunos] = useState<AlunoRef[]>([])
   const [professores, setProfessores] = useState<Professor[]>([])
 
@@ -32,6 +33,7 @@ export default function EditarMovimentacao() {
     professor_id: '',
     conta_bancaria_id: '',
     banco_id: '',
+    esporte_id: '',
     status: '',
     data: '',
     data_vencimento: '',
@@ -65,6 +67,9 @@ export default function EditarMovimentacao() {
         const { data: bcs } = await supabase.from('bancos').select('id, nome').order('nome')
         setBancos(bcs ?? [])
 
+        const { data: esps } = await supabase.from('esportes').select('id, nome').order('nome')
+        setEsportes(esps ?? [])
+
         const { data: alns } = await supabase.from('alunos').select('id, nome').order('nome')
         setAlunos(alns ?? [])
 
@@ -82,6 +87,7 @@ export default function EditarMovimentacao() {
             professor_id: mov.professor_id ?? '',
             conta_bancaria_id: mov.conta_bancaria_id ?? '',
             banco_id: mov.banco_id ?? '',
+            esporte_id: mov.esporte_id ?? '',
             status: mov.status ?? '',
             data: mov.data ?? '',
             data_vencimento: mov.data_vencimento ?? '',
@@ -118,6 +124,7 @@ export default function EditarMovimentacao() {
       professor_id: form.professor_id || null,
       conta_bancaria_id: form.conta_bancaria_id || null,
       banco_id: form.banco_id || null,
+      esporte_id: form.esporte_id || null,
       status: form.status || null,
       data: form.data,
       data_vencimento: form.data_vencimento || null,
@@ -227,6 +234,18 @@ export default function EditarMovimentacao() {
             >
               <option value="">Nenhuma</option>
               {contas.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
+            </select>
+          </div>
+
+          <div>
+            <label className="text-label text-gray-500 block mb-1">Esporte (opcional — para o gráfico por professor)</label>
+            <select
+              value={form.esporte_id}
+              onChange={e => setForm({ ...form, esporte_id: e.target.value })}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"
+            >
+              <option value="">Nenhum</option>
+              {esportes.map(x => <option key={x.id} value={x.id}>{x.nome}</option>)}
             </select>
           </div>
 
