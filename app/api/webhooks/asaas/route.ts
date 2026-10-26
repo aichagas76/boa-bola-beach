@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/supabase-admin'
 import { textoIgual } from '@/lib/seguranca'
+import { enviarAlerta } from '@/lib/alerta'
 import { dataSaoPaulo } from '@/lib/cobranca-regras'
 import { decidirWebhook, somarUmMes } from '@/lib/webhook-regras'
 
@@ -163,6 +164,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error('Erro ao processar webhook Asaas:', error)
+    await enviarAlerta({ origem: 'Webhook do Asaas', mensagem: 'Um aviso de pagamento do Asaas falhou. O Asaas tenta de novo sozinho; se persistir, conferir.', detalhe: error instanceof Error ? error.message : String(error) })
     return NextResponse.json({ error: 'Erro ao processar' }, { status: 500 })
   }
 }

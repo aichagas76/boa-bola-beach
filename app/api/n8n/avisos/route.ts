@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/supabase-admin'
 import { bearerValido } from '@/lib/seguranca'
+import { sinalAviso, type RegistroAviso } from '@/lib/avisos-regras'
 
 export const runtime = 'nodejs'
 
@@ -16,7 +17,8 @@ function dataBR(iso: string) {
 /**
  * Lista, no mesmo formato da planilha "Cadastro" usada pelo fluxo do n8n, os alunos
  * ativos que têm cobrança em aberto com link. O n8n continua decidindo quem recebe
- * cada aviso (3 dias antes, no dia, 3 e 6 dias depois) com o filtro que já existe.
+ * cada aviso (3 dias antes, no dia, 3 e 6 dias depois) com o filtro que já existe;
+ * o que já foi enviado (SIM) ou falhou 3 vezes (ERRO) vem de avisos_whatsapp.
  */
 export async function GET(request: NextRequest) {
   if (!autorizadoN8n(request)) {
@@ -47,13 +49,28 @@ export async function GET(request: NextRequest) {
 
   const { data: alunos } = await db
     .from('alunos')
-    .select('id, nome, celular, status, aviso_3dias, aviso_vencimento, aviso_3dias_atraso, aviso_6dias_atraso')
+    .select('id, nome, celular, status')
     .in('id', Array.from(porAluno.keys()))
+
+  const { data: avisos, error: avisosError } = await db
+    .from('avisos_whatsapp')
+    .select('pagamento_id, tipo, resultado, tentativas')
+    .in('pagamento_id', Array.from(porAluno.values()).map(p => p.id))
+  if (avisosError) {
+    // Melhor parar do que reenviar mensagens que já foram
+    console.error('[n8n/avisos] erro ao ler avisos_whatsapp:', avisosError)
+    return NextResponse.json({ error: 'Erro ao ler avisos enviados' }, { status: 500 })
+  }
+  const registro = new Map<string, RegistroAviso>()
+  for (const a of avisos ?? []) {
+    registro.set(`${a.pagamento_id}:${a.tipo}`, { resultado: a.resultado, tentativas: a.tentativas })
+  }
 
   const lista = (alunos ?? [])
     .filter(a => a.status === 'Ativo' && a.celular)
     .map(a => {
       const p = porAluno.get(a.id)!
+      const sinal = (tipo: string) => sinalAviso(registro.get(`${p.id}:${tipo}`))
       return {
         RowId: a.id,
         Nome: a.nome,
@@ -64,10 +81,10 @@ export async function GET(request: NextRequest) {
         ValorAsaas: Number(p.valor),
         LinkPix: p.link_pagamento,
         IdCobrancaAsaas: p.id_cobranca_asaas,
-        Aviso3DiasEnviado: a.aviso_3dias ?? 'NAO',
-        AvisoVencimentoEnviado: a.aviso_vencimento ?? 'NAO',
-        Aviso3DiasAtraso: a.aviso_3dias_atraso ?? 'NAO',
-        Aviso6DiasAtraso: a.aviso_6dias_atraso ?? 'NAO',
+        Aviso3DiasEnviado: sinal('3dias'),
+        AvisoVencimentoEnviado: sinal('vencimento'),
+        Aviso3DiasAtraso: sinal('3diasAtraso'),
+        Aviso6DiasAtraso: sinal('6diasAtraso'),
       }
     })
 

@@ -1,0 +1,34 @@
+{
+  "name": "BOA BOLA - Alerta de erros por WhatsApp",
+  "nodes": [
+    {
+      "parameters": { "httpMethod": "POST", "path": "boa-bola-alerta", "options": {} },
+      "name": "Webhook alerta",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://ribbitingoyster-evolution.cloudfy.live/message/sendText/BoaBola2_WhatsApp",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [ { "name": "apikey", "value": "COLE_AQUI_A_APIKEY_DA_EVOLUTION" }, { "name": "Content-Type", "value": "application/json" } ] },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "number", "value": "={{ $json.body.telefone }}" },
+            { "name": "text", "value": "={{ ($json.body.teste ? '🧪 TESTE\n' : '') + '⚠️ *Boa Bola* - ' + $json.body.origem + '\n' + $json.body.mensagem + ($json.body.detalhe ? '\n\nDetalhe: ' + $json.body.detalhe : '') + '\n' + $json.body.quando }}" }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Enviar WhatsApp",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [260, 0]
+    }
+  ],
+  "connections": { "Webhook alerta": { "main": [ [ { "node": "Enviar WhatsApp", "type": "main", "index": 0 } ] ] } },
+  "settings": { "executionOrder": "v1", "timezone": "America/Sao_Paulo" }
+}

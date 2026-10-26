@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/supabase-admin'
 import { bearerValido } from '@/lib/seguranca'
+import { enviarAlerta } from '@/lib/alerta'
 import { criarCobrancaAsaas } from '@/lib/asaas-cobranca'
 import { dataSaoPaulo, situacaoVencimento, jaTemCobranca, MAX_DIAS_ATRASO_AUTOMATICO } from '@/lib/cobranca-regras'
 
@@ -115,22 +116,20 @@ export async function GET(request: NextRequest) {
         throw e
       }
 
-      // Novo ciclo: libera os avisos de WhatsApp de novo
-      await db
-        .from('alunos')
-        .update({
-          aviso_3dias: 'NAO',
-          aviso_vencimento: 'NAO',
-          aviso_3dias_atraso: 'NAO',
-          aviso_6dias_atraso: 'NAO',
-        })
-        .eq('id', aluno.id)
 
       geradas.push({ aluno: aluno.nome, vencimento: aluno.data_vencimento, atrasado })
     } catch (e) {
       console.error('[cron] falha ao gerar cobrança de', aluno.nome, e)
       falhas.push({ aluno: aluno.nome, erro: e instanceof Error ? e.message : String(e) })
     }
+  }
+
+  if (!simular && falhas.length > 0) {
+    await enviarAlerta({
+      origem: 'Cobranças automáticas',
+      mensagem: `${falhas.length} cobrança(s) não foram geradas hoje: ${falhas.map(x => x.aluno).join(', ')}`,
+      detalhe: falhas[0].erro,
+    })
   }
 
   console.log(`[cron] simular=${simular} atrasados marcados: ${marcadosAtrasados}, geradas: ${geradas.length}, ignorados: ${ignorados.length}, falhas: ${falhas.length}`)
