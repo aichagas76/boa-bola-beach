@@ -11,7 +11,8 @@ import IconeEsporte from '@/components/alunos/IconeEsporte'
 import { ordenar, proximaOrdem, type Direcao, type Valor } from '@/lib/ordenacao'
 import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react'
 import IconeModalidade from '@/components/alunos/IconeModalidade'
-import { BadgeCheck, Copy, X } from 'lucide-react'
+import { BadgeCheck, Copy, ShoppingBag, X } from 'lucide-react'
+import { VendaDoAluno } from '@/components/estoque/FormVenda'
 
 type Aluno = {
   id: string
@@ -63,7 +64,7 @@ const COLUNAS: { id: ColunaId; titulo: string; dica?: string }[] = [
   { id: 'nome', titulo: 'Nome' },
   { id: 'celular', titulo: 'Celular' },
   { id: 'vencimento', titulo: 'Vencimento' },
-  { id: 'ultimo', titulo: 'Últ. Pag.', dica: 'Último pagamento' },
+  { id: 'ultimo', titulo: 'Pago', dica: 'Último pagamento' },
   { id: 'esporte', titulo: 'Esporte', dica: 'Esporte (bola) e modalidades (símbolos pequenos)' },
   { id: 'professor', titulo: 'Professor' },
   { id: 'valor', titulo: 'Valor' },
@@ -95,6 +96,7 @@ export default function Alunos() {
   const [idAsaasAberto, setIdAsaasAberto] = useState<{ nome: string; id: string } | null>(null)
   const [copiado, setCopiado] = useState(false)
   const [responsavelAberto, setResponsavelAberto] = useState<Aluno | null>(null)
+  const [retiradaAluno, setRetiradaAluno] = useState<Aluno | null>(null)
 
   async function copiarId(id: string) {
     try {
@@ -491,6 +493,12 @@ export default function Alunos() {
                   >
                     💰
                   </button>
+                  <button
+                    onClick={() => setRetiradaAluno(aluno)}
+                    title="Retirar produto (estoque)"
+                    aria-label={`Retirar produto para ${aluno.nome}`}
+                    className="text-gray-500 hover:text-[#5a9217] hover:scale-110 transition-transform"
+                  ><ShoppingBag size={18} /></button>
                   <Link href={`/alunos/${aluno.id}/editar`} className="text-gray-500 hover:text-blue-600" title="Editar">✏️</Link>
                   <button
                     onClick={() => excluirAluno(aluno.id, aluno.nome)}
@@ -514,6 +522,11 @@ export default function Alunos() {
           onPageChange={pagination.goToPage}
         />
       </div>
+
+      {/* Retirada de produto do estoque para o aluno */}
+      {retiradaAluno && (
+        <VendaDoAluno aluno={{ id: retiradaAluno.id, nome: retiradaAluno.nome, data_vencimento: retiradaAluno.data_vencimento }} onFechar={() => setRetiradaAluno(null)} />
+      )}
 
       {/* Dados do responsável (abre ao clicar no R ao lado do nome) */}
       {responsavelAberto && (
