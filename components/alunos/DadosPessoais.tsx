@@ -84,9 +84,9 @@ export default function DadosPessoais({ form, onChange, erros, mostrarErros, alu
 
       <div className="grid grid-cols-1 md:grid-cols-12 gap-x-4 gap-y-3.5">
         <div className="md:col-span-6">
-          <div className="flex items-center gap-6">
+          <div className="flex items-center">
             <Rotulo>Nome completo</Rotulo>
-            <label className="inline-flex items-center gap-2 text-sm text-blue-950 font-medium cursor-pointer select-none mb-1">
+            <label className="inline-flex items-center gap-2 text-sm text-blue-950 font-medium cursor-pointer select-none mb-1 mx-auto">
               <input type="checkbox" className="h-[18px] w-[18px] accent-blue-600" checked={form.tem_responsavel}
                 onChange={e => set({ tem_responsavel: e.target.checked })} />
               Responsável
