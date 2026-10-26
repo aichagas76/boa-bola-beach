@@ -222,7 +222,7 @@ export default function PainelGerencial() {
   const rotuloPeriodo = periodo.inicio === periodo.fim ? periodo.inicio : `${periodo.inicio.split('-').reverse().join('/')} a ${periodo.fim.split('-').reverse().join('/')}`
 
   return (
-    <div>
+    <div className="max-w-6xl">
       {/* Cabeçalho e filtros */}
       <div className="flex flex-wrap items-end justify-between gap-3 mb-5">
         <div className="pl-12 md:pl-0">
