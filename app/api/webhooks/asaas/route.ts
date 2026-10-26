@@ -1,17 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/supabase-admin'
 import { textoIgual } from '@/lib/seguranca'
+import { dataSaoPaulo } from '@/lib/cobranca-regras'
+import { decidirWebhook, somarUmMes } from '@/lib/webhook-regras'
 
 export const runtime = 'nodejs'
-
-// Evento Asaas -> status usado no app (pagamentos: Pago/Pendente/Atrasado)
-const EVENT_STATUS: Record<string, string> = {
-  PAYMENT_RECEIVED: 'Pago',
-  PAYMENT_CONFIRMED: 'Pago',
-  PAYMENT_OVERDUE: 'Atrasado',
-  PAYMENT_RESTORED: 'Pendente',
-  PAYMENT_REFUNDED: 'Pendente',
-}
 
 // Rótulo da forma de pagamento quando a cobrança é paga pelo Asaas
 const FORMA_ASAAS: Record<string, string> = {
@@ -19,6 +12,16 @@ const FORMA_ASAAS: Record<string, string> = {
   BOLETO: 'Boleto Asaas',
   CREDIT_CARD: 'Cartão Asaas',
   DEBIT_CARD: 'Cartão Asaas',
+}
+
+type Db = ReturnType<typeof getSupabaseAdmin>
+
+/** Deixa um aviso na tela de Logs para a equipe conferir (o webhook em si responde 200). */
+async function avisarEquipe(db: Db, acao: string, paymentId: string, detalhes: string) {
+  const { error } = await db
+    .from('logs')
+    .insert({ usuario_email: 'Asaas', acao, tabela: 'pagamentos', registro_id: paymentId, detalhes })
+  if (error) console.error('Erro ao gravar log do webhook:', error)
 }
 
 export async function POST(request: NextRequest) {
@@ -33,84 +36,130 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Webhook inválido' }, { status: 400 })
     }
 
-    const status = EVENT_STATUS[event]
-    if (!status) return NextResponse.json({ success: true, ignored: event })
-
     const db = getSupabaseAdmin()
-    const pago = status === 'Pago'
-    const formaPagamento = FORMA_ASAAS[payment.billingType] ?? 'Asaas'
-    const dataPagamento = pago
-      ? payment.paymentDate || payment.confirmedDate || new Date().toLocaleDateString('en-CA')
-      : null
 
-    const { data, error } = await db
+    const { data: achados, error: buscaError } = await db
       .from('pagamentos')
-      .update({
-        status,
-        data_pagamento: dataPagamento,
-        valor_pago: pago ? payment.value : null,
-        meio_pagamento: formaPagamento,
-        id_pagamento_asaas: payment.id,
-      })
+      .select('id, aluno_id, valor, status')
       .eq('id_cobranca_asaas', payment.id)
-      .select('aluno_id, valor')
-
-    if (error) {
-      console.error('Erro ao atualizar pagamento via webhook:', error)
-      return NextResponse.json({ error: 'Erro ao atualizar pagamento' }, { status: 500 })
+      .limit(1)
+    if (buscaError) {
+      console.error('Erro ao buscar pagamento do webhook:', buscaError)
+      return NextResponse.json({ error: 'Erro ao buscar pagamento' }, { status: 500 })
+    }
+    const pagamento = achados?.[0]
+    if (!pagamento) {
+      // Responde 200 para o Asaas não ficar reenviando, mas deixa rastro
+      console.warn(`[Asaas Webhook] ${event} ${payment.id}: cobrança não existe no sistema`)
+      if (event === 'PAYMENT_RECEIVED' || event === 'PAYMENT_CONFIRMED') {
+        await avisarEquipe(db, 'Pagamento Asaas sem cobrança no sistema', payment.id, `${event} R$ ${payment.value}: lançar na mão`)
+      }
+      return NextResponse.json({ success: true, ignored: 'cobranca_desconhecida' })
     }
 
+    const acao = decidirWebhook(event, Number(payment.value), pagamento)
+
+    if (acao.tipo === 'ignorar') {
+      if (acao.motivo.includes('conferir')) await avisarEquipe(db, 'Webhook Asaas: conferir', payment.id, `${event}: ${acao.motivo}`)
+      return NextResponse.json({ success: true, ignored: acao.motivo })
+    }
+
+    if (acao.tipo === 'marcar') {
+      const { error } = await db.from('pagamentos').update({ status: acao.status }).eq('id', pagamento.id)
+      if (error) throw error
+      console.log(`[Asaas Webhook] ${event} ${payment.id} -> ${acao.status}`)
+      return NextResponse.json({ success: true })
+    }
+
+    if (acao.tipo === 'estornar') {
+      const { error } = await db
+        .from('pagamentos')
+        .update({ status: 'Pendente', data_pagamento: null, valor_pago: null })
+        .eq('id', pagamento.id)
+      if (error) throw error
+      await db.from('movimentacoes').update({ status: 'Estornado' }).eq('id_cobranca_asaas', payment.id)
+      await avisarEquipe(db, 'Estorno no Asaas', payment.id, 'Entrada marcada como Estornado. Conferir o vencimento do aluno (não é revertido sozinho).')
+      return NextResponse.json({ success: true })
+    }
+
+    // --- Pagamento recebido ---
+    const formaPagamento = FORMA_ASAAS[payment.billingType] ?? 'Asaas'
+    const dataPagamento: string = payment.paymentDate || payment.confirmedDate || dataSaoPaulo()
+    const { valorPago, parcial } = acao
+
+    // Pagamento parcial: registra o valor, mas a cobrança continua em aberto
+    const { error: upError } = await db
+      .from('pagamentos')
+      .update(
+        parcial
+          ? { valor_pago: valorPago, meio_pagamento: formaPagamento, id_pagamento_asaas: payment.id }
+          : {
+              status: 'Pago',
+              data_pagamento: dataPagamento,
+              valor_pago: valorPago,
+              meio_pagamento: formaPagamento,
+              id_pagamento_asaas: payment.id,
+            }
+      )
+      .eq('id', pagamento.id)
+    if (upError) throw upError
+
     // Lança a entrada no financeiro (as telas leem de movimentacoes), sem duplicar
-    if (pago && data && data.length > 0) {
-      const { data: existente } = await db
-        .from('movimentacoes')
-        .select('id')
-        .eq('id_cobranca_asaas', payment.id)
-        .limit(1)
+    const { data: existente } = await db
+      .from('movimentacoes')
+      .select('id, descricao, status')
+      .eq('id_cobranca_asaas', payment.id)
+      .limit(1)
+    const jaLancada = existente?.[0]
+    const reaproveitar = jaLancada?.status === 'Estornado' || !!jaLancada?.descricao?.toLowerCase().includes('parcial')
+    if (jaLancada && !reaproveitar) return NextResponse.json({ success: true, ignored: 'ja_lancado' })
 
-      if (!existente || existente.length === 0) {
-        const { error: movError } = await db.from('movimentacoes').insert({
-          tipo: 'Entrada',
-          descricao: 'Cobrança Asaas',
-          valor: payment.value ?? data[0].valor,
-          forma_pagamento: formaPagamento,
-          data: dataPagamento,
-          data_pagamento: dataPagamento,
-          data_vencimento: payment.dueDate ?? null,
-          status: 'Recebido',
-          aluno_ref_id: data[0].aluno_id,
-          origem: 'Asaas',
-          id_cobranca_asaas: payment.id,
-        })
-        if (movError) {
-          console.error('Erro ao lançar entrada via webhook:', movError)
-          return NextResponse.json({ error: 'Erro ao lançar entrada' }, { status: 500 })
-        }
+    const lancamento = {
+      tipo: 'Entrada',
+      descricao: parcial ? 'Pagamento parcial Asaas' : 'Cobrança Asaas',
+      valor: valorPago,
+      forma_pagamento: formaPagamento,
+      data: dataPagamento,
+      data_pagamento: dataPagamento,
+      data_vencimento: payment.dueDate ?? null,
+      status: 'Recebido',
+      aluno_ref_id: pagamento.aluno_id,
+      origem: 'Asaas',
+      id_cobranca_asaas: payment.id,
+    }
+    const { error: movError } = jaLancada
+      ? await db.from('movimentacoes').update(lancamento).eq('id', jaLancada.id)
+      : await db.from('movimentacoes').insert(lancamento)
+    if (movError) {
+      // 23505 = o mesmo evento chegou duas vezes ao mesmo tempo; a outra chamada já lançou
+      if (movError.code === '23505') return NextResponse.json({ success: true, ignored: 'ja_lancado' })
+      console.error('Erro ao lançar entrada via webhook:', movError)
+      return NextResponse.json({ error: 'Erro ao lançar entrada' }, { status: 500 })
+    }
 
-        // Pagamento total: avança o vencimento do aluno em 1 mês (igual ao pagamento manual)
-        const alunoId = data[0].aluno_id
-        const { data: mats } = await db.from('matriculas').select('valor').eq('aluno_id', alunoId)
-        const totalMats = (mats ?? []).reduce((acc, m) => acc + (m.valor ?? 0), 0)
-        const valorPago = Number(payment.value ?? data[0].valor)
-        if (totalMats > 0 && valorPago >= totalMats) {
-          const { data: aluno } = await db
-            .from('alunos')
-            .select('data_vencimento')
-            .eq('id', alunoId)
-            .single()
-          if (aluno?.data_vencimento) {
-            const [y, m, d] = aluno.data_vencimento.split('-').map(Number)
-            const proximo = new Date(Date.UTC(y, m, d)) // mês seguinte (m já é base 1)
-            await db
-              .from('alunos')
-              .update({ data_vencimento: proximo.toISOString().split('T')[0] })
-              .eq('id', alunoId)
-          }
-        }
+    if (parcial) {
+      await avisarEquipe(db, 'Pagamento parcial no Asaas', payment.id, `Recebido R$ ${valorPago} de R$ ${pagamento.valor}. Cobrança segue em aberto.`)
+      return NextResponse.json({ success: true, parcial: true })
+    }
+
+    // Pagamento total: avança o vencimento do aluno em 1 mês (igual ao pagamento manual)
+    const { data: mats } = await db.from('matriculas').select('valor').eq('aluno_id', pagamento.aluno_id)
+    const totalMats = (mats ?? []).reduce((acc, m) => acc + (m.valor ?? 0), 0)
+    if (totalMats > 0 && valorPago >= totalMats) {
+      const { data: aluno } = await db
+        .from('alunos')
+        .select('data_vencimento')
+        .eq('id', pagamento.aluno_id)
+        .single()
+      if (aluno?.data_vencimento) {
+        await db
+          .from('alunos')
+          .update({ data_vencimento: somarUmMes(aluno.data_vencimento) })
+          .eq('id', pagamento.aluno_id)
       }
     }
 
-    console.log(`[Asaas Webhook] ${event} ${payment.id} -> ${status}`)
+    console.log(`[Asaas Webhook] ${event} ${payment.id} -> Pago`)
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error('Erro ao processar webhook Asaas:', error)

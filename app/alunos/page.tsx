@@ -97,6 +97,7 @@ export default function Alunos() {
       .select('aluno_id, link_pagamento')
       .not('link_pagamento', 'is', null)
       .neq('status', 'Pago')
+      .neq('status', 'Cancelado')
       .order('data_vencimento', { ascending: false })
 
     const { data: matriculasData } = await supabase

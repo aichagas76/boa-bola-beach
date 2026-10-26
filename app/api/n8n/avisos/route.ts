@@ -29,6 +29,7 @@ export async function GET(request: NextRequest) {
     .from('pagamentos')
     .select('id, aluno_id, valor, data_vencimento, link_pagamento, id_cobranca_asaas, status')
     .neq('status', 'Pago')
+    .neq('status', 'Cancelado')
     .not('link_pagamento', 'is', null)
     .not('data_vencimento', 'is', null)
     .order('data_vencimento', { ascending: false })
