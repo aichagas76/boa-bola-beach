@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/supabase-admin'
+import { textoIgual } from '@/lib/seguranca'
 
 export const runtime = 'nodejs'
 
@@ -21,9 +22,8 @@ const FORMA_ASAAS: Record<string, string> = {
 }
 
 export async function POST(request: NextRequest) {
-  // Token configurado no painel do Asaas (opcional, mas recomendado)
-  const expected = process.env.ASAAS_WEBHOOK_TOKEN
-  if (expected && request.headers.get('asaas-access-token') !== expected) {
+  // Token configurado no painel do Asaas (obrigatório: sem ele o webhook recusa tudo)
+  if (!textoIgual(request.headers.get('asaas-access-token'), process.env.ASAAS_WEBHOOK_TOKEN)) {
     return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
   }
 

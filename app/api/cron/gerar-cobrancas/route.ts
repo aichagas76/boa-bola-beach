@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/supabase-admin'
+import { bearerValido } from '@/lib/seguranca'
 import { criarCobrancaAsaas } from '@/lib/asaas-cobranca'
 
 export const runtime = 'nodejs'
@@ -18,8 +19,7 @@ function dataSaoPaulo(somarDias = 0) {
  * Autenticação: header Authorization: Bearer CRON_SECRET (a Vercel envia sozinha).
  */
 export async function GET(request: NextRequest) {
-  const secret = process.env.CRON_SECRET
-  if (!secret || request.headers.get('authorization') !== `Bearer ${secret}`) {
+  if (!bearerValido(request.headers.get('authorization'), process.env.CRON_SECRET)) {
     return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
   }
 

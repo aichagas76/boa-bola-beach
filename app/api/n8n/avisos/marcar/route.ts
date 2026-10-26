@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/supabase-admin'
+import { bearerValido } from '@/lib/seguranca'
 
 export const runtime = 'nodejs'
 
@@ -16,8 +17,7 @@ const COLUNA: Record<string, string> = {
  * Body: { RowId, tipoAviso, resultado }
  */
 export async function POST(request: NextRequest) {
-  const token = process.env.N8N_API_TOKEN
-  if (!token || request.headers.get('authorization') !== `Bearer ${token}`) {
+  if (!bearerValido(request.headers.get('authorization'), process.env.N8N_API_TOKEN)) {
     return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
   }
 

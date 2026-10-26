@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/supabase-admin'
+import { bearerValido } from '@/lib/seguranca'
 
 export const runtime = 'nodejs'
 
 function autorizadoN8n(request: NextRequest) {
-  const token = process.env.N8N_API_TOKEN
-  return !!token && request.headers.get('authorization') === `Bearer ${token}`
+  return bearerValido(request.headers.get('authorization'), process.env.N8N_API_TOKEN)
 }
 
 function dataBR(iso: string) {
