@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { parseValor, mascaraValor, estadoVazio, estadoDasMatriculas, matriculasParaGravar, idsParaApagar, totalMensal } from '../lib/esportes.ts'
+import { parseValor, mascaraValor, estadoVazio, estadoDasMatriculas, matriculasParaGravar, idsParaApagar, idsEditaveis, extrasDe, totalMensal } from '../lib/esportes.ts'
 
 const BT = { id: 'bt', nome: 'Beach Tênis' }
 const PK = { id: 'pk', nome: 'Pickleball' }
@@ -75,4 +75,33 @@ test('desligar um esporte apaga as matrículas dele', () => {
   estados[1].ativo = false
   const g = matriculasParaGravar(estados)
   assert.deepEqual(idsParaApagar(['m1', 'm3'], g), ['m3'])
+})
+
+test('extrasDe separa as modalidades além das três fixas', () => {
+  assert.deepEqual(extrasDe(['Clubinho', 'Aula', 'Ranking', 'Day Use']), ['Day Use'])
+  assert.deepEqual(extrasDe(['Clubinho']), [])
+})
+test('modalidade extra ativa vira matrícula só com o valor', () => {
+  const e = estadoVazio(BT, BB2, ['Day Use']); e.ativo = true
+  e.extras[0] = { tipo: 'Day Use', ativo: true, id: null, valor: '40,50' }
+  const g = matriculasParaGravar([e])
+  assert.equal(g.length, 1)
+  assert.deepEqual([g[0].tipo, g[0].valor, g[0].professor_nome], ['Day Use', 40.5, null])
+})
+test('ida e volta da modalidade extra', () => {
+  const banco = [{ id: 'x1', tipo: 'Day Use', valor: 40, professor_nome: null, esporte_id: 'bt', unidade_id: 'u2', acesso_duas_unidades: false }]
+  const estados = estadoDasMatriculas([BT], banco, BB2, ['Day Use'])
+  assert.equal(estados[0].extras[0].ativo, true)
+  assert.deepEqual(matriculasParaGravar(estados).map(m => m.id), ['x1'])
+})
+test('modalidade inativa: a matrícula do aluno não entra na lista de apagáveis', () => {
+  const matriculas = [{ id: 'a', tipo: 'Clubinho' }, { id: 'b', tipo: 'Ranking' }, { id: 'c', tipo: 'Aula' }]
+  assert.deepEqual(idsEditaveis(matriculas, ['Clubinho', 'Aula']), ['a', 'c'])
+  // salvar sem mexer em nada não apaga o Ranking escondido
+  const estados = [estadoVazio(BT, BB2)]
+  estados[0].ativo = true
+  estados[0].clubinho = { ativo: true, id: 'a', valor: '10', combo: false }
+  estados[0].aulas = { ativo: true, lista: [{ id: 'c', tipo: 'Aula', professor: '', valor: '10' }] }
+  const apagar = idsParaApagar(idsEditaveis(matriculas, ['Clubinho', 'Aula']), matriculasParaGravar(estados))
+  assert.deepEqual(apagar, [])
 })

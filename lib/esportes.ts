@@ -1,7 +1,10 @@
-// Modelo do cadastro: aluno -> esportes -> modalidades (Clubinho, Aula, Ranking).
+// Modelo do cadastro: aluno -> esportes -> modalidades (Clubinho, Aula, Ranking e as que forem cadastradas em Modalidades).
 // Funções puras (sem banco) para poderem ser testadas.
 
-export type Modalidade = 'Clubinho' | 'Aula' | 'Ranking'
+export type Modalidade = string
+
+/** Modalidades com tela própria (Clubinho tem combo, Aula tem professor). As demais aparecem só com o valor. */
+export const MODALIDADES_FIXAS = ['Clubinho', 'Aula', 'Ranking'] as const
 
 export type LinhaMatricula = {
   id: string | null // null = ainda não existe no banco
@@ -9,6 +12,8 @@ export type LinhaMatricula = {
   professor: string
   valor: string // texto digitado, ex.: "150" ou "150,00"
 }
+
+export type ModalidadeExtra = { tipo: string; ativo: boolean; id: string | null; valor: string }
 
 export type EstadoEsporte = {
   esporteId: string
@@ -18,6 +23,7 @@ export type EstadoEsporte = {
   clubinho: { ativo: boolean; id: string | null; valor: string; combo: boolean }
   aulas: { ativo: boolean; lista: LinhaMatricula[] }
   ranking: { ativo: boolean; id: string | null; valor: string }
+  extras: ModalidadeExtra[] // modalidades cadastradas além das três fixas
 }
 
 export const MAX_AULAS_POR_ESPORTE = 2
@@ -39,7 +45,14 @@ export function mascaraValor(v: string) {
   return resto.length ? `${inteiro},${resto.join('').slice(0, 2)}` : inteiro
 }
 
-export function estadoVazio(esporte: { id: string; nome: string }, unidadeId: string): EstadoEsporte {
+const ehFixa = (tipo: string) => (MODALIDADES_FIXAS as readonly string[]).includes(tipo)
+
+/** Nomes das modalidades ativas que não são as três fixas (as que ganham só o campo de valor). */
+export function extrasDe(modalidadesAtivas: string[]) {
+  return modalidadesAtivas.filter(m => !ehFixa(m))
+}
+
+export function estadoVazio(esporte: { id: string; nome: string }, unidadeId: string, extras: string[] = []): EstadoEsporte {
   return {
     esporteId: esporte.id,
     nome: esporte.nome,
@@ -48,6 +61,7 @@ export function estadoVazio(esporte: { id: string; nome: string }, unidadeId: st
     clubinho: { ativo: false, id: null, valor: '', combo: false },
     aulas: { ativo: false, lista: [{ id: null, tipo: 'Aula', professor: '', valor: '' }] },
     ranking: { ativo: false, id: null, valor: '' },
+    extras: extras.map(tipo => ({ tipo, ativo: false, id: null, valor: '' })),
   }
 }
 
@@ -65,10 +79,11 @@ export type MatriculaBanco = {
 export function estadoDasMatriculas(
   esportes: { id: string; nome: string }[],
   matriculas: MatriculaBanco[],
-  unidadePadraoId: string
+  unidadePadraoId: string,
+  extrasAtivos: string[] = []
 ): EstadoEsporte[] {
   return esportes.map(e => {
-    const est = estadoVazio(e, unidadePadraoId)
+    const est = estadoVazio(e, unidadePadraoId, extrasAtivos)
     const dele = matriculas.filter(m => m.esporte_id === e.id)
     if (dele.length === 0) return est
     est.ativo = true
@@ -85,6 +100,10 @@ export function estadoDasMatriculas(
     }
     const r = dele.find(m => m.tipo === 'Ranking')
     if (r) est.ranking = { ativo: true, id: r.id, valor: fmt(r.valor) }
+    est.extras = est.extras.map(x => {
+      const m = dele.find(d => d.tipo === x.tipo)
+      return m ? { tipo: x.tipo, ativo: true, id: m.id, valor: fmt(m.valor) } : x
+    })
     return est
   })
 }
@@ -122,6 +141,9 @@ export function matriculasParaGravar(estados: EstadoEsporte[]): MatriculaParaGra
     if (e.ranking.ativo) {
       saida.push({ ...base, id: e.ranking.id, tipo: 'Ranking', valor: parseValor(e.ranking.valor), professor_nome: null, acesso_duas_unidades: false })
     }
+    for (const x of e.extras) {
+      if (x.ativo) saida.push({ ...base, id: x.id, tipo: x.tipo, valor: parseValor(x.valor), professor_nome: null, acesso_duas_unidades: false })
+    }
   }
   return saida
 }
@@ -130,6 +152,14 @@ export function matriculasParaGravar(estados: EstadoEsporte[]): MatriculaParaGra
 export function idsParaApagar(idsExistentes: string[], gravar: MatriculaParaGravar[]) {
   const mantidos = new Set(gravar.map(m => m.id).filter(Boolean))
   return idsExistentes.filter(id => !mantidos.has(id))
+}
+
+/**
+ * Só as matrículas de modalidades que aparecem na tela podem ser apagadas pelo cadastro.
+ * As de modalidade inativa ficam como estão (escondidas, mas não perdidas).
+ */
+export function idsEditaveis(matriculas: { id: string; tipo: string }[], modalidadesAtivas: string[]) {
+  return matriculas.filter(m => modalidadesAtivas.includes(m.tipo)).map(m => m.id)
 }
 
 export function totalMensal(gravar: MatriculaParaGravar[]) {

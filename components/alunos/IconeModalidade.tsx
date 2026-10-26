@@ -14,6 +14,6 @@ export default function IconeModalidade({ tipo, tamanho = 20 }: Props) {
       </svg>
     )
   }
-  const emoji = tipo === 'Ranking' ? '🥇' : '🎓'
+  const emoji = tipo === 'Ranking' ? '🥇' : tipo === 'Aula' ? '🎓' : '🏷️'
   return <span role="img" aria-label={tipo} title={tipo} style={{ fontSize: tamanho * 0.95, lineHeight: 1 }}>{emoji}</span>
 }

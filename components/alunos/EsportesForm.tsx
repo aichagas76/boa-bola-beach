@@ -33,20 +33,22 @@ function Marca({ marcado, onChange, children }: { marcado: boolean; onChange: (v
   )
 }
 
-const temModalidade = (e: EstadoEsporte) => e.clubinho.ativo || e.aulas.ativo || e.ranking.ativo
+const temModalidade = (e: EstadoEsporte) => e.clubinho.ativo || e.aulas.ativo || e.ranking.ativo || e.extras.some(x => x.ativo)
 const LINHA = 'grid grid-cols-1 md:grid-cols-[10rem_12rem_1fr] gap-x-4 gap-y-2 items-center'
 
 type Props = {
   estados: EstadoEsporte[]
   onChange: (estados: EstadoEsporte[]) => void
   professores: { id: string; nome: string }[]
+  modalidades: string[] // só as ativas (cadastro de Modalidades)
 }
 
 /**
  * Cartão "Esportes e modalidades": cada pílula liga/desliga um esporte (pode ligar vários)
  * e, para cada esporte ligado, aparece abaixo o quadro com Clubinho / Aulas / Ranking.
  */
-export default function EsportesForm({ estados, onChange, professores }: Props) {
+export default function EsportesForm({ estados, onChange, professores, modalidades }: Props) {
+  const mostra = (nome: string) => modalidades.includes(nome)
   const [recolhidos, setRecolhidos] = useState<Record<string, boolean>>({})
 
   function mudar(esporteId: string, fn: (x: EstadoEsporte) => EstadoEsporte) {
@@ -112,7 +114,7 @@ export default function EsportesForm({ estados, onChange, professores }: Props) 
             {!recolhido && (
               <div className="px-4 py-4 space-y-3.5">
                 {/* Clubinho */}
-                <div className={LINHA}>
+                {mostra('Clubinho') && <div className={LINHA}>
                   <Marca marcado={e.clubinho.ativo} onChange={v => mudar(e.esporteId, x => ({ ...x, clubinho: { ...x.clubinho, ativo: v } }))}>
                     <IconeModalidade tipo="Clubinho" tamanho={22} /> Clubinho
                   </Marca>
@@ -125,10 +127,10 @@ export default function EsportesForm({ estados, onChange, professores }: Props) 
                       Combo (Boa Bola 1 e 2)
                     </label>
                   ) : <span />}
-                </div>
+                </div>}
 
                 {/* Aulas */}
-                {e.aulas.lista.map((aula, k) => (
+                {mostra('Aula') && e.aulas.lista.map((aula, k) => (
                   <div key={k} className={LINHA}>
                     {k === 0 ? (
                       <Marca marcado={e.aulas.ativo} onChange={v => mudar(e.esporteId, x => ({ ...x, aulas: { ...x.aulas, ativo: v } }))}>
@@ -152,7 +154,7 @@ export default function EsportesForm({ estados, onChange, professores }: Props) 
                     </div>
                   </div>
                 ))}
-                {e.aulas.ativo && e.aulas.lista.length < MAX_AULAS_POR_ESPORTE && (
+                {mostra('Aula') && e.aulas.ativo && e.aulas.lista.length < MAX_AULAS_POR_ESPORTE && (
                   <button type="button" className="md:ml-[calc(10rem+1rem)] text-sm text-blue-600 hover:underline"
                     onClick={() => mudar(e.esporteId, x => ({ ...x, aulas: { ...x.aulas, lista: [...x.aulas.lista, { id: null, tipo: 'Aula', professor: '', valor: '' }] } }))}>
                     + outra aula
@@ -160,14 +162,30 @@ export default function EsportesForm({ estados, onChange, professores }: Props) 
                 )}
 
                 {/* Ranking */}
-                <div className={LINHA}>
+                {mostra('Ranking') && <div className={LINHA}>
                   <Marca marcado={e.ranking.ativo} onChange={v => mudar(e.esporteId, x => ({ ...x, ranking: { ...x.ranking, ativo: v } }))}>
                     <IconeModalidade tipo="Ranking" tamanho={22} /> Ranking
                   </Marca>
                   <CampoValor valor={e.ranking.valor} placeholder="0,00" desligado={!e.ranking.ativo}
                     onChange={v => mudar(e.esporteId, x => ({ ...x, ranking: { ...x.ranking, valor: v } }))} />
                   <span />
-                </div>
+                </div>}
+
+                {/* Outras modalidades cadastradas: só o valor */}
+                {e.extras.filter(x => mostra(x.tipo)).map(x => (
+                  <div key={x.tipo} className={LINHA}>
+                    <Marca marcado={x.ativo} onChange={v => mudar(e.esporteId, y => ({ ...y, extras: y.extras.map(z => z.tipo === x.tipo ? { ...z, ativo: v } : z) }))}>
+                      <IconeModalidade tipo={x.tipo} tamanho={22} /> {x.tipo}
+                    </Marca>
+                    <CampoValor valor={x.valor} placeholder="0,00" desligado={!x.ativo}
+                      onChange={v => mudar(e.esporteId, y => ({ ...y, extras: y.extras.map(z => z.tipo === x.tipo ? { ...z, valor: v } : z) }))} />
+                    <span />
+                  </div>
+                ))}
+
+                {modalidades.length === 0 && (
+                  <p className="text-sm text-gray-400">Nenhuma modalidade ativa. Ative em Cadastros &gt; Modalidades.</p>
+                )}
               </div>
             )}
           </div>
