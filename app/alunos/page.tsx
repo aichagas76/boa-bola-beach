@@ -11,7 +11,7 @@ import IconeEsporte from '@/components/alunos/IconeEsporte'
 import { ordenar, proximaOrdem, type Direcao, type Valor } from '@/lib/ordenacao'
 import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react'
 import IconeModalidade from '@/components/alunos/IconeModalidade'
-import { BadgeCheck, Copy, CreditCard, Link2, Pencil, ShoppingBag, Trash2, Wallet, X } from 'lucide-react'
+import { BadgeCheck, Copy, CircleDollarSign, CreditCard, Link2, Package, Pencil, Trash2, X } from 'lucide-react'
 import { VendaDoAluno } from '@/components/estoque/FormVenda'
 
 type Aluno = {
@@ -59,6 +59,9 @@ const CHAVES: Record<ColunaId, (a: Aluno) => Valor> = {
   link: a => (a.link_pagamento ? 1 : 0),
   status: a => a.status,
 }
+
+// Cada esporte tem sempre a mesma posição na coluna Esporte (a bolinha fica alinhada de linha para linha)
+const ORDEM_ESPORTES = ['Tênis', 'Beach Tênis', 'Pickleball', 'Padel']
 
 type Alinha = 'left' | 'center' | 'right'
 const ALINHA: Record<ColunaId, Alinha> = {
@@ -295,6 +298,8 @@ export default function Alunos() {
   }
 
   // A coluna Parcial só aparece quando algum aluno tem pagamento parcial no mês (poupa largura da tabela)
+  const presentes = new Set(alunos.flatMap(a => a.esportesMod.map(g => g.esporte)))
+  const ordemEsportes = [...ORDEM_ESPORTES, ...Array.from(presentes).filter(n => !ORDEM_ESPORTES.includes(n))].filter(n => presentes.has(n))
   const temParcial = alunos.some(a => a.parcial_mes > 0)
 
   const filtrados = ordenar(alunos.filter(a => {
@@ -435,15 +440,22 @@ export default function Alunos() {
                   {aluno.esportesMod.length === 0 ? (
                     <span className="text-gray-400">-</span>
                   ) : (
-                    <div className="flex items-start gap-2.5">
-                      {aluno.esportesMod.map(g => (
-                        <div key={g.esporte} className="flex flex-col items-center gap-0.5" title={`${g.esporte}: ${g.modalidades.map(m => (m === 'Aula' ? 'Aulas' : m)).join(', ')}`}>
-                          <IconeEsporte nome={g.esporte} tamanho={22} />
-                          <span className="flex items-center gap-0.5">
-                            {g.modalidades.map(m => <IconeModalidade key={m} tipo={m} tamanho={12} />)}
-                          </span>
-                        </div>
-                      ))}
+                    <div className="flex items-start">
+                      {ordemEsportes.map(nome => {
+                        const g = aluno.esportesMod.find(x => x.esporte === nome)
+                        return (
+                          <div key={nome} className="flex w-9 shrink-0 flex-col items-center gap-0.5" title={g ? `${g.esporte}: ${g.modalidades.map(m => (m === 'Aula' ? 'Aulas' : m)).join(', ')}` : undefined}>
+                            {g && (
+                              <>
+                                <IconeEsporte nome={g.esporte} tamanho={22} />
+                                <span className="flex items-center gap-0.5">
+                                  {g.modalidades.map(m => <IconeModalidade key={m} tipo={m} tamanho={12} />)}
+                                </span>
+                              </>
+                            )}
+                          </div>
+                        )
+                      })}
                     </div>
                   )}
                 </td>
@@ -499,13 +511,13 @@ export default function Alunos() {
                     title="Registrar pagamento"
                     aria-label={`Registrar pagamento de ${aluno.nome}`}
                     className="inline-flex h-8 w-7 items-center justify-center rounded-lg transition-colors text-[#5a9217] hover:bg-green-50"
-                  ><Wallet size={18} /></button>
+                  ><CircleDollarSign size={18} /></button>
                   <button
                     onClick={() => setRetiradaAluno(aluno)}
                     title="Retirar produto (estoque)"
                     aria-label={`Retirar produto para ${aluno.nome}`}
                     className="inline-flex h-8 w-7 items-center justify-center rounded-lg transition-colors text-gray-500 hover:bg-gray-100 hover:text-gray-800"
-                  ><ShoppingBag size={18} /></button>
+                  ><Package size={18} /></button>
                   <Link href={`/alunos/${aluno.id}/editar`} className="inline-flex h-8 w-7 items-center justify-center rounded-lg transition-colors text-gray-500 hover:bg-blue-50 hover:text-blue-600" title="Editar" aria-label={`Editar ${aluno.nome}`}><Pencil size={18} /></Link>
                   <button
                     onClick={() => excluirAluno(aluno.id, aluno.nome)}
