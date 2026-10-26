@@ -27,6 +27,9 @@ type Aluno = {
   pago_mes: number
   parcial_mes: number
   asaas_customer_id: string | null
+  responsavel_nome?: string | null
+  responsavel_cpf?: string | null
+  responsavel_celular?: string | null
   link_pagamento: string | null
 }
 
@@ -90,6 +93,7 @@ export default function Alunos() {
   const [gerandoId, setGerandoId] = useState<string | null>(null)
   const [idAsaasAberto, setIdAsaasAberto] = useState<{ nome: string; id: string } | null>(null)
   const [copiado, setCopiado] = useState(false)
+  const [responsavelAberto, setResponsavelAberto] = useState<Aluno | null>(null)
 
   async function copiarId(id: string) {
     try {
@@ -137,7 +141,7 @@ export default function Alunos() {
 
     const { data: alunosData } = await supabase
       .from('alunos')
-      .select('id, nome, celular, cpf, status, data_vencimento, asaas_customer_id, unidade_id')
+      .select('id, nome, celular, cpf, status, data_vencimento, asaas_customer_id, unidade_id, responsavel_nome, responsavel_cpf, responsavel_celular')
       .order('nome')
 
     const { data: pagamentosLinkData } = await supabase
@@ -381,7 +385,19 @@ export default function Alunos() {
             )}
             {pagination.paginatedItems.map((aluno, i) => (
               <tr key={aluno.id} className={`border-b border-gray-100 hover:bg-gray-50 ${i === pagination.paginatedItems.length - 1 && pagination.currentPage === pagination.totalPages ? 'border-0' : ''}`}>
-                <td className="px-2 py-2.5 font-medium text-gray-900 whitespace-normal min-w-[8rem]">{aluno.nome}</td>
+                <td className="px-2 py-2.5 font-medium text-gray-900 whitespace-normal min-w-[10rem]">
+                  <div className="flex items-center justify-between gap-2">
+                    <span>{aluno.nome}</span>
+                    {aluno.responsavel_nome ? (
+                      <button
+                        onClick={() => setResponsavelAberto(aluno)}
+                        title="Este aluno tem responsável — clique para ver"
+                        aria-label={`Ver responsável de ${aluno.nome}`}
+                        className="shrink-0 inline-flex h-5 w-5 items-center justify-center rounded-full bg-blue-100 text-[11px] font-bold text-blue-700 hover:bg-blue-200"
+                      >R</button>
+                    ) : <span className="inline-block h-5 w-5 shrink-0" />}
+                  </div>
+                </td>
                 <td className="px-2 py-2.5 text-gray-600">
                   <a href={`https://wa.me/55${aluno.celular.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5">
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" className="shrink-0" viewBox="0 0 24 24" fill="#25D366">
@@ -488,6 +504,34 @@ export default function Alunos() {
           onPageChange={pagination.goToPage}
         />
       </div>
+
+      {/* Dados do responsável (abre ao clicar no R ao lado do nome) */}
+      {responsavelAberto && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => setResponsavelAberto(null)}>
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-5" onClick={e => e.stopPropagation()}>
+            <div className="flex items-start justify-between gap-3 mb-3">
+              <div>
+                <div className="text-section-title text-gray-900">Responsável</div>
+                <div className="text-sm text-gray-500">de {responsavelAberto.nome}</div>
+              </div>
+              <button onClick={() => setResponsavelAberto(null)} className="text-gray-400 hover:text-gray-600" title="Fechar"><X size={18} /></button>
+            </div>
+            <dl className="text-sm space-y-2">
+              <div><dt className="text-xs text-gray-500">Nome</dt><dd className="text-gray-900 font-medium">{responsavelAberto.responsavel_nome}</dd></div>
+              <div><dt className="text-xs text-gray-500">CPF</dt><dd className="text-gray-900">{responsavelAberto.responsavel_cpf || '—'}</dd></div>
+              <div>
+                <dt className="text-xs text-gray-500">Celular</dt>
+                <dd className="text-gray-900">
+                  {responsavelAberto.responsavel_celular ? (
+                    <a href={`https://wa.me/55${responsavelAberto.responsavel_celular.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">{responsavelAberto.responsavel_celular}</a>
+                  ) : '—'}
+                </dd>
+              </div>
+            </dl>
+            <p className="mt-3 text-xs text-gray-500">A cobrança e os avisos de pagamento deste aluno vão para o responsável.</p>
+          </div>
+        </div>
+      )}
 
       {/* Número do cadastro no Asaas (só aparece quando o operador clica no ícone) */}
       {idAsaasAberto && (
