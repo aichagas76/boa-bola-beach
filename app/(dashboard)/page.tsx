@@ -25,7 +25,7 @@ export default function Dashboard() {
 
       const { data: matriculas } = await supabase
         .from('matriculas')
-        .select('aluno_id, tipo, valor')
+        .select('aluno_id, tipo, valor, esportes(nome)')
 
       const { data: movimentacoes } = await supabase
         .from('movimentacoes')
@@ -45,7 +45,8 @@ export default function Dashboard() {
       const receitaPorModalidade = (matriculas ?? [])
         .filter(m => idsAtivos.has(m.aluno_id))
         .reduce((acc: Record<string, number>, m) => {
-          const tipo = m.tipo || 'Outro'
+          const esporte = (m.esportes as unknown as { nome: string } | null)?.nome
+          const tipo = esporte ? `${esporte} · ${m.tipo}` : m.tipo || 'Outro'
           acc[tipo] = (acc[tipo] || 0) + (m.valor ?? 0)
           return acc
         }, {})

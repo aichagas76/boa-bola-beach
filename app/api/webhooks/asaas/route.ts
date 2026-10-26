@@ -115,6 +115,7 @@ export async function POST(request: NextRequest) {
     const reaproveitar = jaLancada?.status === 'Estornado' || !!jaLancada?.descricao?.toLowerCase().includes('parcial')
     if (jaLancada && !reaproveitar) return NextResponse.json({ success: true, ignored: 'ja_lancado' })
 
+    const { data: alu } = await db.from('alunos').select('unidade_id').eq('id', pagamento.aluno_id).maybeSingle()
     const lancamento = {
       tipo: 'Entrada',
       descricao: parcial ? 'Pagamento parcial Asaas' : 'Cobrança Asaas',
@@ -127,6 +128,7 @@ export async function POST(request: NextRequest) {
       aluno_ref_id: pagamento.aluno_id,
       origem: 'Asaas',
       id_cobranca_asaas: payment.id,
+      unidade_id: alu?.unidade_id ?? undefined, // financeiro na unidade do aluno
     }
     const { error: movError } = jaLancada
       ? await db.from('movimentacoes').update(lancamento).eq('id', jaLancada.id)

@@ -23,6 +23,9 @@ type Matricula = {
   tipo: string
   valor: number
   professor_nome: string
+  esportes: { nome: string } | null
+  unidades: { nome: string } | null
+  acesso_duas_unidades: boolean | null
 }
 
 type Pagamento = {
@@ -55,7 +58,7 @@ export default function DetalheAluno() {
 
       const { data: m } = await supabase
         .from('matriculas')
-        .select('*')
+        .select('*, esportes(nome), unidades(nome)')
         .eq('aluno_id', id)
 
       const { data: p } = await supabase
@@ -121,8 +124,6 @@ export default function DetalheAluno() {
   if (loading) return <div className="text-gray-400 text-sm">Carregando...</div>
   if (!aluno) return <div className="text-gray-400 text-sm">Aluno não encontrado.</div>
 
-  const clubinho = matriculas.find(m => m.tipo === 'Clubinho')
-  const aulasList = matriculas.filter(m => m.tipo === 'Aula')
   const pagamentoComLink = pagamentos.find(p => p.link_pagamento && p.status !== 'Pago')
 
   return (
@@ -136,7 +137,7 @@ export default function DetalheAluno() {
       </div>
 
       <div className="bg-white border border-gray-200 rounded-xl p-6 mb-4">
-        <div className="text-th text-gray-400r mb-4">Dados pessoais</div>
+        <div className="text-th text-gray-400 mb-4">Dados pessoais</div>
         <div className="grid grid-cols-2 gap-4 text-sm">
           <div>
             <div className="text-label text-gray-500 mb-1">Celular</div>
@@ -191,33 +192,28 @@ export default function DetalheAluno() {
       </div>
 
       <div className="bg-white border border-gray-200 rounded-xl p-6 mb-4">
-        <div className="text-th text-gray-400r mb-4">Modalidades</div>
+        <div className="text-th text-gray-400 mb-4">Modalidades</div>
 
-        {!clubinho && aulasList.length === 0 && (
+        {matriculas.length === 0 && (
           <div className="text-sm text-gray-400">Nenhuma modalidade cadastrada.</div>
         )}
 
-        {clubinho && (
-          <div className="flex items-center justify-between py-2 border-b border-gray-100">
-            <span className="text-sm font-medium text-gray-900">🏆 Clubinho</span>
-            <span className="text-sm text-gray-600">R$ {clubinho.valor?.toFixed(2).replace('.', ',')}/mês</span>
-          </div>
-        )}
-
-        {aulasList.map((aula, i) => (
-          <div key={aula.id} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
+        {matriculas.map(m => (
+          <div key={m.id} className="flex items-center justify-between gap-3 py-2 border-b border-gray-100 last:border-0">
             <div className="text-sm font-medium text-gray-900">
-              🎓 Aula {aulasList.length > 1 ? i + 1 : ''}
-              {aula.professor_nome && <span className="text-gray-400 font-normal ml-1">· {aula.professor_nome}</span>}
+              {m.tipo === 'Clubinho' ? '🏆' : m.tipo === 'Ranking' ? '🥇' : '🎓'} {m.esportes?.nome ?? 'Beach Tênis'} · {m.tipo === 'Aula' ? 'Aula' : m.tipo}
+              {m.professor_nome && <span className="text-gray-400 font-normal ml-1">· {m.professor_nome}</span>}
+              {m.unidades?.nome && <span className="text-gray-400 font-normal ml-1">· {m.unidades.nome}</span>}
+              {m.acesso_duas_unidades && <span className="ml-2 inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700">Combo 2 unidades</span>}
             </div>
-            <span className="text-sm text-gray-600">R$ {aula.valor?.toFixed(2).replace('.', ',')}/mês</span>
+            <span className="text-sm text-gray-600 whitespace-nowrap">R$ {m.valor?.toFixed(2).replace('.', ',')}/mês</span>
           </div>
         ))}
       </div>
 
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden mb-4">
         <div className="px-6 py-4 border-b border-gray-100">
-          <div className="text-th text-gray-400r">Pagamentos</div>
+          <div className="text-th text-gray-400">Pagamentos</div>
         </div>
         {pagamentos.length === 0 ? (
           <div className="px-6 py-4 text-sm text-gray-400">Nenhum pagamento encontrado.</div>

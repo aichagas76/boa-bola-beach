@@ -7,11 +7,16 @@ import { registrarLog } from '@/lib/log'
 import { useFormValidation } from '@/lib/hooks/useFormValidation'
 import { FormInput, FormSelect, FormError } from '@/components/ui/form-error'
 import { validarCPF, validarCelular, VALIDATION_MESSAGES } from '@/lib/validators'
+import EsportesForm from '@/components/alunos/EsportesForm'
+import { carregarCatalogo, estadosIniciais, salvarMatriculas, type Unidade } from '@/lib/esportes-db'
+import type { EstadoEsporte } from '@/lib/esportes'
 
 export default function NovoAluno() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [professores, setProfessores] = useState<{ id: string; nome: string }[]>([])
+  const [unidades, setUnidades] = useState<Unidade[]>([])
+  const [estados, setEstados] = useState<EstadoEsporte[]>([])
 
   const rules = {
     nome: { required: true, minLength: 3, message: 'Nome deve ter no mínimo 3 caracteres' },
@@ -29,6 +34,12 @@ export default function NovoAluno() {
   useEffect(() => {
     supabase.from('professores').select('id, nome').eq('ativo', true).order('nome')
       .then(({ data }) => setProfessores(data ?? []))
+    carregarCatalogo(supabase).then(({ esportes, unidades }) => {
+      setUnidades(unidades)
+      const padrao = unidades[0]?.id ?? ''
+      setForm(f => ({ ...f, unidade_id: f.unidade_id || padrao }))
+      setEstados(estadosIniciais(esportes, padrao))
+    })
   }, [])
 
   const [form, setForm] = useState({
@@ -42,12 +53,8 @@ export default function NovoAluno() {
     endereco: '',
     observacao: '',
     status: 'Ativo',
+    unidade_id: '',
   })
-
-  const [clubinho, setClubinho] = useState(false)
-  const [valorClubinho, setValorClubinho] = useState('')
-  const [aulas, setAulas] = useState(false)
-  const [aulasList, setAulasList] = useState([{ professor: '', valor: '' }])
 
   function mascaraCPF(v: string) {
     v = v.replace(/\D/g, '').slice(0, 11)
@@ -57,14 +64,6 @@ export default function NovoAluno() {
     return v
   }
 
-  function mascaraValor(v: string) {
-    // Remove tudo que não é número
-    const num = v.replace(/\D/g, '')
-    if (!num) return ''
-    // Formata com vírgula
-    return num
-  }
-
   function mascaraCelular(v: string) {
     v = v.replace(/\D/g, '').slice(0, 11)
     if (v.length > 6) v = v.replace(/(\d{2})(\d{5})(\d{0,4})/, '($1) $2-$3')
@@ -72,28 +71,15 @@ export default function NovoAluno() {
     return v
   }
 
-  function addAula() {
-    if (aulasList.length < 2) setAulasList([...aulasList, { professor: '', valor: '' }])
-  }
-
-  function removeAula(i: number) {
-    setAulasList(aulasList.filter((_, idx) => idx !== i))
-  }
-
-  function updateAula(i: number, field: string, value: string) {
-    const nova = [...aulasList]
-    nova[i] = { ...nova[i], [field]: value }
-    setAulasList(nova)
-  }
-
   async function salvar() {
     if (!validation.validate(form)) return
+    if (!form.unidade_id) return alert('Seu login ainda não tem unidade liberada. Fale com quem administra o sistema.')
 
     setLoading(true)
 
     const { data: aluno, error } = await supabase
       .from('alunos')
-      .insert(form)
+      .insert({ ...form, unidade_id: form.unidade_id || undefined })
       .select()
       .single()
 
@@ -103,24 +89,8 @@ export default function NovoAluno() {
       return
     }
 
-    if (clubinho) {
-      await supabase.from('matriculas').insert({
-        aluno_id: aluno.id,
-        tipo: 'Clubinho',
-        valor: parseFloat(valorClubinho.replace(/\D/g, '')) || 0,
-      })
-    }
-
-    if (aulas) {
-      for (const a of aulasList) {
-        await supabase.from('matriculas').insert({
-          aluno_id: aluno.id,
-          tipo: 'Aula',
-          valor: parseFloat(a.valor.replace(/\D/g, '')) || 0,
-          professor_nome: a.professor || null,
-        })
-      }
-    }
+    const erroMatriculas = await salvarMatriculas(supabase, aluno.id, estados, [])
+    if (erroMatriculas) alert('Aluno salvo, mas houve erro nas modalidades: ' + erroMatriculas)
 
     try {
       console.log('📤 Criando cliente Asaas...', { nome: form.nome, cpf: form.cpf })
@@ -156,7 +126,7 @@ export default function NovoAluno() {
       </div>
 
       <div className="bg-white border border-gray-200 rounded-xl p-6 mb-4">
-        <div className="text-th text-gray-400r mb-4">Dados pessoais</div>
+        <div className="text-th text-gray-400 mb-4">Dados pessoais</div>
         <div className="grid grid-cols-2 gap-4">
           <div className="col-span-2">
             <FormInput
@@ -258,74 +228,20 @@ export default function NovoAluno() {
       </div>
 
       <div className="bg-white border border-gray-200 rounded-xl p-6 mb-6">
-        <div className="text-th text-gray-400r mb-4">Modalidades</div>
-
-        <div className="flex items-center justify-between py-3 border-b border-gray-100">
-          <span className="text-sm font-medium text-gray-900">🏆 Clubinho</span>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <div className="relative">
-              <input type="checkbox" className="sr-only" checked={clubinho} onChange={e => setClubinho(e.target.checked)} />
-              <div className={`w-9 h-5 rounded-full transition-colors ${clubinho ? 'bg-blue-500' : 'bg-gray-300'}`}></div>
-              <div className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${clubinho ? 'translate-x-4' : ''}`}></div>
-            </div>
-          </label>
-        </div>
-        {clubinho && (
-          <div className="mt-3 p-3 bg-gray-50 rounded-lg">
-            <label className="text-label text-gray-500 block mb-1">Valor mensal</label>
-            <div className="flex items-center border border-gray-200 rounded-lg bg-white">
-              <span className="px-3 py-2 text-sm text-gray-600 font-semibold">R$</span>
-              <input className="flex-1 border-0 px-0 py-2 text-sm bg-transparent" placeholder="150,00"
-                value={valorClubinho} onChange={e => setValorClubinho(mascaraValor(e.target.value))} />
-            </div>
+        <div className="text-th text-gray-400 mb-4">Esportes e modalidades</div>
+        {unidades.length > 1 && (
+          <div className="mb-4">
+            <label className="text-label text-gray-500 block mb-1">Unidade principal (a cobrança sai por ela)</label>
+            <select
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"
+              value={form.unidade_id}
+              onChange={e => setForm({ ...form, unidade_id: e.target.value })}
+            >
+              {unidades.map(u => <option key={u.id} value={u.id}>{u.nome}</option>)}
+            </select>
           </div>
         )}
-
-        <div className="flex items-center justify-between py-3 mt-2">
-          <span className="text-sm font-medium text-gray-900">🎓 Aulas</span>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <div className="relative">
-              <input type="checkbox" className="sr-only" checked={aulas} onChange={e => setAulas(e.target.checked)} />
-              <div className={`w-9 h-5 rounded-full transition-colors ${aulas ? 'bg-blue-500' : 'bg-gray-300'}`}></div>
-              <div className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${aulas ? 'translate-x-4' : ''}`}></div>
-            </div>
-          </label>
-        </div>
-        {aulas && (
-          <div className="space-y-3 mt-1">
-            {aulasList.map((aula, i) => (
-              <div key={i} className="p-3 bg-gray-50 rounded-lg relative">
-                <div className="text-th text-gray-400 mb-3">Aula {i + 1}</div>
-                {i > 0 && (
-                  <button onClick={() => removeAula(i)} className="absolute top-3 right-3 text-red-400 hover:text-red-600 text-sm">✕</button>
-                )}
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-label text-gray-500 block mb-1">Professor</label>
-                    <select className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"
-                      value={aula.professor} onChange={e => updateAula(i, 'professor', e.target.value)}>
-                      <option value="">Selecionar professor</option>
-                      {professores.map(p => <option key={p.id} value={p.nome}>{p.nome}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-label text-gray-500 block mb-1">Valor mensal</label>
-                    <div className="flex items-center border border-gray-200 rounded-lg bg-white">
-                      <span className="px-3 py-2 text-sm text-gray-600 font-semibold">R$</span>
-                      <input className="flex-1 border-0 px-0 py-2 text-sm bg-transparent" placeholder="180,00"
-                        value={aula.valor} onChange={e => updateAula(i, 'valor', mascaraValor(e.target.value))} />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-            {aulasList.length < 2 && (
-              <button onClick={addAula} className="w-full border border-dashed border-blue-300 text-blue-600 text-sm py-2 rounded-lg hover:bg-blue-50">
-                + Adicionar outra aula
-              </button>
-            )}
-          </div>
-        )}
+        <EsportesForm estados={estados} onChange={setEstados} unidades={unidades} professores={professores} />
       </div>
 
       <div className="flex justify-end gap-3">

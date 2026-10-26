@@ -102,7 +102,7 @@ export default function Alunos() {
 
     const { data: matriculasData } = await supabase
       .from('matriculas')
-      .select('aluno_id, tipo, valor, professor_nome')
+      .select('aluno_id, tipo, valor, professor_nome, esportes(nome)')
 
     const { data: pagamentosData } = await supabase
       .from('movimentacoes')
@@ -240,12 +240,9 @@ export default function Alunos() {
   }
 
   function iconeModalidade(modalidades: string[]) {
-    const temClubinho = modalidades.includes('Clubinho')
-    const temAula = modalidades.includes('Aula')
-    if (temClubinho && temAula) return '🏆🎓'
-    if (temClubinho) return '🏆'
-    if (temAula) return '🎓'
-    return '-'
+    const icone: Record<string, string> = { Clubinho: '🏆', Aula: '🎓', Ranking: '🥇' }
+    const unicos = Array.from(new Set(modalidades))
+    return unicos.length ? unicos.map(m => icone[m] ?? '').join('') : '-'
   }
 
   function dataCurta(iso: string | null) {
@@ -449,7 +446,7 @@ export default function Alunos() {
             <div className="p-6 space-y-4">
               {/* Matrículas */}
               <div>
-                <div className="text-th text-gray-400r mb-2">Matrículas</div>
+                <div className="text-th text-gray-400 mb-2">Matrículas</div>
                 {matriculasModal.length === 0 ? (
                   <p className="text-sm text-gray-400">Nenhuma matrícula encontrada.</p>
                 ) : (

@@ -4,6 +4,9 @@ import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { registrarLog } from '@/lib/log'
+import EsportesForm from '@/components/alunos/EsportesForm'
+import { carregarCatalogo, estadosDoAluno, salvarMatriculas, type Unidade } from '@/lib/esportes-db'
+import type { EstadoEsporte, MatriculaBanco } from '@/lib/esportes'
 
 function validarCPF(cpf: string) {
   const nums = cpf.replace(/\D/g, '')
@@ -44,15 +47,13 @@ export default function EditarAluno() {
     data_vencimento: '',
     observacao: '',
     status: 'Ativo',
+    unidade_id: '',
   })
 
-  const [clubinho, setClubinho] = useState(false)
-  const [valorClubinho, setValorClubinho] = useState('')
-  const [matriculaClubinhoId, setMatriculaClubinhoId] = useState<string | null>(null)
-
-  const [aulas, setAulas] = useState(false)
-  const [aulasList, setAulasList] = useState<{ id: string | null, professor: string, valor: string }[]>([{ id: null, professor: '', valor: '' }])
   const [professores, setProfessores] = useState<{ id: string; nome: string }[]>([])
+  const [unidades, setUnidades] = useState<Unidade[]>([])
+  const [estados, setEstados] = useState<EstadoEsporte[]>([])
+  const [idsExistentes, setIdsExistentes] = useState<string[]>([])
 
   function mascaraCPF(v: string) {
     v = v.replace(/\D/g, '').slice(0, 11)
@@ -60,14 +61,6 @@ export default function EditarAluno() {
     else if (v.length > 6) v = v.replace(/(\d{3})(\d{3})(\d{0,3})/, '$1.$2.$3')
     else if (v.length > 3) v = v.replace(/(\d{3})(\d{0,3})/, '$1.$2')
     return v
-  }
-
-  function mascaraValor(v: string) {
-    // Remove tudo que não é número
-    const num = v.replace(/\D/g, '')
-    if (!num) return ''
-    // Retorna apenas os números
-    return num
   }
 
   function mascaraCelular(v: string) {
@@ -93,79 +86,36 @@ export default function EditarAluno() {
           data_vencimento: a.data_vencimento ?? '',
           observacao: a.observacao ?? '',
           status: a.status ?? 'Ativo',
+          unidade_id: a.unidade_id ?? '',
         })
-      }
-
-      if (m) {
-        const c = m.find(x => x.tipo === 'Clubinho')
-        if (c) {
-          setClubinho(true)
-          setValorClubinho(c.valor?.toString().replace('.', ',') ?? '')
-          setMatriculaClubinhoId(c.id)
-        }
-
-        const al = m.filter(x => x.tipo === 'Aula')
-        if (al.length > 0) {
-          setAulas(true)
-          setAulasList(al.map(x => ({ id: x.id, professor: x.professor_nome ?? '', valor: x.valor?.toString().replace('.', ',') ?? '' })))
-        }
       }
 
       const { data: profs } = await supabase.from('professores').select('id, nome').eq('ativo', true).order('nome')
       setProfessores(profs ?? [])
+
+      const { esportes, unidades: libs } = await carregarCatalogo(supabase)
+      setUnidades(libs)
+      const unidadePadrao = a?.unidade_id ?? libs[0]?.id ?? ''
+      setIdsExistentes((m ?? []).map(x => x.id))
+      setEstados(estadosDoAluno(esportes, (m ?? []) as MatriculaBanco[], unidadePadrao))
 
       setLoading(false)
     }
     carregar()
   }, [id])
 
-  function addAula() {
-    if (aulasList.length < 2) setAulasList([...aulasList, { id: null, professor: '', valor: '' }])
-  }
-
-  function removeAula(i: number) {
-    setAulasList(aulasList.filter((_, idx) => idx !== i))
-  }
-
-  function updateAula(i: number, field: string, value: string) {
-    const nova = [...aulasList]
-    nova[i] = { ...nova[i], [field]: value }
-    setAulasList(nova)
-  }
-
   async function salvar() {
     if (!form.nome) return alert('Informe o nome do aluno')
     if (form.cpf && !validarCPF(form.cpf)) return alert('CPF inválido')
     setSaving(true)
 
-    await supabase.from('alunos').update(form).eq('id', id)
+    await supabase.from('alunos').update({ ...form, unidade_id: form.unidade_id || undefined }).eq('id', id)
 
-    // Clubinho
-    if (clubinho) {
-      if (matriculaClubinhoId) {
-        await supabase.from('matriculas').update({ valor: parseFloat(valorClubinho.replace(',', '.')) || 0 }).eq('id', matriculaClubinhoId)
-      } else {
-        await supabase.from('matriculas').insert({ aluno_id: id, tipo: 'Clubinho', valor: parseFloat(valorClubinho.replace(',', '.')) || 0 })
-      }
-    } else if (matriculaClubinhoId) {
-      await supabase.from('matriculas').delete().eq('id', matriculaClubinhoId)
-    }
-
-    // Aulas
-    const aulasAntigas = aulasList.filter(a => a.id)
-    const aulasNovas = aulasList.filter(a => !a.id)
-
-    if (aulas) {
-      for (const a of aulasAntigas) {
-        await supabase.from('matriculas').update({ valor: parseFloat(a.valor.replace(',', '.')) || 0, professor_nome: a.professor || null }).eq('id', a.id!)
-      }
-      for (const a of aulasNovas) {
-        await supabase.from('matriculas').insert({ aluno_id: id, tipo: 'Aula', valor: parseFloat(a.valor.replace(',', '.')) || 0, professor_nome: a.professor || null })
-      }
-    } else {
-      for (const a of aulasAntigas) {
-        await supabase.from('matriculas').delete().eq('id', a.id!)
-      }
+    const erroMatriculas = await salvarMatriculas(supabase, id, estados, idsExistentes)
+    if (erroMatriculas) {
+      alert('Erro ao salvar as modalidades: ' + erroMatriculas)
+      setSaving(false)
+      return
     }
 
     await registrarLog('Editou aluno', 'alunos', id, form.nome)
@@ -182,7 +132,7 @@ export default function EditarAluno() {
       </div>
 
       <div className="bg-white border border-gray-200 rounded-xl p-6 mb-4">
-        <div className="text-th text-gray-400r mb-4">Dados pessoais</div>
+        <div className="text-th text-gray-400 mb-4">Dados pessoais</div>
         <div className="grid grid-cols-2 gap-4">
           <div className="col-span-2">
             <label className="text-label text-gray-500 block mb-1">Nome completo</label>
@@ -254,68 +204,20 @@ export default function EditarAluno() {
       </div>
 
       <div className="bg-white border border-gray-200 rounded-xl p-6 mb-6">
-        <div className="text-th text-gray-400r mb-4">Modalidades</div>
-
-        <div className="flex items-center justify-between py-3 border-b border-gray-100">
-          <span className="text-sm font-medium text-gray-900">🏆 Clubinho</span>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <div className="relative">
-              <input type="checkbox" className="sr-only" checked={clubinho} onChange={e => setClubinho(e.target.checked)} />
-              <div className={`w-9 h-5 rounded-full transition-colors ${clubinho ? 'bg-blue-500' : 'bg-gray-300'}`}></div>
-              <div className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${clubinho ? 'translate-x-4' : ''}`}></div>
-            </div>
-          </label>
-        </div>
-        {clubinho && (
-          <div className="mt-3 p-3 bg-gray-50 rounded-lg">
-            <label className="text-label text-gray-500 block mb-1">Valor mensal</label>
-            <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white" placeholder="150,00"
-              value={valorClubinho} onChange={e => setValorClubinho(mascaraValor(e.target.value))} />
+        <div className="text-th text-gray-400 mb-4">Esportes e modalidades</div>
+        {unidades.length > 1 && (
+          <div className="mb-4">
+            <label className="text-label text-gray-500 block mb-1">Unidade principal (a cobrança sai por ela)</label>
+            <select
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"
+              value={form.unidade_id}
+              onChange={e => setForm({ ...form, unidade_id: e.target.value })}
+            >
+              {unidades.map(u => <option key={u.id} value={u.id}>{u.nome}</option>)}
+            </select>
           </div>
         )}
-
-        <div className="flex items-center justify-between py-3 mt-2">
-          <span className="text-sm font-medium text-gray-900">🎓 Aulas</span>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <div className="relative">
-              <input type="checkbox" className="sr-only" checked={aulas} onChange={e => setAulas(e.target.checked)} />
-              <div className={`w-9 h-5 rounded-full transition-colors ${aulas ? 'bg-blue-500' : 'bg-gray-300'}`}></div>
-              <div className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${aulas ? 'translate-x-4' : ''}`}></div>
-            </div>
-          </label>
-        </div>
-        {aulas && (
-          <div className="space-y-3 mt-1">
-            {aulasList.map((aula, i) => (
-              <div key={i} className="p-3 bg-gray-50 rounded-lg relative">
-                <div className="text-th text-gray-400 mb-3">Aula {i + 1}</div>
-                {i > 0 && (
-                  <button onClick={() => removeAula(i)} className="absolute top-3 right-3 text-red-400 hover:text-red-600 text-sm">✕</button>
-                )}
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-label text-gray-500 block mb-1">Professor</label>
-                    <select className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"
-                      value={aula.professor} onChange={e => updateAula(i, 'professor', e.target.value)}>
-                      <option value="">Selecionar professor</option>
-                      {professores.map(p => <option key={p.id} value={p.nome}>{p.nome}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-label text-gray-500 block mb-1">Valor mensal</label>
-                    <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white" placeholder="180,00"
-                      value={aula.valor} onChange={e => updateAula(i, 'valor', mascaraValor(e.target.value))} />
-                  </div>
-                </div>
-              </div>
-            ))}
-            {aulasList.length < 2 && (
-              <button onClick={addAula} className="w-full border border-dashed border-blue-300 text-blue-600 text-sm py-2 rounded-lg hover:bg-blue-50">
-                + Adicionar outra aula
-              </button>
-            )}
-          </div>
-        )}
+        <EsportesForm estados={estados} onChange={setEstados} unidades={unidades} professores={professores} />
       </div>
 
       <div className="flex justify-end gap-3">
