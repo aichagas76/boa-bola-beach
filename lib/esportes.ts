@@ -165,3 +165,33 @@ export function idsEditaveis(matriculas: { id: string; tipo: string }[], modalid
 export function totalMensal(gravar: MatriculaParaGravar[]) {
   return gravar.reduce((acc, m) => acc + m.valor, 0)
 }
+
+/* ---------- modalidades que valem para cada esporte ---------- */
+
+export type VinculoModalidadeEsporte = { esporte_id: string; modalidades: { nome: string } | null }
+
+/**
+ * Para cada esporte, os nomes das modalidades ATIVAS que valem nele.
+ * Se o cadastro de vínculos ainda não existe (vinculos = null), todo esporte mostra todas as modalidades ativas.
+ */
+export function modalidadesPorEsporte(
+  esportes: { id: string }[],
+  modalidadesAtivas: string[],
+  vinculos: VinculoModalidadeEsporte[] | null
+): Record<string, string[]> {
+  const mapa: Record<string, string[]> = {}
+  for (const e of esportes) {
+    mapa[e.id] = vinculos === null
+      ? [...modalidadesAtivas]
+      : vinculos.filter(v => v.esporte_id === e.id && v.modalidades && modalidadesAtivas.includes(v.modalidades.nome)).map(v => v.modalidades!.nome)
+  }
+  return mapa
+}
+
+/** Matrículas que o cadastro pode apagar: só as de modalidade que aparece na tela PARA AQUELE ESPORTE. */
+export function idsEditaveisPorEsporte(
+  matriculas: { id: string; tipo: string; esporte_id: string | null }[],
+  mapa: Record<string, string[]>
+) {
+  return matriculas.filter(m => !!m.esporte_id && (mapa[m.esporte_id] ?? []).includes(m.tipo)).map(m => m.id)
+}

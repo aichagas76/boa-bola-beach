@@ -23,7 +23,7 @@ export default function NovoAluno() {
   const [nomeDuplicado, setNomeDuplicado] = useState(false)
   const [professores, setProfessores] = useState<{ id: string; nome: string }[]>([])
   const [estados, setEstados] = useState<EstadoEsporte[]>([])
-  const [modalidades, setModalidades] = useState<string[]>([])
+  const [modalidadesPorEsporte, setModalidadesPorEsporte] = useState<Record<string, string[]>>({})
 
   const [form, setForm] = useState<FormAluno>({
     nome: '',
@@ -44,8 +44,8 @@ export default function NovoAluno() {
   useEffect(() => {
     supabase.from('professores').select('id, nome').eq('ativo', true).order('nome')
       .then(({ data }) => setProfessores(data ?? []))
-    carregarCatalogo(supabase).then(({ esportes, modalidades }) => {
-      setModalidades(modalidades)
+    carregarCatalogo(supabase).then(({ esportes, modalidades, modalidadesPorEsporte }) => {
+      setModalidadesPorEsporte(modalidadesPorEsporte)
       setEstados(estadosIniciais(esportes, '', modalidades))
     })
   }, [])
@@ -117,7 +117,7 @@ export default function NovoAluno() {
 
       <DadosPessoais form={form} onChange={setForm} erros={erros} mostrarErros={tentou} onNomeDuplicado={setNomeDuplicado} />
 
-      <EsportesForm estados={estados} onChange={setEstados} professores={professores} modalidades={modalidades} />
+      <EsportesForm estados={estados} onChange={setEstados} professores={professores} modalidadesPorEsporte={modalidadesPorEsporte} />
 
       <div className="flex justify-end gap-3">
         <button onClick={() => router.back()} className="h-10 px-5 text-sm font-medium border border-gray-200 rounded-lg text-gray-700 bg-white hover:bg-gray-50">

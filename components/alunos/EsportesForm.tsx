@@ -40,15 +40,15 @@ type Props = {
   estados: EstadoEsporte[]
   onChange: (estados: EstadoEsporte[]) => void
   professores: { id: string; nome: string }[]
-  modalidades: string[] // só as ativas (cadastro de Modalidades)
+  modalidadesPorEsporte: Record<string, string[]> // para cada esporte, as modalidades ativas que valem nele
 }
 
 /**
  * Cartão "Esportes e modalidades": cada pílula liga/desliga um esporte (pode ligar vários)
  * e, para cada esporte ligado, aparece abaixo o quadro com Clubinho / Aulas / Ranking.
  */
-export default function EsportesForm({ estados, onChange, professores, modalidades }: Props) {
-  const mostra = (nome: string) => modalidades.includes(nome)
+export default function EsportesForm({ estados, onChange, professores, modalidadesPorEsporte }: Props) {
+  const mostra = (e: EstadoEsporte, nome: string) => (modalidadesPorEsporte[e.esporteId] ?? []).includes(nome)
   const [recolhidos, setRecolhidos] = useState<Record<string, boolean>>({})
 
   function mudar(esporteId: string, fn: (x: EstadoEsporte) => EstadoEsporte) {
@@ -114,7 +114,7 @@ export default function EsportesForm({ estados, onChange, professores, modalidad
             {!recolhido && (
               <div className="px-4 py-4 space-y-3.5">
                 {/* Clubinho */}
-                {mostra('Clubinho') && <div className={LINHA}>
+                {mostra(e, 'Clubinho') && <div className={LINHA}>
                   <Marca marcado={e.clubinho.ativo} onChange={v => mudar(e.esporteId, x => ({ ...x, clubinho: { ...x.clubinho, ativo: v } }))}>
                     <IconeModalidade tipo="Clubinho" tamanho={22} /> Clubinho
                   </Marca>
@@ -130,7 +130,7 @@ export default function EsportesForm({ estados, onChange, professores, modalidad
                 </div>}
 
                 {/* Aulas */}
-                {mostra('Aula') && e.aulas.lista.map((aula, k) => (
+                {mostra(e, 'Aula') && e.aulas.lista.map((aula, k) => (
                   <div key={k} className={LINHA}>
                     {k === 0 ? (
                       <Marca marcado={e.aulas.ativo} onChange={v => mudar(e.esporteId, x => ({ ...x, aulas: { ...x.aulas, ativo: v } }))}>
@@ -154,7 +154,7 @@ export default function EsportesForm({ estados, onChange, professores, modalidad
                     </div>
                   </div>
                 ))}
-                {mostra('Aula') && e.aulas.ativo && e.aulas.lista.length < MAX_AULAS_POR_ESPORTE && (
+                {mostra(e, 'Aula') && e.aulas.ativo && e.aulas.lista.length < MAX_AULAS_POR_ESPORTE && (
                   <button type="button" className="md:ml-[calc(10rem+1rem)] text-sm text-blue-600 hover:underline"
                     onClick={() => mudar(e.esporteId, x => ({ ...x, aulas: { ...x.aulas, lista: [...x.aulas.lista, { id: null, tipo: 'Aula', professor: '', valor: '' }] } }))}>
                     + outra aula
@@ -162,7 +162,7 @@ export default function EsportesForm({ estados, onChange, professores, modalidad
                 )}
 
                 {/* Ranking */}
-                {mostra('Ranking') && <div className={LINHA}>
+                {mostra(e, 'Ranking') && <div className={LINHA}>
                   <Marca marcado={e.ranking.ativo} onChange={v => mudar(e.esporteId, x => ({ ...x, ranking: { ...x.ranking, ativo: v } }))}>
                     <IconeModalidade tipo="Ranking" tamanho={22} /> Ranking
                   </Marca>
@@ -172,7 +172,7 @@ export default function EsportesForm({ estados, onChange, professores, modalidad
                 </div>}
 
                 {/* Outras modalidades cadastradas: só o valor */}
-                {e.extras.filter(x => mostra(x.tipo)).map(x => (
+                {e.extras.filter(x => mostra(e, x.tipo)).map(x => (
                   <div key={x.tipo} className={LINHA}>
                     <Marca marcado={x.ativo} onChange={v => mudar(e.esporteId, y => ({ ...y, extras: y.extras.map(z => z.tipo === x.tipo ? { ...z, ativo: v } : z) }))}>
                       <IconeModalidade tipo={x.tipo} tamanho={22} /> {x.tipo}
@@ -183,8 +183,8 @@ export default function EsportesForm({ estados, onChange, professores, modalidad
                   </div>
                 ))}
 
-                {modalidades.length === 0 && (
-                  <p className="text-sm text-gray-400">Nenhuma modalidade ativa. Ative em Cadastros &gt; Modalidades.</p>
+                {(modalidadesPorEsporte[e.esporteId] ?? []).length === 0 && (
+                  <p className="text-sm text-gray-400">Nenhuma modalidade vale para este esporte. Veja em Cadastros &gt; Modalidades.</p>
                 )}
               </div>
             )}

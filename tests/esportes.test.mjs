@@ -105,3 +105,31 @@ test('modalidade inativa: a matrícula do aluno não entra na lista de apagávei
   const apagar = idsParaApagar(idsEditaveis(matriculas, ['Clubinho', 'Aula']), matriculasParaGravar(estados))
   assert.deepEqual(apagar, [])
 })
+
+import { modalidadesPorEsporte, idsEditaveisPorEsporte } from '../lib/esportes.ts'
+
+const ESPORTES = [{ id: 'bt' }, { id: 'tn' }]
+const vinc = (esporte_id, nome) => ({ esporte_id, modalidades: { nome } })
+
+test('cada esporte mostra só as modalidades ativas que valem para ele', () => {
+  const vinculos = [vinc('bt', 'Clubinho'), vinc('bt', 'Aula'), vinc('bt', 'Ranking'), vinc('tn', 'Aula'), vinc('tn', 'Ranking')]
+  const mapa = modalidadesPorEsporte(ESPORTES, ['Clubinho', 'Aula', 'Ranking'], vinculos)
+  assert.deepEqual(mapa, { bt: ['Clubinho', 'Aula', 'Ranking'], tn: ['Aula', 'Ranking'] })
+})
+test('modalidade inativa some de todos os esportes', () => {
+  const vinculos = [vinc('bt', 'Clubinho'), vinc('bt', 'Ranking'), vinc('tn', 'Ranking')]
+  assert.deepEqual(modalidadesPorEsporte(ESPORTES, ['Clubinho'], vinculos), { bt: ['Clubinho'], tn: [] })
+})
+test('sem o cadastro de vínculos, tudo que está ativo aparece em todo esporte', () => {
+  assert.deepEqual(modalidadesPorEsporte(ESPORTES, ['Aula'], null), { bt: ['Aula'], tn: ['Aula'] })
+})
+test('matrícula de modalidade que não vale para o esporte fica escondida e não é apagada', () => {
+  const mapa = { bt: ['Clubinho', 'Aula'], tn: ['Aula'] }
+  const matriculas = [
+    { id: 'a', tipo: 'Clubinho', esporte_id: 'bt' },
+    { id: 'b', tipo: 'Clubinho', esporte_id: 'tn' }, // Clubinho de Tênis: não vale mais
+    { id: 'c', tipo: 'Aula', esporte_id: 'tn' },
+    { id: 'd', tipo: 'Aula', esporte_id: null },
+  ]
+  assert.deepEqual(idsEditaveisPorEsporte(matriculas, mapa), ['a', 'c'])
+})

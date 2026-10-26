@@ -10,7 +10,7 @@ import { paraBanco } from '@/lib/responsavel'
 import DadosPessoais, { ChaveStatus, nomeJaCadastrado, type FormAluno } from '@/components/alunos/DadosPessoais'
 import EsportesForm from '@/components/alunos/EsportesForm'
 import { carregarCatalogo, estadosDoAluno, salvarMatriculas } from '@/lib/esportes-db'
-import { idsEditaveis, type EstadoEsporte, type MatriculaBanco } from '@/lib/esportes'
+import { idsEditaveisPorEsporte, type EstadoEsporte, type MatriculaBanco } from '@/lib/esportes'
 
 const dadosParaValidar = (f: FormAluno) => ({ ...f, temResponsavel: f.tem_responsavel })
 
@@ -42,7 +42,7 @@ export default function EditarAluno() {
   })
   const [professores, setProfessores] = useState<{ id: string; nome: string }[]>([])
   const [estados, setEstados] = useState<EstadoEsporte[]>([])
-  const [modalidades, setModalidades] = useState<string[]>([])
+  const [modalidadesPorEsporte, setModalidadesPorEsporte] = useState<Record<string, string[]>>({})
   const [idsExistentes, setIdsExistentes] = useState<string[]>([])
 
   useEffect(() => {
@@ -71,12 +71,12 @@ export default function EditarAluno() {
       const { data: profs } = await supabase.from('professores').select('id, nome').eq('ativo', true).order('nome')
       setProfessores(profs ?? [])
 
-      const { esportes, unidades, modalidades: ativas } = await carregarCatalogo(supabase)
-      setModalidades(ativas)
+      const { esportes, unidades, modalidades: ativas, modalidadesPorEsporte: porEsporte } = await carregarCatalogo(supabase)
+      setModalidadesPorEsporte(porEsporte)
       const unidadePadrao = a?.unidade_id ?? unidades[0]?.id ?? ''
       setNomeUnidade(unidades.find(u => u.id === a?.unidade_id)?.nome ?? '')
-      // Matrícula de modalidade inativa fica escondida e intocada (não é apagada ao salvar)
-      setIdsExistentes(idsEditaveis(m ?? [], ativas))
+      // Matrícula de modalidade inativa (ou que não vale para o esporte) fica escondida e intocada: não é apagada ao salvar
+      setIdsExistentes(idsEditaveisPorEsporte(m ?? [], porEsporte))
       setEstados(estadosDoAluno(esportes, (m ?? []) as MatriculaBanco[], unidadePadrao, ativas))
 
       setLoading(false)
@@ -130,7 +130,7 @@ export default function EditarAluno() {
 
       <DadosPessoais form={form} onChange={setForm} erros={erros} mostrarErros={tentou} alunoId={id} onNomeDuplicado={setNomeDuplicado} />
 
-      <EsportesForm estados={estados} onChange={setEstados} professores={professores} modalidades={modalidades} />
+      <EsportesForm estados={estados} onChange={setEstados} professores={professores} modalidadesPorEsporte={modalidadesPorEsporte} />
 
       <div className="flex justify-end gap-3">
         <button onClick={() => router.back()} className="h-10 px-5 text-sm font-medium border border-gray-200 rounded-lg text-gray-700 bg-white hover:bg-gray-50">
