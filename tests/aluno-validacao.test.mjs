@@ -35,3 +35,28 @@ test('celular é opcional', () => {
   const e = validarDadosAluno({ nome: 'Maria', cpf: '529.982.247-25', celular: '', data_vencimento: '2026-11-10' })
   assert.deepEqual(e, {})
 })
+
+const base = { nome: 'Joãozinho Silva', cpf: '', celular: '', data_vencimento: '2026-11-10' }
+test('sem responsável o CPF do aluno é obrigatório', () => {
+  assert.match(validarDadosAluno(base).cpf, /obrigatório/)
+})
+test('com responsável o CPF do aluno não é obrigatório', () => {
+  const e = validarDadosAluno({ ...base, temResponsavel: true, responsavel_nome: 'Maria Silva', responsavel_cpf: '529.982.247-25' })
+  assert.deepEqual(e, {})
+})
+test('com responsável, CPF do aluno preenchido errado ainda é recusado', () => {
+  const e = validarDadosAluno({ ...base, cpf: '123.456.789-00', temResponsavel: true, responsavel_nome: 'Maria Silva', responsavel_cpf: '529.982.247-25' })
+  assert.match(e.cpf, /inválido/)
+})
+test('com responsável, nome e CPF do responsável são obrigatórios e validados', () => {
+  const e = validarDadosAluno({ ...base, temResponsavel: true, responsavel_nome: '', responsavel_cpf: '' })
+  assert.ok(e.responsavel_nome)
+  assert.match(e.responsavel_cpf, /obrigatório/)
+  const e2 = validarDadosAluno({ ...base, temResponsavel: true, responsavel_nome: 'Maria Silva', responsavel_cpf: '123.456.789-00' })
+  assert.match(e2.responsavel_cpf, /inválido/)
+})
+test('celular do responsável é opcional, mas validado', () => {
+  const ok = { ...base, temResponsavel: true, responsavel_nome: 'Maria Silva', responsavel_cpf: '529.982.247-25' }
+  assert.equal(validarDadosAluno({ ...ok, responsavel_celular: '' }).responsavel_celular, undefined)
+  assert.match(validarDadosAluno({ ...ok, responsavel_celular: '(19) 123' }).responsavel_celular, /inválido/)
+})

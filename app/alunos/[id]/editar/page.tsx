@@ -6,10 +6,13 @@ import { ArrowLeft, Check } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { registrarLog } from '@/lib/log'
 import { validarDadosAluno } from '@/lib/aluno-validacao'
+import { paraBanco } from '@/lib/responsavel'
 import DadosPessoais, { ChaveStatus, nomeJaCadastrado, type FormAluno } from '@/components/alunos/DadosPessoais'
 import EsportesForm from '@/components/alunos/EsportesForm'
 import { carregarCatalogo, estadosDoAluno, salvarMatriculas } from '@/lib/esportes-db'
 import type { EstadoEsporte, MatriculaBanco } from '@/lib/esportes'
+
+const dadosParaValidar = (f: FormAluno) => ({ ...f, temResponsavel: f.tem_responsavel })
 
 export default function EditarAluno() {
   const router = useRouter()
@@ -32,6 +35,10 @@ export default function EditarAluno() {
     data_vencimento: '',
     observacao: '',
     status: 'Ativo',
+    tem_responsavel: false,
+    responsavel_nome: '',
+    responsavel_cpf: '',
+    responsavel_celular: '',
   })
   const [professores, setProfessores] = useState<{ id: string; nome: string }[]>([])
   const [estados, setEstados] = useState<EstadoEsporte[]>([])
@@ -53,6 +60,10 @@ export default function EditarAluno() {
           data_vencimento: a.data_vencimento ?? '',
           observacao: a.observacao ?? '',
           status: a.status ?? 'Ativo',
+          tem_responsavel: !!a.responsavel_nome,
+          responsavel_nome: a.responsavel_nome ?? '',
+          responsavel_cpf: a.responsavel_cpf ?? '',
+          responsavel_celular: a.responsavel_celular ?? '',
         })
       }
 
@@ -70,17 +81,17 @@ export default function EditarAluno() {
     carregar()
   }, [id])
 
-  const erros = validarDadosAluno(form, { nomeJaCadastrado: nomeDuplicado })
+  const erros = validarDadosAluno(dadosParaValidar(form), { nomeJaCadastrado: nomeDuplicado })
 
   async function salvar() {
     setTentou(true)
     const duplicado = await nomeJaCadastrado(form.nome, id)
     setNomeDuplicado(duplicado)
-    if (Object.keys(validarDadosAluno(form, { nomeJaCadastrado: duplicado })).length > 0) return
+    if (Object.keys(validarDadosAluno(dadosParaValidar(form), { nomeJaCadastrado: duplicado })).length > 0) return
 
     setSaving(true)
 
-    const { error } = await supabase.from('alunos').update(form).eq('id', id)
+    const { error } = await supabase.from('alunos').update(paraBanco(form)).eq('id', id)
     if (error) {
       alert(error.code === '23505' ? 'Já existe um aluno com este nome.' : 'Erro ao salvar aluno: ' + error.message)
       setSaving(false)

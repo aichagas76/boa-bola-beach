@@ -15,6 +15,10 @@ export type FormAluno = {
   data_vencimento: string
   observacao: string
   status: string
+  tem_responsavel: boolean // só da tela: marca que o aluno tem responsável
+  responsavel_nome: string
+  responsavel_cpf: string
+  responsavel_celular: string
 }
 
 const campo = 'w-full h-10 border rounded-lg px-3 text-sm bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500'
@@ -62,10 +66,14 @@ type Props = {
 export default function DadosPessoais({ form, onChange, erros, mostrarErros, alunoId, onNomeDuplicado }: Props) {
   const [tocados, setTocados] = useState<Record<string, boolean>>({})
   const [erroCpfLocal, setErroCpfLocal] = useState<string | null>(null)
+  const [erroCpfRespLocal, setErroCpfRespLocal] = useState<string | null>(null)
   const set = (p: Partial<FormAluno>) => onChange({ ...form, ...p })
   const marca = (k: string) => setTocados(t => ({ ...t, [k]: true }))
   const ver = (k: keyof ErrosAluno) => (mostrarErros || tocados[k]) ? erros[k] : undefined
-  const erroDoCpf = ver('cpf') ?? (tocados.cpf ? erroCpfLocal : undefined)
+  // Com responsável, o CPF do aluno é opcional: só avisa se foi digitado errado
+  const erroLocalDoCpf = tocados.cpf && (!form.tem_responsavel || form.cpf) ? erroCpfLocal : undefined
+  const erroDoCpf = ver('cpf') ?? erroLocalDoCpf
+  const erroDoCpfResp = ver('responsavel_cpf') ?? (tocados.responsavel_cpf ? erroCpfRespLocal : undefined)
 
   return (
     <section className="bg-white border border-gray-200 rounded-2xl p-5 mb-4 shadow-sm">
@@ -76,14 +84,21 @@ export default function DadosPessoais({ form, onChange, erros, mostrarErros, alu
 
       <div className="grid grid-cols-1 md:grid-cols-12 gap-x-4 gap-y-3.5">
         <div className="md:col-span-6">
-          <Rotulo>Nome completo</Rotulo>
+          <div className="flex items-center justify-between">
+            <Rotulo>Nome completo</Rotulo>
+            <label className="inline-flex items-center gap-2 text-sm text-blue-950 font-medium cursor-pointer select-none mb-1">
+              <input type="checkbox" className="h-[18px] w-[18px] accent-blue-600" checked={form.tem_responsavel}
+                onChange={e => set({ tem_responsavel: e.target.checked })} />
+              Responsável
+            </label>
+          </div>
           <input className={`${campo} ${ver('nome') ? ruim : ok}`} placeholder="Nome completo do aluno" value={form.nome}
             onChange={e => { set({ nome: e.target.value }); onNomeDuplicado?.(false) }}
             onBlur={async () => { marca('nome'); if (form.nome.trim().length >= 3) onNomeDuplicado?.(await nomeJaCadastrado(form.nome, alunoId)) }} />
           <Erro texto={ver('nome')} />
         </div>
         <div className="md:col-span-3">
-          <Rotulo>CPF</Rotulo>
+          <Rotulo>{form.tem_responsavel ? 'CPF (opcional)' : 'CPF'}</Rotulo>
           <input className={`${campo} ${erroDoCpf ? ruim : ok}`} placeholder="000.000.000-00" inputMode="numeric" value={form.cpf}
             onChange={e => { set({ cpf: mascaraCPF(e.target.value) }); setErroCpfLocal(null) }}
             onBlur={() => { marca('cpf'); setErroCpfLocal(erroCPF(form.cpf)) }} />
@@ -95,6 +110,34 @@ export default function DadosPessoais({ form, onChange, erros, mostrarErros, alu
             onChange={e => set({ celular: mascaraCelular(e.target.value) })} onBlur={() => marca('celular')} />
           <Erro texto={ver('celular')} />
         </div>
+
+        {form.tem_responsavel && (
+          <div className="md:col-span-12 rounded-xl border border-blue-100 bg-blue-50/50 p-4">
+            <div className="text-sm font-semibold text-blue-950 mb-0.5">Responsável pela cobrança</div>
+            <p className="text-xs text-gray-500 mb-3">Os pagamentos e os avisos de cobrança vão para o responsável.</p>
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-x-4 gap-y-3">
+              <div className="md:col-span-6">
+                <Rotulo>Nome do responsável</Rotulo>
+                <input className={`${campo} ${ver('responsavel_nome') ? ruim : ok}`} placeholder="Nome completo do responsável" value={form.responsavel_nome}
+                  onChange={e => set({ responsavel_nome: e.target.value })} onBlur={() => marca('responsavel_nome')} />
+                <Erro texto={ver('responsavel_nome')} />
+              </div>
+              <div className="md:col-span-3">
+                <Rotulo>CPF</Rotulo>
+                <input className={`${campo} ${erroDoCpfResp ? ruim : ok}`} placeholder="000.000.000-00" inputMode="numeric" value={form.responsavel_cpf}
+                  onChange={e => { set({ responsavel_cpf: mascaraCPF(e.target.value) }); setErroCpfRespLocal(null) }}
+                  onBlur={() => { marca('responsavel_cpf'); setErroCpfRespLocal(erroCPF(form.responsavel_cpf)) }} />
+                <Erro texto={erroDoCpfResp} />
+              </div>
+              <div className="md:col-span-3">
+                <Rotulo>Celular</Rotulo>
+                <input className={`${campo} ${ver('responsavel_celular') ? ruim : ok}`} placeholder="(00) 90000-0000" inputMode="tel" value={form.responsavel_celular}
+                  onChange={e => set({ responsavel_celular: mascaraCelular(e.target.value) })} onBlur={() => marca('responsavel_celular')} />
+                <Erro texto={ver('responsavel_celular')} />
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="md:col-span-3">
           <Rotulo>Nascimento</Rotulo>

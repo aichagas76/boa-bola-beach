@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/supabase-admin'
 import { bearerValido } from '@/lib/seguranca'
 import { sinalAviso, type RegistroAviso } from '@/lib/avisos-regras'
+import { pagador } from '@/lib/responsavel'
 
 export const runtime = 'nodejs'
 
@@ -49,7 +50,7 @@ export async function GET(request: NextRequest) {
 
   const { data: alunos } = await db
     .from('alunos')
-    .select('id, nome, celular, status')
+    .select('id, nome, celular, status, responsavel_nome, responsavel_celular')
     .in('id', Array.from(porAluno.keys()))
 
   const { data: avisos, error: avisosError } = await db
@@ -67,14 +68,15 @@ export async function GET(request: NextRequest) {
   }
 
   const lista = (alunos ?? [])
-    .filter(a => a.status === 'Ativo' && a.celular)
+    .filter(a => a.status === 'Ativo' && pagador(a).celular)
     .map(a => {
       const p = porAluno.get(a.id)!
       const sinal = (tipo: string) => sinalAviso(registro.get(`${p.id}:${tipo}`))
       return {
         RowId: a.id,
-        Nome: a.nome,
-        Celular: a.celular,
+        Nome: pagador(a).nome, // com responsável, o aviso vai para ele
+        NomeAluno: a.nome,
+        Celular: pagador(a).celular,
         Status: 'ATIVO',
         StatusPagamento: 'Pendente',
         DataVencimento: dataBR(p.data_vencimento),

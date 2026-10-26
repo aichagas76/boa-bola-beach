@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/supabase-admin'
 import { bearerValido } from '@/lib/seguranca'
 import { enviarAlerta } from '@/lib/alerta'
+import { pagador } from '@/lib/responsavel'
 import { criarCobrancaAsaas } from '@/lib/asaas-cobranca'
 import { dataSaoPaulo, situacaoVencimento, jaTemCobranca, MAX_DIAS_ATRASO_AUTOMATICO } from '@/lib/cobranca-regras'
 
@@ -51,7 +52,7 @@ export async function GET(request: NextRequest) {
   // 2) Alunos ativos com vencimento até o limite (inclui os já vencidos)
   const { data: alunos, error } = await db
     .from('alunos')
-    .select('id, nome, cpf, data_vencimento')
+    .select('id, nome, cpf, data_vencimento, responsavel_nome, responsavel_cpf, responsavel_celular')
     .eq('status', 'Ativo')
     .not('data_vencimento', 'is', null)
     .lte('data_vencimento', limite)
@@ -86,8 +87,8 @@ export async function GET(request: NextRequest) {
         ignorados.push({ aluno: aluno.nome, motivo: 'sem matrícula com valor' })
         continue
       }
-      if (!aluno.cpf) {
-        ignorados.push({ aluno: aluno.nome, motivo: 'sem CPF' })
+      if (!pagador(aluno).cpf) {
+        ignorados.push({ aluno: aluno.nome, motivo: 'sem CPF (de quem paga)' })
         continue
       }
 

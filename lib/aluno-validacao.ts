@@ -6,6 +6,10 @@ export type DadosAluno = {
   cpf: string
   celular: string
   data_vencimento: string
+  temResponsavel?: boolean
+  responsavel_nome?: string
+  responsavel_cpf?: string
+  responsavel_celular?: string
 }
 
 export type ErrosAluno = Partial<Record<keyof DadosAluno, string>>
@@ -38,8 +42,22 @@ export function validarDadosAluno(d: DadosAluno, opcoes: { nomeJaCadastrado?: bo
   const erros: ErrosAluno = {}
   if (d.nome.trim().length < 3) erros.nome = 'Nome deve ter no mínimo 3 caracteres'
   else if (opcoes.nomeJaCadastrado) erros.nome = 'Já existe um aluno com este nome'
-  const ec = erroCPF(d.cpf)
-  if (ec) erros.cpf = ec
+
+  if (d.temResponsavel) {
+    // Com responsável, o CPF do aluno deixa de ser obrigatório (mas, se preenchido, tem que estar certo)
+    if (d.cpf.replace(/\D/g, '')) {
+      const ec = erroCPF(d.cpf)
+      if (ec) erros.cpf = ec
+    }
+    if ((d.responsavel_nome ?? '').trim().length < 3) erros.responsavel_nome = 'Informe o nome do responsável'
+    const er = erroCPF(d.responsavel_cpf ?? '')
+    if (er) erros.responsavel_cpf = er.replace('(a cobrança precisa dele)', '(a cobrança vai para ele)')
+    if (d.responsavel_celular && !validarCelular(d.responsavel_celular)) erros.responsavel_celular = 'Celular inválido: use DDD + 9 dígitos'
+  } else {
+    const ec = erroCPF(d.cpf)
+    if (ec) erros.cpf = ec
+  }
+
   if (d.celular && !validarCelular(d.celular)) erros.celular = 'Celular inválido: use DDD + 9 dígitos'
   if (!d.data_vencimento) erros.data_vencimento = 'Informe o vencimento'
   return erros

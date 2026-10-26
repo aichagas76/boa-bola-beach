@@ -6,11 +6,14 @@ import { ArrowLeft, Check } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { registrarLog } from '@/lib/log'
 import { validarDadosAluno } from '@/lib/aluno-validacao'
+import { pagador, paraBanco } from '@/lib/responsavel'
 import DadosPessoais, { ChaveStatus, nomeJaCadastrado, type FormAluno } from '@/components/alunos/DadosPessoais'
 import EsportesForm from '@/components/alunos/EsportesForm'
 import { useUnidade } from '@/components/layout/UnidadeProvider'
 import { carregarCatalogo, estadosIniciais, salvarMatriculas } from '@/lib/esportes-db'
 import type { EstadoEsporte } from '@/lib/esportes'
+
+const dadosParaValidar = (f: FormAluno) => ({ ...f, temResponsavel: f.tem_responsavel })
 
 export default function NovoAluno() {
   const router = useRouter()
@@ -31,6 +34,10 @@ export default function NovoAluno() {
     data_vencimento: '',
     observacao: '',
     status: 'Ativo',
+    tem_responsavel: false,
+    responsavel_nome: '',
+    responsavel_cpf: '',
+    responsavel_celular: '',
   })
 
   useEffect(() => {
@@ -39,7 +46,7 @@ export default function NovoAluno() {
     carregarCatalogo(supabase).then(({ esportes }) => setEstados(estadosIniciais(esportes, '')))
   }, [])
 
-  const erros = validarDadosAluno(form, { nomeJaCadastrado: nomeDuplicado })
+  const erros = validarDadosAluno(dadosParaValidar(form), { nomeJaCadastrado: nomeDuplicado })
 
   async function salvar() {
     setTentou(true)
@@ -47,13 +54,13 @@ export default function NovoAluno() {
     // Confere o nome de novo na hora de salvar (outra pessoa pode ter cadastrado enquanto isso)
     const duplicado = await nomeJaCadastrado(form.nome)
     setNomeDuplicado(duplicado)
-    if (Object.keys(validarDadosAluno(form, { nomeJaCadastrado: duplicado })).length > 0) return
+    if (Object.keys(validarDadosAluno(dadosParaValidar(form), { nomeJaCadastrado: duplicado })).length > 0) return
 
     setLoading(true)
 
     const { data: aluno, error } = await supabase
       .from('alunos')
-      .insert({ ...form, unidade_id: unidadeId })
+      .insert({ ...paraBanco(form), unidade_id: unidadeId })
       .select()
       .single()
 
@@ -67,15 +74,16 @@ export default function NovoAluno() {
     if (erroMatriculas) alert('Aluno salvo, mas houve erro nas modalidades: ' + erroMatriculas)
 
     try {
+      const quemPaga = pagador({ nome: form.nome, cpf: form.cpf, celular: form.celular, responsavel_nome: form.tem_responsavel ? form.responsavel_nome : null, responsavel_cpf: form.responsavel_cpf, responsavel_celular: form.responsavel_celular })
       const asaasRes = await fetch('/api/asaas/criar-cliente', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nome: form.nome, celular: form.celular, cpf: form.cpf, aluno_id: aluno.id })
+        body: JSON.stringify({ nome: quemPaga.nome, celular: quemPaga.celular, cpf: quemPaga.cpf, aluno_id: aluno.id })
       })
       const asaasData = await asaasRes.json()
 
       if (asaasData.id) {
-        await supabase.from('alunos').update({ asaas_customer_id: asaasData.id }).eq('id', aluno.id)
+        await supabase.from('alunos').update({ asaas_customer_id: asaasData.id, asaas_customer_doc: (quemPaga.cpf ?? '').replace(/\D/g, '') }).eq('id', aluno.id)
       } else if (asaasData.error) {
         console.error('Erro Asaas:', asaasData.error)
         alert('Erro ao criar cliente Asaas: ' + asaasData.error)
