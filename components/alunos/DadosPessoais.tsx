@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { UserRound } from 'lucide-react'
 import { mascaraCPF, mascaraCelular, erroCPF, type ErrosAluno } from '@/lib/aluno-validacao'
 
 export type FormAluno = {
@@ -16,21 +17,36 @@ export type FormAluno = {
   status: string
 }
 
-const campo = 'w-full border rounded-md px-2.5 py-1.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-[#7DC421]'
+const campo = 'w-full h-10 border rounded-lg px-3 text-sm bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500'
 const ok = 'border-gray-200'
 const ruim = 'border-red-300 bg-red-50'
 
 function Rotulo({ children }: { children: React.ReactNode }) {
-  return <label className="text-label text-gray-500 block mb-0.5">{children}</label>
+  return <label className="text-sm text-gray-700 block mb-1">{children}</label>
 }
 function Erro({ texto }: { texto?: string | null }) {
-  return texto ? <div className="text-xs text-red-600 mt-0.5">{texto}</div> : null
+  return texto ? <div className="text-xs text-red-600 mt-1">{texto}</div> : null
 }
 
 /** Pergunta ao banco se já existe aluno com este nome em qualquer unidade (CPF pode repetir; nome não). Se a consulta falhar, não bloqueia: o banco também recusa. */
 export async function nomeJaCadastrado(nome: string, ignorarAlunoId?: string) {
   const { data, error } = await supabase.rpc('nome_ja_cadastrado', { p_nome: nome, p_ignorar: ignorarAlunoId ?? null })
   return error ? false : data === true
+}
+
+/** Chave "Ativo" do canto superior da página. */
+export function ChaveStatus({ status, onChange }: { status: string; onChange: (s: string) => void }) {
+  const ativo = status === 'Ativo'
+  return (
+    <label className="flex items-center gap-2.5 cursor-pointer select-none">
+      <span className={`text-sm font-medium ${ativo ? 'text-green-600' : 'text-gray-500'}`}>{status}</span>
+      <div className="relative">
+        <input type="checkbox" className="sr-only" checked={ativo} onChange={e => onChange(e.target.checked ? 'Ativo' : 'Inativo')} />
+        <div className={`w-11 h-6 rounded-full transition-colors ${ativo ? 'bg-green-500' : 'bg-gray-300'}`}></div>
+        <div className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${ativo ? 'translate-x-5' : ''}`}></div>
+      </div>
+    </label>
+  )
 }
 
 type Props = {
@@ -42,63 +58,49 @@ type Props = {
   onNomeDuplicado?: (duplicado: boolean) => void
 }
 
-/** Dados pessoais em poucas linhas: Nome/CPF/Celular, depois Nascimento/Sexo/Cadastro/Vencimento. */
+/** Cartão "Dados pessoais": Nome / CPF / Celular e, abaixo, Nascimento / Sexo / Cadastro / Vencimento. */
 export default function DadosPessoais({ form, onChange, erros, mostrarErros, alunoId, onNomeDuplicado }: Props) {
   const [tocados, setTocados] = useState<Record<string, boolean>>({})
   const [erroCpfLocal, setErroCpfLocal] = useState<string | null>(null)
   const set = (p: Partial<FormAluno>) => onChange({ ...form, ...p })
   const marca = (k: string) => setTocados(t => ({ ...t, [k]: true }))
   const ver = (k: keyof ErrosAluno) => (mostrarErros || tocados[k]) ? erros[k] : undefined
-
-  function aoSairDoCpf() {
-    marca('cpf')
-    setErroCpfLocal(erroCPF(form.cpf))
-  }
-
   const erroDoCpf = ver('cpf') ?? (tocados.cpf ? erroCpfLocal : undefined)
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 mb-3">
-      <div className="flex items-center justify-between mb-3">
-        <div className="text-th text-gray-400">Dados pessoais</div>
-        <label className="flex items-center gap-2 cursor-pointer">
-          <span className={`text-xs font-medium ${form.status === 'Ativo' ? 'text-green-700' : 'text-gray-500'}`}>{form.status}</span>
-          <div className="relative">
-            <input type="checkbox" className="sr-only" checked={form.status === 'Ativo'}
-              onChange={e => set({ status: e.target.checked ? 'Ativo' : 'Inativo' })} />
-            <div className={`w-9 h-5 rounded-full transition-colors ${form.status === 'Ativo' ? 'bg-green-500' : 'bg-gray-300'}`}></div>
-            <div className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${form.status === 'Ativo' ? 'translate-x-4' : ''}`}></div>
-          </div>
-        </label>
-      </div>
+    <section className="bg-white border border-gray-200 rounded-2xl p-5 mb-4 shadow-sm">
+      <h2 className="flex items-center gap-2.5 text-sm font-bold uppercase tracking-wide text-blue-950 mb-4">
+        <span className="h-7 w-7 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center"><UserRound size={16} /></span>
+        Dados pessoais
+      </h2>
 
-      <div className="grid grid-cols-2 md:grid-cols-12 gap-x-3 gap-y-2.5">
-        <div className="col-span-2 md:col-span-6">
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-x-4 gap-y-3.5">
+        <div className="md:col-span-6">
           <Rotulo>Nome completo</Rotulo>
           <input className={`${campo} ${ver('nome') ? ruim : ok}`} placeholder="Nome completo do aluno" value={form.nome}
             onChange={e => { set({ nome: e.target.value }); onNomeDuplicado?.(false) }}
             onBlur={async () => { marca('nome'); if (form.nome.trim().length >= 3) onNomeDuplicado?.(await nomeJaCadastrado(form.nome, alunoId)) }} />
           <Erro texto={ver('nome')} />
         </div>
-        <div className="col-span-1 md:col-span-3">
+        <div className="md:col-span-3">
           <Rotulo>CPF</Rotulo>
           <input className={`${campo} ${erroDoCpf ? ruim : ok}`} placeholder="000.000.000-00" inputMode="numeric" value={form.cpf}
             onChange={e => { set({ cpf: mascaraCPF(e.target.value) }); setErroCpfLocal(null) }}
-            onBlur={aoSairDoCpf} />
+            onBlur={() => { marca('cpf'); setErroCpfLocal(erroCPF(form.cpf)) }} />
           <Erro texto={erroDoCpf} />
         </div>
-        <div className="col-span-1 md:col-span-3">
+        <div className="md:col-span-3">
           <Rotulo>Celular</Rotulo>
           <input className={`${campo} ${ver('celular') ? ruim : ok}`} placeholder="(00) 90000-0000" inputMode="tel" value={form.celular}
             onChange={e => set({ celular: mascaraCelular(e.target.value) })} onBlur={() => marca('celular')} />
           <Erro texto={ver('celular')} />
         </div>
 
-        <div className="col-span-1 md:col-span-3">
+        <div className="md:col-span-3">
           <Rotulo>Nascimento</Rotulo>
           <input type="date" className={`${campo} ${ok}`} value={form.data_nascimento} onChange={e => set({ data_nascimento: e.target.value })} />
         </div>
-        <div className="col-span-1 md:col-span-3">
+        <div className="md:col-span-3">
           <Rotulo>Sexo</Rotulo>
           <select className={`${campo} ${ok}`} value={form.sexo} onChange={e => set({ sexo: e.target.value })}>
             <option value="">Selecionar</option>
@@ -106,17 +108,17 @@ export default function DadosPessoais({ form, onChange, erros, mostrarErros, alu
             <option value="F">Feminino</option>
           </select>
         </div>
-        <div className="col-span-1 md:col-span-3">
+        <div className="md:col-span-3">
           <Rotulo>Cadastro</Rotulo>
           <input type="date" className={`${campo} ${ok}`} value={form.data_cadastro} onChange={e => set({ data_cadastro: e.target.value })} />
         </div>
-        <div className="col-span-1 md:col-span-3">
+        <div className="md:col-span-3">
           <Rotulo>Vencimento</Rotulo>
           <input type="date" className={`${campo} ${ver('data_vencimento') ? ruim : ok}`} value={form.data_vencimento}
             onChange={e => set({ data_vencimento: e.target.value })} onBlur={() => marca('data_vencimento')} />
           <Erro texto={ver('data_vencimento')} />
         </div>
       </div>
-    </div>
+    </section>
   )
 }

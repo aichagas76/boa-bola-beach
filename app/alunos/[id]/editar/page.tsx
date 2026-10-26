@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
+import { ArrowLeft, Check } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { registrarLog } from '@/lib/log'
 import { validarDadosAluno } from '@/lib/aluno-validacao'
-import DadosPessoais, { nomeJaCadastrado, type FormAluno } from '@/components/alunos/DadosPessoais'
+import DadosPessoais, { ChaveStatus, nomeJaCadastrado, type FormAluno } from '@/components/alunos/DadosPessoais'
 import EsportesForm from '@/components/alunos/EsportesForm'
 import { carregarCatalogo, estadosDoAluno, salvarMatriculas } from '@/lib/esportes-db'
 import type { EstadoEsporte, MatriculaBanco } from '@/lib/esportes'
@@ -19,6 +20,7 @@ export default function EditarAluno() {
   const [saving, setSaving] = useState(false)
   const [tentou, setTentou] = useState(false)
   const [nomeDuplicado, setNomeDuplicado] = useState(false)
+  const [nomeUnidade, setNomeUnidade] = useState('')
 
   const [form, setForm] = useState<FormAluno>({
     nome: '',
@@ -59,6 +61,7 @@ export default function EditarAluno() {
 
       const { esportes, unidades } = await carregarCatalogo(supabase)
       const unidadePadrao = a?.unidade_id ?? unidades[0]?.id ?? ''
+      setNomeUnidade(unidades.find(u => u.id === a?.unidade_id)?.nome ?? '')
       setIdsExistentes((m ?? []).map(x => x.id))
       setEstados(estadosDoAluno(esportes, (m ?? []) as MatriculaBanco[], unidadePadrao))
 
@@ -98,25 +101,29 @@ export default function EditarAluno() {
   if (loading) return <div className="text-gray-400 text-sm">Carregando...</div>
 
   return (
-    <div className="max-w-4xl">
-      <div className="flex items-center gap-3 mb-4">
-        <button onClick={() => router.back()} className="text-sm text-gray-500 hover:text-gray-700">← Voltar</button>
-        <h1 className="text-page-title text-gray-900">Editar aluno</h1>
+    <div className="max-w-5xl">
+      <div className="flex items-center justify-between gap-3 mb-4 pl-12 md:pl-0">
+        <div className="flex items-center gap-4 min-w-0">
+          <button onClick={() => router.back()} className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-800 shrink-0">
+            <ArrowLeft size={16} /> Voltar
+          </button>
+          <span className="h-7 w-px bg-gray-200" />
+          <h1 className="text-page-title text-blue-950 truncate">Editar aluno</h1>
+          {nomeUnidade && <span className="text-sm text-gray-500 shrink-0">{nomeUnidade}</span>}
+        </div>
+        <ChaveStatus status={form.status} onChange={status => setForm({ ...form, status })} />
       </div>
 
       <DadosPessoais form={form} onChange={setForm} erros={erros} mostrarErros={tentou} alunoId={id} onNomeDuplicado={setNomeDuplicado} />
 
-      <div className="bg-white border border-gray-200 rounded-xl p-4 mb-4">
-        <div className="text-th text-gray-400 mb-3">Esportes e modalidades</div>
-        <EsportesForm estados={estados} onChange={setEstados} professores={professores} />
-      </div>
+      <EsportesForm estados={estados} onChange={setEstados} professores={professores} />
 
       <div className="flex justify-end gap-3">
-        <button onClick={() => router.back()} className="px-4 py-2 text-sm border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50">
+        <button onClick={() => router.back()} className="h-10 px-5 text-sm font-medium border border-gray-200 rounded-lg text-gray-700 bg-white hover:bg-gray-50">
           Cancelar
         </button>
-        <button onClick={salvar} disabled={saving} className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">
-          {saving ? 'Salvando...' : 'Salvar alterações'}
+        <button onClick={salvar} disabled={saving} className="inline-flex items-center gap-2 h-10 px-5 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">
+          <Check size={16} /> {saving ? 'Salvando...' : 'Salvar alterações'}
         </button>
       </div>
     </div>

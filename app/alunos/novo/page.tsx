@@ -2,10 +2,11 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { ArrowLeft, Check } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { registrarLog } from '@/lib/log'
 import { validarDadosAluno } from '@/lib/aluno-validacao'
-import DadosPessoais, { nomeJaCadastrado, type FormAluno } from '@/components/alunos/DadosPessoais'
+import DadosPessoais, { ChaveStatus, nomeJaCadastrado, type FormAluno } from '@/components/alunos/DadosPessoais'
 import EsportesForm from '@/components/alunos/EsportesForm'
 import { useUnidade } from '@/components/layout/UnidadeProvider'
 import { carregarCatalogo, estadosIniciais, salvarMatriculas } from '@/lib/esportes-db'
@@ -43,7 +44,7 @@ export default function NovoAluno() {
   async function salvar() {
     setTentou(true)
     if (!unidadeId) return alert('Seu login ainda não tem unidade liberada. Fale com quem administra o sistema.')
-    // Confere o CPF de novo na hora de salvar (outra pessoa pode ter cadastrado enquanto isso)
+    // Confere o nome de novo na hora de salvar (outra pessoa pode ter cadastrado enquanto isso)
     const duplicado = await nomeJaCadastrado(form.nome)
     setNomeDuplicado(duplicado)
     if (Object.keys(validarDadosAluno(form, { nomeJaCadastrado: duplicado })).length > 0) return
@@ -89,26 +90,29 @@ export default function NovoAluno() {
   }
 
   return (
-    <div className="max-w-4xl">
-      <div className="flex items-center gap-3 mb-4">
-        <button onClick={() => router.back()} className="text-sm text-gray-500 hover:text-gray-700">← Voltar</button>
-        <h1 className="text-page-title text-gray-900">Novo aluno</h1>
-        {unidade && <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">{unidade.nome}</span>}
+    <div className="max-w-5xl">
+      <div className="flex items-center justify-between gap-3 mb-4 pl-12 md:pl-0">
+        <div className="flex items-center gap-4 min-w-0">
+          <button onClick={() => router.back()} className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-800 shrink-0">
+            <ArrowLeft size={16} /> Voltar
+          </button>
+          <span className="h-7 w-px bg-gray-200" />
+          <h1 className="text-page-title text-blue-950 truncate">Novo aluno</h1>
+          {unidade && <span className="text-sm text-gray-500 shrink-0">{unidade.nome}</span>}
+        </div>
+        <ChaveStatus status={form.status} onChange={status => setForm({ ...form, status })} />
       </div>
 
       <DadosPessoais form={form} onChange={setForm} erros={erros} mostrarErros={tentou} onNomeDuplicado={setNomeDuplicado} />
 
-      <div className="bg-white border border-gray-200 rounded-xl p-4 mb-4">
-        <div className="text-th text-gray-400 mb-3">Esportes e modalidades</div>
-        <EsportesForm estados={estados} onChange={setEstados} professores={professores} />
-      </div>
+      <EsportesForm estados={estados} onChange={setEstados} professores={professores} />
 
       <div className="flex justify-end gap-3">
-        <button onClick={() => router.back()} className="px-4 py-2 text-sm border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50">
+        <button onClick={() => router.back()} className="h-10 px-5 text-sm font-medium border border-gray-200 rounded-lg text-gray-700 bg-white hover:bg-gray-50">
           Cancelar
         </button>
-        <button onClick={salvar} disabled={loading} className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">
-          {loading ? 'Salvando...' : 'Salvar aluno'}
+        <button onClick={salvar} disabled={loading} className="inline-flex items-center gap-2 h-10 px-5 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">
+          <Check size={16} /> {loading ? 'Salvando...' : 'Salvar aluno'}
         </button>
       </div>
     </div>
