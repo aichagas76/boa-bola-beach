@@ -10,7 +10,7 @@ export function MobileSidebar() {
   const router = useRouter()
 
   const links = [
-    { href: '/', label: 'Dashboard', icon: '📊' },
+    { href: '/', label: 'Painel', icon: '📊' },
     { href: '/alunos', label: 'Alunos', icon: '👥' },
     { href: '/pagamentos', label: 'Pagamentos', icon: '💰' },
     { href: '/atraso', label: 'Em atraso', icon: '⚠️' },

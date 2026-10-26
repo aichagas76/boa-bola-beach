@@ -10,7 +10,7 @@ import { useUnidade } from '@/components/layout/UnidadeProvider'
 type SubItem = { href: string; label: string; icon: LucideIcon; color?: string }
 
 const navItems: SubItem[] = [
-  { href: '/', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/', label: 'Painel', icon: LayoutDashboard },
   { href: '/alunos', label: 'Alunos', icon: Users },
   { href: '/pagamentos', label: 'Pagamentos', icon: CreditCard },
   { href: '/atraso', label: 'Em atraso', icon: AlertCircle },
