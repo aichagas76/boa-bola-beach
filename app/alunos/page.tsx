@@ -370,9 +370,9 @@ export default function Alunos() {
 
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm whitespace-nowrap">
-            <thead>
-              <tr className="bg-gray-50/80 border-b border-gray-200">
+          <table className="w-full text-sm whitespace-nowrap border-separate border-spacing-0">
+            <thead className="[&>tr>th]:border-b [&>tr>th]:border-gray-200">
+              <tr className="bg-gray-50/80">
                 {COLUNAS.filter(c => c.id !== 'parcial' || temParcial).map(c => {
                   const ativa = ordem.coluna === c.id
                   return (
@@ -381,7 +381,7 @@ export default function Alunos() {
                       onClick={() => setOrdem(o => proximaOrdem(o, c.id))}
                       title={`${c.dica ?? c.titulo} — clique para ordenar`}
                       aria-sort={ativa ? (ordem.direcao === 'asc' ? 'ascending' : 'descending') : 'none'}
-                      className={`${CLASSE_ALINHA[ALINHA[c.id]]} px-2 h-11 text-th text-gray-500 cursor-pointer select-none hover:bg-gray-100 hover:text-gray-700 transition-colors`}
+                      className={`${CLASSE_ALINHA[ALINHA[c.id]]} ${c.id === 'nome' ? 'sticky left-0 z-20 bg-gray-50' : ''} px-2 h-11 text-th text-gray-600 cursor-pointer select-none hover:bg-gray-100 hover:text-gray-800 transition-colors`}
                     >
                       <span className="inline-flex items-center gap-1">
                         {c.titulo}
@@ -392,10 +392,10 @@ export default function Alunos() {
                     </th>
                   )
                 })}
-                <th className="text-center px-2 h-11 text-th text-gray-500">Ações</th>
+                <th className="sticky right-0 z-20 bg-gray-50 text-center px-2 h-11 text-th text-gray-600 shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.15)]">Ações</th>
               </tr>
           </thead>
-          <tbody>
+          <tbody className="[&>tr>td]:border-b [&>tr>td]:border-gray-100">
             {loading && (
               <tr><td colSpan={12} className="text-center py-8 text-gray-400">Carregando...</td></tr>
             )}
@@ -403,8 +403,8 @@ export default function Alunos() {
               <tr><td colSpan={12} className="text-center py-8 text-gray-400">Nenhum aluno encontrado.</td></tr>
             )}
             {pagination.paginatedItems.map((aluno, i) => (
-              <tr key={aluno.id} className={`h-14 border-b border-gray-100 hover:bg-[#7DC421]/[0.06] transition-colors ${i === pagination.paginatedItems.length - 1 && pagination.currentPage === pagination.totalPages ? 'border-0' : ''}`}>
-                <td className="px-2 font-semibold text-gray-900 min-w-[13rem]">
+              <tr key={aluno.id} className={`group h-12 hover:bg-[#7DC421]/[0.06] transition-colors ${i === pagination.paginatedItems.length - 1 && pagination.currentPage === pagination.totalPages ? 'border-0' : ''}`}>
+                <td className="sticky left-0 z-10 bg-white group-hover:bg-[#f6fbee] transition-colors px-2 font-semibold text-gray-900 min-w-[11rem]">
                   <div className="flex items-center justify-between gap-2">
                     <span>{aluno.nome}</span>
                     <span className="flex shrink-0 items-center gap-1">
@@ -505,25 +505,25 @@ export default function Alunos() {
                     {aluno.status}
                   </span>
                 </td>
-                <td className="px-2"><div className="flex items-center justify-center gap-0.5">
+                <td className="sticky right-0 z-10 bg-white group-hover:bg-[#f6fbee] transition-colors px-2 shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.15)]"><div className="flex items-center justify-center gap-0.5">
                   <button
                     onClick={() => abrirModal(aluno)}
                     title="Registrar pagamento"
                     aria-label={`Registrar pagamento de ${aluno.nome}`}
-                    className="inline-flex h-8 w-7 items-center justify-center rounded-lg transition-colors text-[#5a9217] hover:bg-green-50"
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg transition-colors text-[#5a9217] hover:bg-green-50"
                   ><CircleDollarSign size={18} /></button>
                   <button
                     onClick={() => setRetiradaAluno(aluno)}
                     title="Retirar produto (estoque)"
                     aria-label={`Retirar produto para ${aluno.nome}`}
-                    className="inline-flex h-8 w-7 items-center justify-center rounded-lg transition-colors text-gray-500 hover:bg-gray-100 hover:text-gray-800"
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg transition-colors text-gray-500 hover:bg-gray-100 hover:text-gray-800"
                   ><Package size={18} /></button>
-                  <Link href={`/alunos/${aluno.id}/editar`} className="inline-flex h-8 w-7 items-center justify-center rounded-lg transition-colors text-gray-500 hover:bg-blue-50 hover:text-blue-600" title="Editar" aria-label={`Editar ${aluno.nome}`}><Pencil size={18} /></Link>
+                  <Link href={`/alunos/${aluno.id}/editar`} className="inline-flex h-8 w-8 items-center justify-center rounded-lg transition-colors text-gray-500 hover:bg-blue-50 hover:text-blue-600" title="Editar" aria-label={`Editar ${aluno.nome}`}><Pencil size={18} /></Link>
                   <button
                     onClick={() => excluirAluno(aluno.id, aluno.nome)}
                     title="Excluir aluno"
                     aria-label={`Excluir ${aluno.nome}`}
-                    className="inline-flex h-8 w-7 items-center justify-center rounded-lg transition-colors text-gray-400 hover:bg-red-50 hover:text-red-600"
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg transition-colors text-gray-400 hover:bg-red-50 hover:text-red-600"
                   ><Trash2 size={18} /></button>
                 </div></td>
               </tr>
