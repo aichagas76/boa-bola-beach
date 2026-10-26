@@ -84,7 +84,7 @@ export default function DadosPessoais({ form, onChange, erros, mostrarErros, alu
 
       <div className="grid grid-cols-1 md:grid-cols-12 gap-x-4 gap-y-3.5">
         <div className="md:col-span-6">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center gap-6">
             <Rotulo>Nome completo</Rotulo>
             <label className="inline-flex items-center gap-2 text-sm text-blue-950 font-medium cursor-pointer select-none mb-1">
               <input type="checkbox" className="h-[18px] w-[18px] accent-blue-600" checked={form.tem_responsavel}
