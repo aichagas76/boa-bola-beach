@@ -27,6 +27,7 @@ type Aluno = {
   pago_mes: number
   parcial_mes: number
   asaas_customer_id: string | null
+  combo?: boolean
   responsavel_nome?: string | null
   responsavel_cpf?: string | null
   responsavel_celular?: string | null
@@ -154,7 +155,7 @@ export default function Alunos() {
 
     const { data: matriculasData } = await supabase
       .from('matriculas')
-      .select('aluno_id, tipo, valor, professor_nome, unidade_id, esportes(nome)')
+      .select('aluno_id, tipo, valor, professor_nome, unidade_id, acesso_duas_unidades, esportes(nome)')
 
     const { data: pagamentosData } = await supabase
       .from('movimentacoes')
@@ -192,7 +193,7 @@ export default function Alunos() {
 
     // Aluno aparece na unidade escolhida se for dela (principal) ou se tiver matrícula nela (integração)
     const alunos = (alunosData ?? []).filter(a => !unidadeId || a.unidade_id === unidadeId ||
-      (matriculasData ?? []).some(m => m.aluno_id === a.id && m.unidade_id === unidadeId)).map(a => {
+      (matriculasData ?? []).some(m => m.aluno_id === a.id && (m.unidade_id === unidadeId || m.acesso_duas_unidades))).map(a => {
       const mats = (matriculasData ?? []).filter(m => m.aluno_id === a.id)
       const valor_total = mats.reduce((acc, m) => acc + (m.valor ?? 0), 0)
       const porEsporte = new Map<string, Set<string>>()
@@ -204,6 +205,7 @@ export default function Alunos() {
       const professores_nomes = mats.filter(m => m.tipo === 'Aula' && m.professor_nome).map(m => m.professor_nome).join(' / ') || '-'
       return {
         ...a, valor_total, esportesMod, professores_nomes,
+        combo: mats.some(m => m.acesso_duas_unidades),
         ultimo_pagamento: ultimoPorAluno[a.id] ?? null,
         pago_mes: pagoMesPorAluno[a.id] ?? 0,
         parcial_mes: parcialMesPorAluno[a.id] ?? 0,
@@ -391,6 +393,10 @@ export default function Alunos() {
                 <td className="px-2 py-2.5 font-medium text-gray-900 whitespace-normal min-w-[10rem]">
                   <div className="flex items-center justify-between gap-2">
                     <span>{aluno.nome}</span>
+                    <span className="flex shrink-0 items-center gap-1">
+                    {aluno.combo ? (
+                      <span title="Combo: treina nas duas unidades (Boa Bola 1 e 2)" className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-green-100 text-[11px] font-bold text-green-700">C</span>
+                    ) : <span className="inline-block h-5 w-5 shrink-0" />}
                     {aluno.responsavel_nome ? (
                       <button
                         onClick={() => setResponsavelAberto(aluno)}
@@ -399,6 +405,7 @@ export default function Alunos() {
                         className="shrink-0 inline-flex h-5 w-5 items-center justify-center rounded-full bg-blue-100 text-[11px] font-bold text-blue-700 hover:bg-blue-200"
                       >R</button>
                     ) : <span className="inline-block h-5 w-5 shrink-0" />}
+                    </span>
                   </div>
                 </td>
                 <td className="px-2 py-2.5 text-gray-600">
