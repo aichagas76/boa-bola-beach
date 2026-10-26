@@ -11,7 +11,7 @@ import { supabase } from '@/lib/supabase'
 import { useUnidade } from '@/components/layout/UnidadeProvider'
 import {
   alunosDaModalidade, calcularKpis, faixasDeAtraso, itensFinanceiros, mesesDaJanela, participacao, periodoDe,
-  serieAlunos, serieFinanceira, statusDosPagamentos, variacao,
+  serieAlunos, serieFinanceira, statusDosPagamentos, variacao, ticketMedio, gastosDoPeriodo,
   type AlunoP, type MatP, type MovP, type PagP, type Preset,
 } from '@/lib/painel'
 import {
@@ -196,6 +196,14 @@ export default function PainelGerencial() {
   // O recorte por modalidade já foi aplicado nos dados; aqui não filtra de novo
   const kpis = useMemo(() => calcularKpis({ alunos: alunosP, mats: matsP, itens, periodo, hoje, modalidade: null }), [alunosP, matsP, itens, periodo, hoje])
   const financeira = useMemo(() => serieFinanceira(itens, meses), [itens, meses])
+  const ticket = useMemo(() => ticketMedio(itens, periodo.inicio, periodo.fim), [itens, periodo])
+  const ticketAnt = useMemo(() => ticketMedio(itens, periodo.inicioAnt, periodo.fimAnt), [itens, periodo])
+  // Gastos são do negócio (não de um aluno): contam sempre a unidade toda, mesmo com filtro de modalidade
+  const movsDaUnidade: MovP[] = useMemo(() => movs.map(m => ({
+    tipo: m.tipo, status: m.status, valor: Number(m.valor), data: m.data, data_pagamento: m.data_pagamento, data_vencimento: m.data_vencimento, aluno_ref_id: m.aluno_ref_id,
+  })), [movs])
+  const gastos = useMemo(() => gastosDoPeriodo(movsDaUnidade, periodo.inicio, periodo.fim), [movsDaUnidade, periodo])
+  const gastosAnt = useMemo(() => gastosDoPeriodo(movsDaUnidade, periodo.inicioAnt, periodo.fimAnt), [movsDaUnidade, periodo])
   const serieA = useMemo(() => serieAlunos(alunosP, meses), [alunosP, meses])
   const status = useMemo(() => statusDosPagamentos(itens, periodo, hoje), [itens, periodo, hoje])
   const faixas = useMemo(() => faixasDeAtraso(itens, hoje), [itens, hoje])
@@ -258,7 +266,7 @@ export default function PainelGerencial() {
       )}
 
       {/* Indicadores principais */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-8">
         <CartaoKpi rotulo="Alunos ativos" valor={loading ? '...' : String(kpis.alunosAtivos)} href="/alunos">
           <span className="text-xs text-gray-500">{loading ? '' : `Mensalidades somam ${brl(kpis.potencialMensal)}`}</span>
         </CartaoKpi>
@@ -267,6 +275,15 @@ export default function PainelGerencial() {
         </CartaoKpi>
         <CartaoKpi rotulo="Receita prevista" valor={loading ? '...' : brl(kpis.prevista)} href="/contas-receber">
           {!loading && <Delta atual={kpis.prevista} anterior={kpis.previstaAnt} />}
+        </CartaoKpi>
+        <CartaoKpi rotulo="Ticket médio" valor={loading ? '...' : ticket.valor === null ? '—' : brl(ticket.valor)}>
+          {!loading && (ticket.valor === null
+            ? <span className="text-xs text-gray-500">sem pagamentos de alunos</span>
+            : <Delta atual={ticket.valor} anterior={ticketAnt.valor ?? 0} />)}
+        </CartaoKpi>
+        <CartaoKpi rotulo="Gastos mensais" valor={loading ? '...' : brl(gastos.pagos)} href="/contas-pagar" destaque="text-red-600">
+          {!loading && <Delta atual={gastos.pagos} anterior={gastosAnt.pagos} subiuEhBom={false} />}
+          {!loading && <span className="block text-xs text-gray-500 mt-0.5">{gastos.qtdAPagar > 0 ? `A pagar: ${brl(gastos.aPagar)}` : 'Nada a pagar em aberto'}</span>}
         </CartaoKpi>
         <CartaoKpi rotulo="Pagamentos pendentes" valor={loading ? '...' : brl(kpis.abertoValor)} href="/pagamentos" destaque="text-amber-600">
           <span className="text-xs text-gray-500">{loading ? '' : `${kpis.abertoQtd} em aberto · ${kpis.vencidoQtd} vencido${kpis.vencidoQtd === 1 ? '' : 's'}`}</span>
@@ -468,7 +485,7 @@ export default function PainelGerencial() {
 
       <p className="text-xs text-gray-500">
         Fórmulas: recebida = entradas com status Recebido pela data do pagamento; prevista = recebida + a receber que vence no período; inadimplência = alunos ativos com
-        cobrança vencida em aberto ou vencimento do cadastro passado ÷ alunos ativos; crescimento = novos − inativações. Valores da unidade escolhida no menu.
+        cobrança vencida em aberto ou vencimento do cadastro passado ÷ alunos ativos; crescimento = novos − inativações; ticket médio = recebido de alunos ÷ alunos que pagaram em cada mês; gastos = saídas pagas no período pela data do pagamento (sempre da unidade toda, sem filtro de modalidade). Valores da unidade escolhida no menu.
       </p>
     </div>
   )

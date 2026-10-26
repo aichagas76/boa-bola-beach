@@ -273,3 +273,26 @@ export function participacao<T extends { total: number }>(linhas: T[]) {
   const soma = linhas.reduce((s, l) => s + l.total, 0)
   return linhas.map(l => ({ ...l, pct: soma > 0 ? (l.total / soma) * 100 : 0 }))
 }
+
+/* ---------- ticket médio e gastos ---------- */
+
+/**
+ * Ticket médio = valor médio recebido por aluno pagante em cada mês:
+ * recebido de alunos no período ÷ nº de (aluno, mês) com pagamento. Assim, quem tem Clubinho + Aula
+ * (dois lançamentos) conta uma vez por mês, e períodos de vários meses não distorcem a média.
+ */
+export function ticketMedio(itens: Item[], inicio: string, fim: string) {
+  const pagos = itens.filter(x => x.estado === 'pago' && x.alunoId && dentro(x.dataEfetiva, inicio, fim))
+  const pares = new Set(pagos.map(x => `${x.alunoId}|${mesDe(x.dataEfetiva)}`))
+  const total = arredonda(pagos.reduce((s, x) => s + x.valor, 0))
+  return { valor: pares.size > 0 ? arredonda(total / pares.size) : null, pagantes: new Set(pagos.map(x => x.alunoId)).size, total }
+}
+
+/** Gastos = saídas já pagas no período (pela data do pagamento); a pagar = saídas ainda em aberto. */
+export function gastosDoPeriodo(movs: MovP[], inicio: string, fim: string) {
+  const saidas = movs.filter(m => m.tipo === 'Saída')
+  const pagas = saidas.filter(m => m.status === 'Pago' && dentro(m.data_pagamento ?? m.data, inicio, fim))
+  const aPagar = saidas.filter(m => m.status !== 'Pago' && !CANCELADOS.includes(m.status ?? ''))
+  const soma = (xs: MovP[]) => arredonda(xs.reduce((s, m) => s + (Number(m.valor) || 0), 0))
+  return { pagos: soma(pagas), aPagar: soma(aPagar), qtdAPagar: aPagar.length }
+}

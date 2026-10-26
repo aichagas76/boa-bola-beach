@@ -145,3 +145,34 @@ test('participação soma 100%', () => {
   assert.deepEqual(p.map(x => x.pct), [75, 25])
   assert.equal(participacao([{ total: 0 }])[0].pct, 0)
 })
+
+import { ticketMedio, gastosDoPeriodo } from '../lib/painel.ts'
+
+test('ticket médio: dois lançamentos do mesmo aluno no mês contam como um pagante', () => {
+  const itens = itensFinanceiros([
+    mov({ aluno_ref_id: 'a1', valor: 140 }), mov({ aluno_ref_id: 'a1', valor: 260 }), // Clubinho + Aula do mesmo aluno
+    mov({ aluno_ref_id: 'a2', valor: 200 }),
+    mov({ aluno_ref_id: null, valor: 999 }), // venda avulsa, sem aluno: fora
+  ], [])
+  const t = ticketMedio(itens, '2026-10-01', '2026-10-31')
+  assert.deepEqual([t.valor, t.pagantes, t.total], [300, 2, 600])
+})
+test('ticket médio em vários meses é por aluno e por mês', () => {
+  const itens = itensFinanceiros([
+    mov({ aluno_ref_id: 'a1', valor: 100, data: '2026-09-05' }), mov({ aluno_ref_id: 'a1', valor: 100, data: '2026-10-05' }),
+  ], [])
+  assert.equal(ticketMedio(itens, '2026-09-01', '2026-10-31').valor, 100)
+})
+test('ticket médio sem pagantes não existe', () => {
+  assert.equal(ticketMedio([], '2026-10-01', '2026-10-31').valor, null)
+})
+test('gastos: só saídas pagas no período; a pagar à parte', () => {
+  const movs = [
+    mov({ tipo: 'Saída', status: 'Pago', valor: 500 }),
+    mov({ tipo: 'Saída', status: 'Pago', valor: 200, data: '2026-09-10' }), // outro mês
+    mov({ tipo: 'Saída', status: 'Pendente', valor: 80 }),
+    mov({ tipo: 'Saída', status: 'Cancelado', valor: 70 }),
+    mov({ tipo: 'Entrada', valor: 999 }),
+  ]
+  assert.deepEqual(gastosDoPeriodo(movs, '2026-10-01', '2026-10-31'), { pagos: 500, aPagar: 80, qtdAPagar: 1 })
+})
