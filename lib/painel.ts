@@ -202,16 +202,36 @@ export function variacao(atual: number, anterior: number): number | null {
 }
 
 /* ---------- séries por mês ---------- */
-export type LinhaFinanceira = { mes: string; rotulo: string; recebida: number; anterior: number; aReceber: number; prevista: number }
+export type LinhaFinanceira = {
+  mes: string; rotulo: string
+  recebida: number; anterior: number
+  aVencer: number // em aberto, com vencimento ainda por chegar
+  vencido: number // em aberto, vencimento já passou
+  aReceber: number // aVencer + vencido
+  prevista: number // recebida + aReceber
+}
 
-export function serieFinanceira(itens: Item[], meses: string[]): LinhaFinanceira[] {
+export function serieFinanceira(itens: Item[], meses: string[], hoje: string): LinhaFinanceira[] {
   const deslocamento = meses.length
-  const recebidaDo = (mes: string) => arredonda(itens.filter(x => x.estado === 'pago' && mesDe(x.dataEfetiva) === mes).reduce((s, x) => s + x.valor, 0))
+  const soma = (xs: Item[]) => arredonda(xs.reduce((s, x) => s + x.valor, 0))
+  const recebidaDo = (mes: string) => soma(itens.filter(x => x.estado === 'pago' && mesDe(x.dataEfetiva) === mes))
   return meses.map(mes => {
     const recebida = recebidaDo(mes)
-    const aReceber = arredonda(itens.filter(x => x.estado === 'aberto' && x.vencimento && mesDe(x.vencimento) === mes).reduce((s, x) => s + x.valor, 0))
-    return { mes, rotulo: rotuloMes(mes), recebida, anterior: recebidaDo(deslocarMes(mes, -deslocamento)), aReceber, prevista: arredonda(recebida + aReceber) }
+    const abertos = itens.filter(x => x.estado === 'aberto' && x.vencimento && mesDe(x.vencimento) === mes)
+    const vencido = soma(abertos.filter(x => x.vencimento! < hoje))
+    const aVencer = soma(abertos.filter(x => x.vencimento! >= hoje))
+    return {
+      mes, rotulo: rotuloMes(mes), recebida, anterior: recebidaDo(deslocarMes(mes, -deslocamento)),
+      aVencer, vencido, aReceber: arredonda(aVencer + vencido), prevista: arredonda(recebida + aVencer + vencido),
+    }
   })
+}
+
+/** Tira os meses totalmente vazios do começo (sem dado nenhum) para o gráfico não ficar com um vão; mantém pelo menos `minimo` meses. */
+export function aparaMesesVazios<T>(linhas: T[], temDado: (l: T) => boolean, minimo = 3): T[] {
+  let inicio = 0
+  while (inicio < linhas.length - minimo && !temDado(linhas[inicio])) inicio++
+  return linhas.slice(inicio)
 }
 
 export type LinhaAlunos = { mes: string; rotulo: string; novos: number; inativacoes: number; base: number }
@@ -295,4 +315,66 @@ export function gastosDoPeriodo(movs: MovP[], inicio: string, fim: string) {
   const aPagar = saidas.filter(m => m.status !== 'Pago' && !CANCELADOS.includes(m.status ?? ''))
   const soma = (xs: MovP[]) => arredonda(xs.reduce((s, m) => s + (Number(m.valor) || 0), 0))
   return { pagos: soma(pagas), aPagar: soma(aPagar), qtdAPagar: aPagar.length }
+}
+
+/* ---------- área de atenção gerencial ---------- */
+export type Atencao = { id: string; nivel: 'alto' | 'medio'; texto: string; href?: string }
+
+const brlTexto = (v: number) => `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+const plural = (n: number, um: string, varios: string) => (n === 1 ? um : varios)
+
+/**
+ * Só apresenta situações que os dados comprovam. Cada item some quando não há o que mostrar.
+ * Limiar da queda de receita: 10% ou mais abaixo do período anterior.
+ */
+export function pontosDeAtencao(args: {
+  kpis: Kpis
+  itens: Item[]
+  alunos: AlunoP[]
+  mats: MatP[]
+  saidas: MovP[] // saídas da unidade (gastos)
+  hoje: string
+  rastreiaInativacao: boolean
+}): Atencao[] {
+  const { kpis, itens, alunos, mats, saidas, hoje } = args
+  const lista: Atencao[] = []
+
+  if (kpis.vencidoQtd > 0 || kpis.inadimplentes > 0) {
+    const vencidos = itens.filter(x => x.estado === 'aberto' && x.vencimento && x.vencimento < hoje)
+    const maisAntiga = vencidos.length ? Math.max(...vencidos.map(x => diasEntre(x.vencimento!, hoje))) : 0
+    const partes: string[] = []
+    if (kpis.vencidoQtd > 0) partes.push(`${kpis.vencidoQtd} ${plural(kpis.vencidoQtd, 'cobrança vencida', 'cobranças vencidas')} somando ${brlTexto(kpis.vencidoValor)}${maisAntiga > 0 ? ` (a mais antiga há ${maisAntiga} dias)` : ''}`)
+    if (kpis.inadimplentes > 0) partes.push(`${kpis.inadimplentes} ${plural(kpis.inadimplentes, 'aluno inadimplente', 'alunos inadimplentes')}${kpis.inadimplenciaPct !== null ? ` (${kpis.inadimplenciaPct.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}% dos ativos)` : ''}`)
+    lista.push({ id: 'vencidas', nivel: 'alto', texto: partes.join(' · '), href: '/atraso' })
+  }
+
+  const sessentaEOito = somarDias(hoje, 7)
+  const proximos = itens.filter(x => x.estado === 'aberto' && x.vencimento && x.vencimento >= hoje && x.vencimento <= sessentaEOito)
+  if (proximos.length > 0) {
+    const valor = arredonda(proximos.reduce((s, x) => s + x.valor, 0))
+    lista.push({ id: 'proximos', nivel: 'medio', texto: `${proximos.length} ${plural(proximos.length, 'cobrança vence', 'cobranças vencem')} nos próximos 7 dias (${brlTexto(valor)})`, href: '/pagamentos' })
+  }
+
+  const contasVencidas = saidas.filter(m => m.tipo === 'Saída' && m.status !== 'Pago' && !CANCELADOS.includes(m.status ?? '') && m.data_vencimento && m.data_vencimento < hoje)
+  if (contasVencidas.length > 0) {
+    const valor = arredonda(contasVencidas.reduce((s, m) => s + (Number(m.valor) || 0), 0))
+    lista.push({ id: 'contas', nivel: 'alto', texto: `${contasVencidas.length} ${plural(contasVencidas.length, 'conta a pagar vencida', 'contas a pagar vencidas')} (${brlTexto(valor)})`, href: '/contas-pagar' })
+  }
+
+  if (args.rastreiaInativacao && kpis.inativacoes > 0) {
+    lista.push({ id: 'inativacoes', nivel: 'medio', texto: `${kpis.inativacoes} ${plural(kpis.inativacoes, 'aluno inativado', 'alunos inativados')} no período`, href: '/alunos' })
+  }
+
+  const comValor = new Set(mats.filter(m => (Number(m.valor) || 0) > 0).map(m => m.aluno_id))
+  const semMatricula = alunos.filter(a => a.status === 'Ativo' && !comValor.has(a.id)).length
+  if (semMatricula > 0) {
+    lista.push({ id: 'sem-matricula', nivel: 'medio', texto: `${semMatricula} ${plural(semMatricula, 'aluno ativo sem matrícula com valor', 'alunos ativos sem matrícula com valor')} (não geram cobrança)`, href: '/alunos' })
+  }
+
+  const v = variacao(kpis.recebida, kpis.recebidaAnt)
+  if (kpis.recebidaAnt > 0 && v !== null && v <= -10) {
+    lista.push({ id: 'queda', nivel: 'medio', texto: `Receita recebida ${Math.abs(v).toLocaleString('pt-BR', { maximumFractionDigits: 0 })}% abaixo do período anterior`, href: '/financeiro' })
+  }
+
+  return lista.sort((a, b) => (a.nivel === b.nivel ? 0 : a.nivel === 'alto' ? -1 : 1))
 }

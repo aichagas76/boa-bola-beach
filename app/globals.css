@@ -178,3 +178,21 @@ td, th { font-variant-numeric: tabular-nums; }
 @media (max-width: 767px) {
   input, select, textarea { font-size: 16px; }
 }
+
+/* Números dos cartões do Painel: destaque (principais) e compacto (de apoio) */
+@utility text-kpi-lg {
+  font-size: 1.5rem;
+  line-height: 2rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  @media (min-width: 640px) {
+    font-size: 1.875rem;
+    line-height: 2.25rem;
+  }
+}
+@utility text-kpi-sm {
+  font-size: 1.25rem;
+  line-height: 1.75rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}

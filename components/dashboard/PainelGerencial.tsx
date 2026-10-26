@@ -6,12 +6,12 @@ import {
   Bar, BarChart, CartesianGrid, Cell, ComposedChart, Legend, Line, LineChart, Pie, PieChart,
   ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts'
-import { ArrowDownRight, ArrowUpRight, Info, Minus } from 'lucide-react'
+import { AlertTriangle, ArrowDownRight, ArrowUpRight, CheckCircle2, ChevronRight, Info, Minus } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useUnidade } from '@/components/layout/UnidadeProvider'
 import {
-  alunosDaModalidade, calcularKpis, faixasDeAtraso, itensFinanceiros, mesesDaJanela, participacao, periodoDe,
-  serieAlunos, serieFinanceira, statusDosPagamentos, variacao, ticketMedio, gastosDoPeriodo,
+  alunosDaModalidade, aparaMesesVazios, calcularKpis, faixasDeAtraso, gastosDoPeriodo, itensFinanceiros, mesesDaJanela,
+  participacao, periodoDe, pontosDeAtencao, serieAlunos, serieFinanceira, statusDosPagamentos, ticketMedio, variacao,
   type AlunoP, type MatP, type MovP, type PagP, type Preset,
 } from '@/lib/painel'
 import {
@@ -25,16 +25,29 @@ const brlCurto = (v: number) => (Math.abs(v) >= 1000 ? `${(v / 1000).toLocaleStr
 const pct = (v: number) => `${v.toLocaleString('pt-BR', { maximumFractionDigits: Math.abs(v) < 10 ? 1 : 0 })}%`
 const tip = (v: unknown) => brl(Number(v ?? 0))
 
-/* ---------- cores com significado fixo ---------- */
+/* ---------- cores com significado fixo (as mesmas em todo o painel) ---------- */
 const COR = {
-  recebido: '#16A34A', marca: '#7DC421', aReceber: '#F59E0B', vencido: '#DC2626',
-  anterior: '#9CA3AF', base: '#2563EB', cancelado: '#6B7280',
+  recebido: '#16A34A', // dinheiro que entrou / positivo
+  marca: '#7DC421', // receita (verde do Boa Bola)
+  aVencer: '#F59E0B', // previsto, ainda no prazo
+  vencido: '#DC2626', // atrasado / despesa / negativo
+  anterior: '#9CA3AF', // comparação com o período anterior
+  base: '#2563EB', // base de alunos
+  cancelado: '#6B7280',
 }
 const COR_ESPORTE: Record<string, string> = {
   'Beach Tênis': '#F97316', 'Tênis': '#84A60F', Padel: '#2563EB', Pickleball: '#EAB308', 'Sem esporte': '#9CA3AF',
 }
 const corEsporte = (n: string) => COR_ESPORTE[n] ?? '#6B7280'
-const CORES_MODALIDADE = ['#7DC421', '#2563EB', '#F59E0B', '#8B5CF6', '#14B8A6', '#EC4899']
+const COR_STATUS: Record<string, string> = { Pagos: COR.recebido, 'A vencer': COR.aVencer, Vencidos: COR.vencido, Cancelados: COR.cancelado }
+
+/* ---------- padrão dos gráficos ---------- */
+const ALTURA = 240
+const MARGEM = { top: 8, right: 8, left: 0, bottom: 0 }
+const eixoY = { width: 52, tick: { fontSize: 12 }, tickLine: false, axisLine: false } as const
+const eixoX = { tick: { fontSize: 12 }, tickLine: false } as const
+const legenda = { wrapperStyle: { fontSize: 12, paddingTop: 6 } } as const
+const Grade = () => <CartesianGrid strokeDasharray="3 3" stroke="#eee" vertical={false} />
 
 const PRESETS: { id: Preset; nome: string }[] = [
   { id: 'mes_atual', nome: 'Mês atual' },
@@ -53,20 +66,37 @@ function Delta({ atual, anterior, subiuEhBom = true }: { atual: number; anterior
   return (
     <span className={`inline-flex items-center gap-1 text-xs font-medium ${bom ? 'text-green-700' : 'text-red-600'}`}>
       {v > 0 ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
-      {pct(Math.abs(v))} <span className="font-normal text-gray-500">vs. período anterior</span>
+      {pct(Math.abs(v))} <span className="font-normal text-gray-500">vs. anterior</span>
     </span>
   )
 }
 
-function CartaoKpi({ rotulo, valor, children, href, destaque }: { rotulo: string; valor: string; children?: React.ReactNode; href?: string; destaque?: string }) {
+/** Cartão principal (destaque): valor grande. */
+function KpiPrincipal({ rotulo, valor, cor, href, children }: { rotulo: string; valor: string; cor?: string; href?: string; children?: React.ReactNode }) {
   const corpo = (
-    <div className={`h-full bg-white border border-gray-200 rounded-xl p-4 ${href ? 'hover:border-gray-300 hover:shadow-sm transition' : ''}`}>
-      <div className="text-sm text-gray-600 mb-1">{rotulo}</div>
-      <div className={`text-kpi ${destaque ?? 'text-gray-900'}`}>{valor}</div>
-      <div className="mt-1.5 min-h-[1.25rem]">{children}</div>
+    <div className={`h-full bg-white border border-gray-200 rounded-xl p-4 sm:p-5 ${href ? 'hover:border-gray-300 hover:shadow-sm transition' : ''}`}>
+      <div className="text-sm font-medium text-gray-600">{rotulo}</div>
+      <div className={`text-kpi-lg mt-1 ${cor ?? 'text-gray-900'}`}>{valor}</div>
+      <div className="mt-2 min-h-[2.25rem] space-y-0.5">{children}</div>
     </div>
   )
   return href ? <Link href={href} className="block h-full">{corpo}</Link> : corpo
+}
+
+/** Cartão secundário (compacto). */
+function KpiSecundario({ rotulo, valor, cor, href, children }: { rotulo: string; valor: string; cor?: string; href?: string; children?: React.ReactNode }) {
+  const corpo = (
+    <div className={`h-full bg-white border border-gray-200 rounded-xl p-4 ${href ? 'hover:border-gray-300 hover:shadow-sm transition' : ''}`}>
+      <div className="text-xs font-medium text-gray-600">{rotulo}</div>
+      <div className={`text-kpi-sm mt-0.5 ${cor ?? 'text-gray-900'}`}>{valor}</div>
+      <div className="mt-1 min-h-[2rem] space-y-0.5">{children}</div>
+    </div>
+  )
+  return href ? <Link href={href} className="block h-full">{corpo}</Link> : corpo
+}
+
+function Aux({ children }: { children: React.ReactNode }) {
+  return <div className="text-xs text-gray-500 leading-4">{children}</div>
 }
 
 function Secao({ titulo, subtitulo, children }: { titulo: string; subtitulo?: string; children: React.ReactNode }) {
@@ -81,16 +111,16 @@ function Secao({ titulo, subtitulo, children }: { titulo: string; subtitulo?: st
   )
 }
 
-function Grafico({ titulo, nota, vazio, carregando, altura = 260, children, largo }: { titulo: string; nota?: string; vazio?: boolean; carregando?: boolean; altura?: number; children: React.ReactNode; largo?: boolean }) {
+function Grafico({ titulo, nota, vazio, mensagemVazio, carregando, altura = ALTURA, children, largo }: { titulo: string; nota?: string; vazio?: boolean; mensagemVazio?: string; carregando?: boolean; altura?: number; children: React.ReactNode; largo?: boolean }) {
   return (
     <div className={`bg-white border border-gray-200 rounded-xl p-4 ${largo ? 'lg:col-span-2' : ''}`}>
       <div className="text-sm font-semibold text-gray-900">{titulo}</div>
-      {nota && <div className="text-xs text-gray-500 mb-2">{nota}</div>}
-      <div className="mt-2" style={{ minHeight: altura }}>
+      {nota && <div className="text-xs text-gray-500">{nota}</div>}
+      <div className="mt-3" style={{ minHeight: altura }}>
         {carregando ? (
           <div className="flex items-center justify-center text-sm text-gray-400" style={{ height: altura }}>Carregando...</div>
         ) : vazio ? (
-          <div className="flex items-center justify-center text-sm text-gray-400" style={{ height: altura }}>Sem dados neste período</div>
+          <div className="flex items-center justify-center text-center text-sm text-gray-400 px-4" style={{ height: altura }}>{mensagemVazio ?? 'Sem dados neste período'}</div>
         ) : children}
       </div>
     </div>
@@ -195,7 +225,6 @@ export default function PainelGerencial() {
   const itens = useMemo(() => itensFinanceiros(movsP, dados.pagsF), [movsP, dados.pagsF])
   // O recorte por modalidade já foi aplicado nos dados; aqui não filtra de novo
   const kpis = useMemo(() => calcularKpis({ alunos: alunosP, mats: matsP, itens, periodo, hoje, modalidade: null }), [alunosP, matsP, itens, periodo, hoje])
-  const financeira = useMemo(() => serieFinanceira(itens, meses), [itens, meses])
   const ticket = useMemo(() => ticketMedio(itens, periodo.inicio, periodo.fim), [itens, periodo])
   const ticketAnt = useMemo(() => ticketMedio(itens, periodo.inicioAnt, periodo.fimAnt), [itens, periodo])
   // Gastos são do negócio (não de um aluno): contam sempre a unidade toda, mesmo com filtro de modalidade
@@ -204,6 +233,12 @@ export default function PainelGerencial() {
   })), [movs])
   const gastos = useMemo(() => gastosDoPeriodo(movsDaUnidade, periodo.inicio, periodo.fim), [movsDaUnidade, periodo])
   const gastosAnt = useMemo(() => gastosDoPeriodo(movsDaUnidade, periodo.inicioAnt, periodo.fimAnt), [movsDaUnidade, periodo])
+
+  const financeira = useMemo(
+    () => aparaMesesVazios(serieFinanceira(itens, meses, hoje), l => l.recebida > 0 || l.anterior > 0 || l.aReceber > 0),
+    [itens, meses, hoje]
+  )
+  const temAnterior = financeira.some(l => l.anterior > 0)
   const serieA = useMemo(() => serieAlunos(alunosP, meses), [alunosP, meses])
   const status = useMemo(() => statusDosPagamentos(itens, periodo, hoje), [itens, periodo, hoje])
   const faixas = useMemo(() => faixasDeAtraso(itens, hoje), [itens, hoje])
@@ -213,8 +248,16 @@ export default function PainelGerencial() {
     professor_id: m.professor_id, professor_nome: m.professores?.nome ?? null, esporte_nome: m.esportes?.nome ?? null,
   })), [dados.movsF])
   const mesesPeriodo = useMemo(() => mesesDaJanela(periodo.inicio, periodo.fim, 1), [periodo])
-  const lucro = useMemo(() => resumoPorMes(movsRel, meses), [movsRel, meses])
-  const totaisPeriodo = useMemo(() => totaisDoPeriodo(resumoPorMes(movsRel, mesesPeriodo)), [movsRel, mesesPeriodo])
+  // O lucro usa todas as movimentações da unidade (despesas não pertencem a uma modalidade)
+  const movsRelUnidade: Mov[] = useMemo(() => movs.map(m => ({
+    tipo: m.tipo, status: m.status, valor: Number(m.valor), data: m.data, data_pagamento: m.data_pagamento,
+    professor_id: m.professor_id, professor_nome: m.professores?.nome ?? null, esporte_nome: m.esportes?.nome ?? null,
+  })), [movs])
+  const lucro = useMemo(
+    () => aparaMesesVazios(resumoPorMes(movsRelUnidade, meses), l => l.bruto > 0 || l.despesas > 0),
+    [movsRelUnidade, meses]
+  )
+  const totaisPeriodo = useMemo(() => totaisDoPeriodo(resumoPorMes(movsRelUnidade, mesesPeriodo)), [movsRelUnidade, mesesPeriodo])
   const porProfessor = useMemo(() => faturamentoPorProfessor(movsRel, mesesPeriodo), [movsRel, mesesPeriodo])
 
   const matsRel = useMemo(() => dados.matsF.map(m => ({
@@ -226,8 +269,13 @@ export default function PainelGerencial() {
   const modalidadesDisponiveis = useMemo(() => Array.from(new Set(dados.matsU.map(m => m.tipo))).sort(), [dados.matsU])
   const inativosSemData = useMemo(() => alunosP.filter(a => a.status === 'Inativo' && !a.data_inativacao).length, [alunosP])
 
+  const atencao = useMemo(() => pontosDeAtencao({
+    kpis, itens, alunos: alunosP, mats: matsP, saidas: movsDaUnidade, hoje, rastreiaInativacao,
+  }), [kpis, itens, alunosP, matsP, movsDaUnidade, hoje, rastreiaInativacao])
+
   const semAtivos = !loading && kpis.alunosAtivos === 0
   const rotuloPeriodo = periodo.inicio === periodo.fim ? periodo.inicio : `${periodo.inicio.split('-').reverse().join('/')} a ${periodo.fim.split('-').reverse().join('/')}`
+  const nomeModalidade = modalidade === 'Aula' ? 'Aulas' : modalidade
 
   return (
     <div className="max-w-6xl">
@@ -235,7 +283,7 @@ export default function PainelGerencial() {
       <div className="flex flex-wrap items-end justify-between gap-3 mb-5">
         <div className="pl-12 md:pl-0">
           <h1 className="text-page-title text-gray-900">Painel</h1>
-          <p className="text-sm text-gray-500">{unidade?.nome ?? ''} · {rotuloPeriodo}{modalidade ? ` · ${modalidade === 'Aula' ? 'Aulas' : modalidade}` : ''}</p>
+          <p className="text-sm text-gray-500">{unidade?.nome ?? ''} · {rotuloPeriodo}{modalidade ? ` · ${nomeModalidade}` : ''}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <div className="inline-flex max-w-[calc(100vw-2rem)] overflow-x-auto rounded-lg border border-gray-200 bg-white">
@@ -266,83 +314,115 @@ export default function PainelGerencial() {
       )}
 
       {/* Indicadores principais */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-8">
-        <CartaoKpi rotulo="Alunos ativos" valor={loading ? '...' : String(kpis.alunosAtivos)} href="/alunos">
-          <span className="text-xs text-gray-500">{loading ? '' : `Mensalidades somam ${brl(kpis.potencialMensal)}`}</span>
-        </CartaoKpi>
-        <CartaoKpi rotulo="Receita recebida" valor={loading ? '...' : brl(kpis.recebida)} href="/financeiro" destaque="text-green-700">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
+        <KpiPrincipal rotulo="Receita recebida" valor={loading ? '...' : brl(kpis.recebida)} cor="text-green-700" href="/financeiro">
           {!loading && <Delta atual={kpis.recebida} anterior={kpis.recebidaAnt} />}
-        </CartaoKpi>
-        <CartaoKpi rotulo="Receita prevista" valor={loading ? '...' : brl(kpis.prevista)} href="/contas-receber">
-          {!loading && <Delta atual={kpis.prevista} anterior={kpis.previstaAnt} />}
-        </CartaoKpi>
-        <CartaoKpi rotulo="Ticket médio" valor={loading ? '...' : ticket.valor === null ? '—' : brl(ticket.valor)}>
-          {!loading && (ticket.valor === null
-            ? <span className="text-xs text-gray-500">sem pagamentos de alunos</span>
-            : <Delta atual={ticket.valor} anterior={ticketAnt.valor ?? 0} />)}
-        </CartaoKpi>
-        <CartaoKpi rotulo="Gastos mensais" valor={loading ? '...' : brl(gastos.pagos)} href="/contas-pagar" destaque="text-red-600">
-          {!loading && <Delta atual={gastos.pagos} anterior={gastosAnt.pagos} subiuEhBom={false} />}
-          {!loading && <span className="block text-xs text-gray-500 mt-0.5">{gastos.qtdAPagar > 0 ? `A pagar: ${brl(gastos.aPagar)}` : 'Nada a pagar em aberto'}</span>}
-        </CartaoKpi>
-        <CartaoKpi rotulo="Pagamentos pendentes" valor={loading ? '...' : brl(kpis.abertoValor)} href="/pagamentos" destaque="text-amber-600">
-          <span className="text-xs text-gray-500">{loading ? '' : `${kpis.abertoQtd} em aberto · ${kpis.vencidoQtd} vencido${kpis.vencidoQtd === 1 ? '' : 's'}`}</span>
-        </CartaoKpi>
-        <CartaoKpi rotulo="Inadimplência" valor={loading ? '...' : kpis.inadimplenciaPct === null ? '—' : pct(kpis.inadimplenciaPct)} href="/atraso" destaque={kpis.inadimplentes > 0 ? 'text-red-600' : 'text-gray-900'}>
-          <span className="text-xs text-gray-500">{loading ? '' : `${kpis.inadimplentes} de ${kpis.alunosAtivos} alunos ativos`}</span>
-        </CartaoKpi>
-        <CartaoKpi rotulo="Novos alunos" valor={loading ? '...' : String(kpis.novos)} href="/alunos">
+        </KpiPrincipal>
+        <KpiPrincipal rotulo="Alunos ativos" valor={loading ? '...' : String(kpis.alunosAtivos)} href="/alunos">
+          {!loading && <Aux>Mensalidades somam {brl(kpis.potencialMensal)}</Aux>}
+        </KpiPrincipal>
+        <KpiPrincipal rotulo="Valores vencidos" valor={loading ? '...' : brl(kpis.vencidoValor)} cor={kpis.vencidoValor > 0 ? 'text-red-600' : 'text-gray-900'} href="/atraso">
+          {!loading && (
+            <>
+              <Aux>{kpis.vencidoQtd} {kpis.vencidoQtd === 1 ? 'cobrança vencida' : 'cobranças vencidas'}</Aux>
+              <Aux>Total em aberto: {brl(kpis.abertoValor)}</Aux>
+            </>
+          )}
+        </KpiPrincipal>
+        <KpiPrincipal rotulo="Novos alunos" valor={loading ? '...' : String(kpis.novos)} href="/alunos">
           {!loading && <Delta atual={kpis.novos} anterior={kpis.novosAnt} />}
-        </CartaoKpi>
-        <CartaoKpi rotulo="Inativações" valor={loading ? '...' : rastreiaInativacao ? String(kpis.inativacoes) : '—'} href="/alunos">
-          {!loading && (rastreiaInativacao ? <Delta atual={kpis.inativacoes} anterior={kpis.inativacoesAnt} subiuEhBom={false} /> : <span className="text-xs text-gray-500">disponível após a atualização do banco</span>)}
-        </CartaoKpi>
-        <CartaoKpi rotulo="Crescimento líquido" valor={loading ? '...' : `${kpis.crescimento > 0 ? '+' : ''}${kpis.crescimento}`} destaque={kpis.crescimento < 0 ? 'text-red-600' : kpis.crescimento > 0 ? 'text-green-700' : 'text-gray-900'}>
-          {!loading && <span className="text-xs text-gray-500">novos − inativações</span>}
-        </CartaoKpi>
+        </KpiPrincipal>
       </div>
+
+      {/* Indicadores de apoio */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
+        <KpiSecundario rotulo="Receita prevista" valor={loading ? '...' : brl(kpis.prevista)} href="/contas-receber">
+          {!loading && <Delta atual={kpis.prevista} anterior={kpis.previstaAnt} />}
+        </KpiSecundario>
+        <KpiSecundario rotulo="Ticket médio" valor={loading ? '...' : ticket.valor === null ? '—' : brl(ticket.valor)}>
+          {!loading && (ticket.valor === null ? <Aux>sem pagamentos de alunos</Aux> : <Delta atual={ticket.valor} anterior={ticketAnt.valor ?? 0} />)}
+        </KpiSecundario>
+        <KpiSecundario rotulo="Gastos mensais" valor={loading ? '...' : brl(gastos.pagos)} cor="text-red-600" href="/contas-pagar">
+          {!loading && <Delta atual={gastos.pagos} anterior={gastosAnt.pagos} subiuEhBom={false} />}
+          {!loading && <Aux>{gastos.qtdAPagar > 0 ? `A pagar: ${brl(gastos.aPagar)}` : 'Nada a pagar em aberto'}</Aux>}
+        </KpiSecundario>
+        <KpiSecundario rotulo="Inadimplência" valor={loading ? '...' : kpis.inadimplenciaPct === null ? '—' : pct(kpis.inadimplenciaPct)} cor={kpis.inadimplentes > 0 ? 'text-red-600' : 'text-gray-900'} href="/atraso">
+          {!loading && <Aux>{kpis.inadimplentes} de {kpis.alunosAtivos} alunos ativos</Aux>}
+        </KpiSecundario>
+        <KpiSecundario rotulo="Inativações" valor={loading ? '...' : rastreiaInativacao ? String(kpis.inativacoes) : '—'} href="/alunos">
+          {!loading && (rastreiaInativacao ? <Delta atual={kpis.inativacoes} anterior={kpis.inativacoesAnt} subiuEhBom={false} /> : <Aux>disponível após a atualização do banco</Aux>)}
+        </KpiSecundario>
+        <KpiSecundario rotulo="Crescimento líquido" valor={loading ? '...' : `${kpis.crescimento > 0 ? '+' : ''}${kpis.crescimento}`} cor={kpis.crescimento < 0 ? 'text-red-600' : kpis.crescimento > 0 ? 'text-green-700' : 'text-gray-900'}>
+          {!loading && <Aux>novos − inativações</Aux>}
+        </KpiSecundario>
+      </div>
+
+      {/* Atenção gerencial */}
+      {!loading && !erro && (
+        <section className={`mb-8 rounded-xl border p-4 ${atencao.length ? 'border-amber-200 bg-amber-50/60' : 'border-green-200 bg-green-50/60'}`} aria-label="Atenção gerencial">
+          <div className="flex items-center gap-2 mb-2">
+            {atencao.length ? <AlertTriangle size={18} className="text-amber-600" /> : <CheckCircle2 size={18} className="text-green-600" />}
+            <h2 className="text-sm font-semibold text-gray-900">{atencao.length ? 'Atenção gerencial' : 'Nada pedindo atenção agora'}</h2>
+          </div>
+          {atencao.length > 0 && (
+            <ul className="divide-y divide-amber-100">
+              {atencao.map(a => (
+                <li key={a.id} className="flex items-center gap-3 py-2 text-sm text-gray-800">
+                  <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${a.nivel === 'alto' ? 'bg-red-500' : 'bg-amber-500'}`} />
+                  <span className="flex-1">{a.texto}</span>
+                  {a.href && <Link href={a.href} className="inline-flex items-center text-xs font-medium text-blue-600 hover:text-blue-800">Ver <ChevronRight size={14} /></Link>}
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
 
       {semAtivos && !erro && (
         <div className="mb-6 rounded-lg border border-gray-200 bg-white px-4 py-6 text-center text-sm text-gray-500">Nenhum aluno ativo neste recorte (unidade/modalidade).</div>
       )}
 
-      <Secao titulo="Evolução financeira" subtitulo="Pelo mês do pagamento. Mostra no mínimo 6 meses para dar para ver a tendência.">
-        <Grafico titulo="Receita recebida por mês" nota="Linha cinza: mesmo mês do período anterior" carregando={loading} vazio={!loading && financeira.every(l => l.recebida === 0 && l.anterior === 0)}>
-          <ResponsiveContainer width="100%" height={260}>
-            <ComposedChart data={financeira}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e5" />
-              <XAxis dataKey="rotulo" />
-              <YAxis tickFormatter={brlCurto} />
+      <Secao titulo="Financeiro" subtitulo="Pelo mês do pagamento. Mostra pelo menos 3 meses, para dar para ver a tendência.">
+        <Grafico titulo="Receita recebida por mês" nota={temAnterior ? 'Linha cinza: mesmo mês do período anterior' : undefined}
+          carregando={loading} vazio={!loading && financeira.every(l => l.recebida === 0 && l.anterior === 0)} mensagemVazio="Nenhuma receita recebida neste período">
+          <ResponsiveContainer width="100%" height={ALTURA}>
+            <ComposedChart data={financeira} margin={MARGEM}>
+              <Grade />
+              <XAxis dataKey="rotulo" {...eixoX} />
+              <YAxis {...eixoY} tickFormatter={brlCurto} />
               <Tooltip formatter={tip} />
-              <Legend />
-              <Bar dataKey="recebida" name="Recebida" fill={COR.marca} radius={[6, 6, 0, 0]} />
-              <Line type="monotone" dataKey="anterior" name="Período anterior" stroke={COR.anterior} strokeWidth={2} dot={{ r: 3 }} />
+              <Legend {...legenda} />
+              <Bar dataKey="recebida" name="Recebida" fill={COR.marca} radius={[4, 4, 0, 0]} />
+              {temAnterior && <Line type="monotone" dataKey="anterior" name="Período anterior" stroke={COR.anterior} strokeWidth={2} dot={{ r: 3 }} />}
             </ComposedChart>
           </ResponsiveContainer>
         </Grafico>
-        <Grafico titulo="Receita prevista × recebida" nota="Prevista = recebida + a receber que vence no mês" carregando={loading} vazio={!loading && financeira.every(l => l.prevista === 0)}>
-          <ResponsiveContainer width="100%" height={260}>
-            <BarChart data={financeira}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e5" />
-              <XAxis dataKey="rotulo" />
-              <YAxis tickFormatter={brlCurto} />
+        <Grafico titulo="Recebido, a vencer e vencido" nota="Soma de cada barra = receita prevista do mês"
+          carregando={loading} vazio={!loading && financeira.every(l => l.prevista === 0)} mensagemVazio="Nada recebido nem a receber neste período">
+          <ResponsiveContainer width="100%" height={ALTURA}>
+            <BarChart data={financeira} margin={MARGEM}>
+              <Grade />
+              <XAxis dataKey="rotulo" {...eixoX} />
+              <YAxis {...eixoY} tickFormatter={brlCurto} />
               <Tooltip formatter={tip} />
-              <Legend />
-              <Bar dataKey="recebida" stackId="p" name="Recebida" fill={COR.recebido} />
-              <Bar dataKey="aReceber" stackId="p" name="A receber" fill={COR.aReceber} radius={[6, 6, 0, 0]} />
+              <Legend {...legenda} />
+              <Bar dataKey="recebida" stackId="p" name="Recebido" fill={COR.recebido} />
+              <Bar dataKey="aVencer" stackId="p" name="A vencer" fill={COR.aVencer} />
+              <Bar dataKey="vencido" stackId="p" name="Vencido" fill={COR.vencido} radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </Grafico>
-        <Grafico titulo="Lucro líquido por mês" nota={`No período: recebido ${brl(totaisPeriodo.bruto)} − despesas pagas ${brl(totaisPeriodo.despesas)} = ${brl(totaisPeriodo.lucro)}`} carregando={loading} vazio={!loading && lucro.every(l => l.bruto === 0 && l.despesas === 0)} largo>
-          <ResponsiveContainer width="100%" height={260}>
-            <BarChart data={lucro}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e5" />
-              <XAxis dataKey="rotulo" />
-              <YAxis tickFormatter={brlCurto} />
+        <Grafico titulo="Lucro líquido por mês" nota={`No período: recebido ${brl(totaisPeriodo.bruto)} − despesas pagas ${brl(totaisPeriodo.despesas)} = ${brl(totaisPeriodo.lucro)}${modalidade ? " (unidade toda: despesas não se dividem por modalidade)" : ""}`}
+          carregando={loading} vazio={!loading && lucro.every(l => l.bruto === 0 && l.despesas === 0)} mensagemVazio="Sem receitas nem despesas pagas neste período" largo>
+          <ResponsiveContainer width="100%" height={ALTURA}>
+            <BarChart data={lucro} margin={MARGEM}>
+              <Grade />
+              <XAxis dataKey="rotulo" {...eixoX} />
+              <YAxis {...eixoY} tickFormatter={brlCurto} />
               <Tooltip formatter={tip} />
-              <Legend />
-              <Bar dataKey="despesas" name="Despesas pagas" fill={COR.vencido} radius={[6, 6, 0, 0]} />
-              <Bar dataKey="lucro" name="Lucro líquido" fill={COR.recebido} radius={[6, 6, 0, 0]}>
+              <Legend {...legenda} />
+              <Bar dataKey="despesas" name="Despesas pagas" fill={COR.vencido} radius={[4, 4, 0, 0]} />
+              <Bar dataKey="lucro" name="Lucro líquido" fill={COR.recebido} radius={[4, 4, 0, 0]}>
                 {lucro.map(l => <Cell key={l.mes} fill={l.lucro < 0 ? COR.vencido : COR.recebido} />)}
               </Bar>
             </BarChart>
@@ -350,76 +430,71 @@ export default function PainelGerencial() {
         </Grafico>
       </Secao>
 
-      <Secao titulo="Evolução dos alunos" subtitulo={rastreiaInativacao ? 'Base = alunos cadastrados menos as inativações com data registrada.' : 'As inativações ainda não têm data registrada: a base mostra todos os cadastros.'}>
-        <Grafico titulo="Base de alunos" nota={inativosSemData > 0 ? `${inativosSemData} aluno(s) inativo(s) sem data de saída continuam contados na base` : undefined} carregando={loading} vazio={!loading && serieA.every(l => l.base === 0)}>
-          <ResponsiveContainer width="100%" height={260}>
-            <LineChart data={serieA}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e5" />
-              <XAxis dataKey="rotulo" />
-              <YAxis allowDecimals={false} />
+      <Secao titulo="Alunos" subtitulo={rastreiaInativacao ? 'Base = alunos cadastrados menos as inativações com data registrada.' : 'As inativações ainda não têm data registrada: a base mostra todos os cadastros.'}>
+        <Grafico titulo="Base de alunos" nota={inativosSemData > 0 ? `${inativosSemData} aluno(s) inativo(s) sem data de saída continuam contados na base` : undefined}
+          carregando={loading} vazio={!loading && serieA.every(l => l.base === 0)} mensagemVazio="Nenhum aluno cadastrado até este período">
+          <ResponsiveContainer width="100%" height={ALTURA}>
+            <LineChart data={serieA} margin={MARGEM}>
+              <Grade />
+              <XAxis dataKey="rotulo" {...eixoX} />
+              <YAxis {...eixoY} allowDecimals={false} />
               <Tooltip />
               <Line type="monotone" dataKey="base" name="Alunos na base" stroke={COR.base} strokeWidth={2.5} dot={{ r: 3 }} />
             </LineChart>
           </ResponsiveContainer>
         </Grafico>
-        <Grafico titulo="Novos alunos × inativações" carregando={loading} vazio={!loading && serieA.every(l => l.novos === 0 && l.inativacoes === 0)}>
-          <ResponsiveContainer width="100%" height={260}>
-            <BarChart data={serieA}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e5" />
-              <XAxis dataKey="rotulo" />
-              <YAxis allowDecimals={false} />
+        <Grafico titulo="Novos alunos × inativações"
+          carregando={loading} vazio={!loading && serieA.every(l => l.novos === 0 && l.inativacoes === 0)} mensagemVazio="Nenhum cadastro nem inativação neste período">
+          <ResponsiveContainer width="100%" height={ALTURA}>
+            <BarChart data={serieA} margin={MARGEM}>
+              <Grade />
+              <XAxis dataKey="rotulo" {...eixoX} />
+              <YAxis {...eixoY} allowDecimals={false} />
               <Tooltip />
-              <Legend />
-              <Bar dataKey="novos" name="Novos" fill={COR.recebido} radius={[6, 6, 0, 0]} />
-              <Bar dataKey="inativacoes" name="Inativações" fill={COR.vencido} radius={[6, 6, 0, 0]} />
+              <Legend {...legenda} />
+              <Bar dataKey="novos" name="Novos" fill={COR.recebido} radius={[4, 4, 0, 0]} />
+              <Bar dataKey="inativacoes" name="Inativações" fill={COR.vencido} radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </Grafico>
       </Secao>
 
-      <Secao titulo="Modalidades" subtitulo="Alunos ativos de hoje. O aluno em combo conta nas duas unidades.">
-        <Grafico titulo="Participação de cada modalidade" nota="Um aluno com mais de uma modalidade entra em cada uma" carregando={loading} vazio={!loading && fatiasModalidade.length === 0}>
-          <div className="flex flex-col sm:flex-row items-center gap-4">
-            <div className="w-full sm:w-1/2">
-              <ResponsiveContainer width="100%" height={230}>
-                <PieChart>
-                  <Pie data={fatiasModalidade} dataKey="total" nameKey="modalidade" innerRadius={55} outerRadius={90} paddingAngle={2}>
-                    {fatiasModalidade.map((f, i) => <Cell key={f.modalidade} fill={CORES_MODALIDADE[i % CORES_MODALIDADE.length]} />)}
-                  </Pie>
+      <Secao titulo="Modalidades" subtitulo="Alunos ativos de hoje. O aluno em combo conta nas duas unidades; quem tem mais de uma modalidade entra em cada uma.">
+        <Grafico titulo="Alunos por modalidade e esporte" largo
+          carregando={loading} vazio={!loading && porModalidade.dados.length === 0} mensagemVazio="Nenhuma matrícula ativa neste recorte">
+          <div className="flex flex-col md:flex-row md:items-center gap-4">
+            <div className="w-full md:w-2/3">
+              <ResponsiveContainer width="100%" height={ALTURA}>
+                <BarChart data={porModalidade.dados} margin={MARGEM}>
+                  <Grade />
+                  <XAxis dataKey="modalidade" {...eixoX} />
+                  <YAxis {...eixoY} allowDecimals={false} />
                   <Tooltip />
-                </PieChart>
+                  <Legend {...legenda} />
+                  {porModalidade.esportes.map(e => <Bar key={e} dataKey={e} stackId="m" fill={corEsporte(e)} name={e} />)}
+                </BarChart>
               </ResponsiveContainer>
             </div>
-            <ul className="w-full sm:w-1/2 space-y-2 text-sm">
-              {fatiasModalidade.map((f, i) => (
-                <li key={f.modalidade} className="flex items-center justify-between gap-2">
-                  <span className="inline-flex items-center gap-2"><span className="h-3 w-3 rounded-full" style={{ background: CORES_MODALIDADE[i % CORES_MODALIDADE.length] }} />{f.modalidade}</span>
-                  <span className="text-gray-700">{f.total} · {pct(f.pct)}</span>
+            <ul className="w-full md:w-1/3 space-y-2 text-sm">
+              {fatiasModalidade.map(f => (
+                <li key={f.modalidade} className="flex items-center justify-between gap-2 border-b border-gray-100 pb-2 last:border-0">
+                  <span className="text-gray-800">{f.modalidade}</span>
+                  <span className="text-gray-600"><strong className="text-gray-900">{f.total}</strong> · {pct(f.pct)}</span>
                 </li>
               ))}
             </ul>
           </div>
         </Grafico>
-        <Grafico titulo="Alunos por modalidade e esporte" carregando={loading} vazio={!loading && porModalidade.dados.length === 0}>
-          <ResponsiveContainer width="100%" height={260}>
-            <BarChart data={porModalidade.dados}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e5" />
-              <XAxis dataKey="modalidade" />
-              <YAxis allowDecimals={false} />
-              <Tooltip />
-              <Legend />
-              {porModalidade.esportes.map(e => <Bar key={e} dataKey={e} stackId="m" fill={corEsporte(e)} name={e} />)}
-            </BarChart>
-          </ResponsiveContainer>
-        </Grafico>
-        <Grafico titulo="Faturamento por professor (por esporte)" nota="Entradas recebidas no período, vinculadas ao professor" carregando={loading} vazio={!loading && porProfessor.dados.length === 0} altura={Math.max(220, porProfessor.dados.length * 44 + 70)} largo>
-          <ResponsiveContainer width="100%" height={Math.max(220, porProfessor.dados.length * 44 + 70)}>
-            <BarChart data={porProfessor.dados} layout="vertical" margin={{ left: 24 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e5" />
-              <XAxis type="number" tickFormatter={brlCurto} />
-              <YAxis type="category" dataKey="professor" width={90} />
+        <Grafico titulo="Faturamento por professor (por esporte)" nota="Entradas recebidas no período, vinculadas ao professor"
+          carregando={loading} vazio={!loading && porProfessor.dados.length === 0} mensagemVazio="Nenhuma entrada vinculada a professor neste período"
+          altura={Math.max(ALTURA - 20, porProfessor.dados.length * 44 + 70)} largo>
+          <ResponsiveContainer width="100%" height={Math.max(ALTURA - 20, porProfessor.dados.length * 44 + 70)}>
+            <BarChart data={porProfessor.dados} layout="vertical" margin={{ ...MARGEM, left: 16 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#eee" horizontal={false} />
+              <XAxis type="number" tickFormatter={brlCurto} tick={{ fontSize: 12 }} tickLine={false} />
+              <YAxis type="category" dataKey="professor" width={90} tick={{ fontSize: 12 }} tickLine={false} axisLine={false} />
               <Tooltip formatter={tip} />
-              <Legend />
+              <Legend {...legenda} />
               {porProfessor.esportes.map(e => <Bar key={e} dataKey={e} stackId="p" fill={corEsporte(e)} name={e} />)}
             </BarChart>
           </ResponsiveContainer>
@@ -427,15 +502,14 @@ export default function PainelGerencial() {
       </Secao>
 
       <Secao titulo="Pagamentos" subtitulo="Pagos e cancelados são do período; a vencer e vencidos são a carteira em aberto de hoje.">
-        <Grafico titulo="Situação dos pagamentos" carregando={loading} vazio={!loading && status.every(s => s.qtd === 0)}>
+        <Grafico titulo="Situação dos pagamentos"
+          carregando={loading} vazio={!loading && status.every(s => s.qtd === 0)} mensagemVazio="Nenhum pagamento neste período">
           <div className="flex flex-col sm:flex-row items-center gap-4">
             <div className="w-full sm:w-1/2">
-              <ResponsiveContainer width="100%" height={230}>
+              <ResponsiveContainer width="100%" height={ALTURA - 20}>
                 <PieChart>
-                  <Pie data={status.filter(s => s.qtd > 0)} dataKey="valor" nameKey="nome" innerRadius={55} outerRadius={90} paddingAngle={2}>
-                    {status.filter(s => s.qtd > 0).map(s => (
-                      <Cell key={s.nome} fill={s.nome === 'Pagos' ? COR.recebido : s.nome === 'A vencer' ? COR.aReceber : s.nome === 'Vencidos' ? COR.vencido : COR.cancelado} />
-                    ))}
+                  <Pie data={status.filter(s => s.qtd > 0)} dataKey="valor" nameKey="nome" innerRadius={55} outerRadius={88} paddingAngle={2}>
+                    {status.filter(s => s.qtd > 0).map(s => <Cell key={s.nome} fill={COR_STATUS[s.nome]} />)}
                   </Pie>
                   <Tooltip formatter={tip} />
                 </PieChart>
@@ -444,24 +518,22 @@ export default function PainelGerencial() {
             <ul className="w-full sm:w-1/2 space-y-2 text-sm">
               {status.map(s => (
                 <li key={s.nome} className="flex items-center justify-between gap-2">
-                  <span className="inline-flex items-center gap-2">
-                    <span className="h-3 w-3 rounded-full" style={{ background: s.nome === 'Pagos' ? COR.recebido : s.nome === 'A vencer' ? COR.aReceber : s.nome === 'Vencidos' ? COR.vencido : COR.cancelado }} />
-                    {s.nome}
-                  </span>
+                  <span className="inline-flex items-center gap-2"><span className="h-3 w-3 rounded-full" style={{ background: COR_STATUS[s.nome] }} />{s.nome}</span>
                   <span className="text-gray-700">{s.qtd} · {brl(s.valor)}</span>
                 </li>
               ))}
             </ul>
           </div>
         </Grafico>
-        <Grafico titulo="Faixas de atraso" nota="Dias desde o vencimento, só do que está vencido e em aberto" carregando={loading} vazio={!loading && faixas.every(f => f.qtd === 0)}>
-          <ResponsiveContainer width="100%" height={260}>
-            <BarChart data={faixas}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e5" />
-              <XAxis dataKey="faixa" />
-              <YAxis tickFormatter={brlCurto} />
+        <Grafico titulo="Faixas de atraso" nota="Dias desde o vencimento, só do que está vencido e em aberto"
+          carregando={loading} vazio={!loading && faixas.every(f => f.qtd === 0)} mensagemVazio="Nenhuma cobrança vencida em aberto">
+          <ResponsiveContainer width="100%" height={ALTURA - 40}>
+            <BarChart data={faixas} margin={MARGEM}>
+              <Grade />
+              <XAxis dataKey="faixa" {...eixoX} />
+              <YAxis {...eixoY} tickFormatter={brlCurto} />
               <Tooltip formatter={(v, nome) => (nome === 'Valor em atraso' ? tip(v) : String(v))} />
-              <Bar dataKey="valor" name="Valor em atraso" fill={COR.vencido} radius={[6, 6, 0, 0]} />
+              <Bar dataKey="valor" name="Valor em atraso" fill={COR.vencido} radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
           {!loading && (
@@ -472,20 +544,20 @@ export default function PainelGerencial() {
         </Grafico>
       </Secao>
 
-      <section className="mb-8">
-        <h2 className="text-section-title text-gray-900 mb-3">Frequência e utilização</h2>
+      <section className="mb-6">
         <div className="flex gap-3 rounded-xl border border-blue-100 bg-blue-50/60 p-4 text-sm text-gray-700">
           <Info size={18} className="shrink-0 text-blue-600 mt-0.5" />
           <div>
-            <p className="font-medium text-blue-950 mb-1">Ainda não dá para mostrar frequência, horários mais procurados nem ocupação de quadras.</p>
-            <p>O sistema não registra presença, horários das aulas nem reservas de quadra. Para esses gráficos seria preciso cadastrar: turmas com dia, horário e capacidade; a presença de cada aluno por aula; e as reservas de quadra. Não mostro números inventados no lugar.</p>
+            <p className="font-medium text-blue-950 mb-1">Frequência, horários mais procurados e ocupação de quadras ainda não aparecem.</p>
+            <p>O sistema não registra presença, horário das aulas nem reservas de quadra. Para esses gráficos seria preciso cadastrar turmas (dia, horário e capacidade), a presença por aula e as reservas. Não mostro números inventados no lugar.</p>
           </div>
         </div>
       </section>
 
       <p className="text-xs text-gray-500">
-        Fórmulas: recebida = entradas com status Recebido pela data do pagamento; prevista = recebida + a receber que vence no período; inadimplência = alunos ativos com
-        cobrança vencida em aberto ou vencimento do cadastro passado ÷ alunos ativos; crescimento = novos − inativações; ticket médio = recebido de alunos ÷ alunos que pagaram em cada mês; gastos = saídas pagas no período pela data do pagamento (sempre da unidade toda, sem filtro de modalidade). Valores da unidade escolhida no menu.
+        Fórmulas: recebida = entradas com status Recebido pela data do pagamento; prevista = recebida + a receber que vence no período; vencido = a receber com vencimento anterior a hoje;
+        inadimplência = alunos ativos com cobrança vencida em aberto ou vencimento do cadastro passado ÷ alunos ativos; crescimento = novos − inativações; ticket médio = recebido de alunos ÷ alunos
+        que pagaram em cada mês; gastos = saídas pagas no período pela data do pagamento (sempre da unidade toda, sem filtro de modalidade). Valores da unidade escolhida no menu.
       </p>
     </div>
   )

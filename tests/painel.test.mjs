@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   periodoDe, mesesDaJanela, deslocarMes, itensFinanceiros, calcularKpis, variacao,
-  serieFinanceira, serieAlunos, statusDosPagamentos, faixasDeAtraso, participacao, somarDias,
+  serieFinanceira, serieAlunos, statusDosPagamentos, faixasDeAtraso, participacao, somarDias, aparaMesesVazios, pontosDeAtencao,
 } from '../lib/painel.ts'
 
 const HOJE = '2026-10-26'
@@ -107,10 +107,10 @@ test('série financeira compara cada mês com o mesmo mês da janela anterior', 
     mov({ status: 'Pendente', valor: 30, data: '2026-10-10', data_vencimento: '2026-10-25' }),
   ], [])
   const meses = mesesDaJanela('2026-05-01', HOJE) // mai..out
-  const out = serieFinanceira(itens, meses).at(-1)
+  const out = serieFinanceira(itens, meses, HOJE).at(-1)
   assert.deepEqual([out.mes, out.recebida, out.aReceber, out.prevista], ['2026-10', 100, 30, 130])
-  assert.equal(serieFinanceira(itens, meses)[0].anterior, 0) // mai/26 vs nov/25
-  assert.equal(serieFinanceira(itens, ['2026-10', '2026-11']).at(0).anterior, 0)
+  assert.equal(serieFinanceira(itens, meses, HOJE)[0].anterior, 0) // mai/26 vs nov/25
+  assert.equal(serieFinanceira(itens, ['2026-10', '2026-11'], HOJE).at(0).anterior, 0)
 })
 test('série de alunos: base = cadastrados menos inativações registradas', () => {
   const alunos = [
@@ -175,4 +175,57 @@ test('gastos: só saídas pagas no período; a pagar à parte', () => {
     mov({ tipo: 'Entrada', valor: 999 }),
   ]
   assert.deepEqual(gastosDoPeriodo(movs, '2026-10-01', '2026-10-31'), { pagos: 500, aPagar: 80, qtdAPagar: 1 })
+})
+
+test('série financeira separa o que está vencido do que ainda vai vencer', () => {
+  const itens = itensFinanceiros([
+    mov({ valor: 100 }),
+    mov({ status: 'Pendente', valor: 40, data_vencimento: '2026-10-10' }), // já venceu (hoje é 26)
+    mov({ status: 'Pendente', valor: 60, data_vencimento: '2026-10-30' }), // ainda vai vencer
+  ], [])
+  const out = serieFinanceira(itens, ['2026-10'], HOJE)[0]
+  assert.deepEqual([out.recebida, out.vencido, out.aVencer, out.aReceber, out.prevista], [100, 40, 60, 100, 200])
+})
+test('meses vazios do começo são cortados, mantendo um mínimo', () => {
+  const linhas = [0, 0, 0, 5, 0, 7].map((v, i) => ({ i, v }))
+  assert.deepEqual(aparaMesesVazios(linhas, l => l.v > 0, 3).map(l => l.i), [3, 4, 5])
+  const vazio = [0, 0, 0, 0, 0, 0].map((v, i) => ({ i, v }))
+  assert.equal(aparaMesesVazios(vazio, l => l.v > 0, 3).length, 3)
+  assert.equal(aparaMesesVazios([{ v: 1 }], l => l.v > 0, 3).length, 1)
+})
+
+const kpiBase = () => calcularKpis({ alunos: [aluno()], mats: [], itens: [], periodo: periodoDe('mes_atual', HOJE), hoje: HOJE, modalidade: null })
+test('atenção: sem problemas não mostra nada', () => {
+  const alunos = [aluno()]
+  const mats = [{ aluno_id: 'a1', tipo: 'Clubinho', valor: 100 }]
+  const itens = itensFinanceiros([mov()], [])
+  const kpis = calcularKpis({ alunos, mats, itens, periodo: periodoDe('mes_atual', HOJE), hoje: HOJE, modalidade: null })
+  assert.deepEqual(pontosDeAtencao({ kpis, itens, alunos, mats, saidas: [], hoje: HOJE, rastreiaInativacao: true }), [])
+})
+test('atenção: cobrança vencida, inadimplência, vencendo, conta a pagar e aluno sem matrícula', () => {
+  const alunos = [aluno({ id: 'a1' }), aluno({ id: 'a2', data_vencimento: '2026-10-10' })]
+  const mats = [{ aluno_id: 'a1', tipo: 'Clubinho', valor: 100 }]
+  const itens = itensFinanceiros([
+    mov({ status: 'Pendente', valor: 90, data_vencimento: '2026-10-01', aluno_ref_id: 'a2' }),
+    mov({ status: 'Pendente', valor: 50, data_vencimento: '2026-10-28', aluno_ref_id: 'a1' }),
+  ], [])
+  const kpis = calcularKpis({ alunos, mats, itens, periodo: periodoDe('mes_atual', HOJE), hoje: HOJE, modalidade: null })
+  const saidas = [mov({ tipo: 'Saída', status: 'Pendente', valor: 300, data_vencimento: '2026-10-20' })]
+  const pontos = pontosDeAtencao({ kpis, itens, alunos, mats, saidas, hoje: HOJE, rastreiaInativacao: true })
+  assert.deepEqual(pontos.map(p => p.id), ['vencidas', 'contas', 'proximos', 'sem-matricula'])
+  assert.match(pontos[0].texto, /1 cobrança vencida somando R\$\s90,00 \(a mais antiga há 25 dias\) · 1 aluno inadimplente/)
+  assert.equal(pontos[0].nivel, 'alto')
+})
+test('atenção: queda da receita só a partir de 10%', () => {
+  const kpis = { ...kpiBase(), recebida: 89, recebidaAnt: 100 }
+  const pouca = { ...kpiBase(), recebida: 95, recebidaAnt: 100 }
+  const args = (k) => ({ kpis: k, itens: [], alunos: [], mats: [], saidas: [], hoje: HOJE, rastreiaInativacao: true })
+  assert.deepEqual(pontosDeAtencao(args(kpis)).map(p => p.id), ['queda'])
+  assert.deepEqual(pontosDeAtencao(args(pouca)), [])
+})
+test('atenção: inativações só aparecem quando a data é registrada', () => {
+  const k = { ...kpiBase(), inativacoes: 2 }
+  const args = (r) => ({ kpis: k, itens: [], alunos: [], mats: [], saidas: [], hoje: HOJE, rastreiaInativacao: r })
+  assert.deepEqual(pontosDeAtencao(args(true)).map(p => p.id), ['inativacoes'])
+  assert.deepEqual(pontosDeAtencao(args(false)), [])
 })
