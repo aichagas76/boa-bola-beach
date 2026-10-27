@@ -74,7 +74,7 @@ export class AsaasClient {
   }
 
   async createCustomer(params: CreateCustomerParams) {
-    return this.request('/customers', 'POST', {
+    const cliente = await this.request('/customers', 'POST', {
       name: params.name,
       email: params.email || undefined,
       mobilePhone: params.phone?.replace(/\D/g, '') || undefined,
@@ -82,11 +82,32 @@ export class AsaasClient {
       // Nenhuma notificação do Asaas (e-mail, SMS, WhatsApp): toda a comunicação com o cliente é feita pelo n8n
       notificationDisabled: true,
     })
+    // O Asaas cria as notificações padrão (e-mail, SMS, WhatsApp...) já ligadas; zera todas
+    await this.zerarNotificacoes((cliente as { id: string }).id)
+    return cliente
+  }
+
+  /** Desliga todas as notificações do cliente (e-mail, SMS, voz e WhatsApp, para o cliente e para você). */
+  async zerarNotificacoes(customerId: string) {
+    const lista = (await this.request(`/customers/${customerId}/notifications`)) as { data?: { id: string }[] }
+    const notifications = (lista.data ?? []).map(n => ({
+      id: n.id,
+      enabled: false,
+      emailEnabledForProvider: false,
+      smsEnabledForProvider: false,
+      emailEnabledForCustomer: false,
+      smsEnabledForCustomer: false,
+      phoneCallEnabledForCustomer: false,
+      whatsappEnabledForCustomer: false,
+    }))
+    if (notifications.length === 0) return
+    await this.request('/notifications/batch', 'PUT', { customer: customerId, notifications })
   }
 
   /** Desliga as notificações de um cliente que já existe no Asaas. */
   async disableCustomerNotifications(customerId: string) {
-    return this.request(`/customers/${customerId}`, 'PUT', { notificationDisabled: true })
+    await this.request(`/customers/${customerId}`, 'PUT', { notificationDisabled: true })
+    await this.zerarNotificacoes(customerId)
   }
 
   async createPayment(params: CreatePaymentParams): Promise<AsaasPayment> {

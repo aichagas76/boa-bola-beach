@@ -25,15 +25,26 @@ for (let offset = 0; ; offset += 100) {
   clientes.push(...pag.data)
   if (!pag.hasMore) break
 }
-const ligados = clientes.filter(c => !c.notificationDisabled)
-console.log(`Clientes no Asaas: ${clientes.length}. Com notificação ligada: ${ligados.length}.`)
+// Mesmo com notificationDisabled, o Asaas mantém as notificações padrão marcadas: confere cliente a cliente
+async function notificacoesLigadas(id) {
+  const l = await chamar(`/customers/${id}/notifications`)
+  return l.data.filter(n => n.enabled || n.emailEnabledForCustomer || n.smsEnabledForCustomer || n.phoneCallEnabledForCustomer || n.whatsappEnabledForCustomer || n.emailEnabledForProvider || n.smsEnabledForProvider)
+}
+const ligados = []
+for (const c of clientes) { const n = await notificacoesLigadas(c.id); if (!c.notificationDisabled || n.length) ligados.push({ ...c, ntf: n }) }
+console.log(`Clientes no Asaas: ${clientes.length}. Com alguma notificação ligada: ${ligados.length}.`)
 
 if (!gravar) {
   console.log('Nada foi alterado. Rode de novo com --gravar para desligar.')
 } else {
   let ok = 0
   for (const c of ligados) {
-    try { await chamar(`/customers/${c.id}`, 'PUT', { notificationDisabled: true }); ok++ }
+    try {
+      await chamar(`/customers/${c.id}`, 'PUT', { notificationDisabled: true })
+      const todas = (await chamar(`/customers/${c.id}/notifications`)).data.map(n => ({ id: n.id, enabled: false, emailEnabledForProvider: false, smsEnabledForProvider: false, emailEnabledForCustomer: false, smsEnabledForCustomer: false, phoneCallEnabledForCustomer: false, whatsappEnabledForCustomer: false }))
+      if (todas.length) await chamar('/notifications/batch', 'PUT', { customer: c.id, notifications: todas })
+      ok++
+    }
     catch (e) { console.error('Falhou:', c.id, e.message) }
   }
   console.log(`Desligadas em ${ok} de ${ligados.length} clientes.`)
