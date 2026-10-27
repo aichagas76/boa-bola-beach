@@ -31,6 +31,9 @@ const primeiroDia = () => { const d = new Date(); return `${d.getFullYear()}-${S
 const ultimoDia = () => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth() + 1, 0).toLocaleDateString('en-CA') }
 
 const feito = (m: Movimentacao) => m.status === 'Recebido' || m.status === 'Pago'
+// Estornado (o Asaas devolveu o dinheiro): não conta como recebido nem como a receber
+const estornado = (m: Movimentacao) => m.status === 'Estornado'
+const emAberto = (m: Movimentacao) => !feito(m) && !estornado(m)
 const vencimentoDe = (m: Movimentacao) => m.data_vencimento ?? m.data
 const categoriaDe = (m: Movimentacao) => m.categorias_financeiro ? `${m.categorias_financeiro.categoria}${m.categorias_financeiro.subcategoria ? ' / ' + m.categorias_financeiro.subcategoria : ''}` : ''
 const somar = (l: Movimentacao[]) => Math.round(l.reduce((a, m) => a + Number(m.valor), 0) * 100) / 100
@@ -122,8 +125,8 @@ export default function Financeiro() {
   const { lista, abertoTotal, vencido } = useMemo(() => {
     const q = busca.trim().toLowerCase()
     let l = movs.filter(m => {
-      if (aba === 'receber' && (m.tipo !== 'Entrada' || feito(m))) return false
-      if (aba === 'pagar' && (m.tipo !== 'Saída' || feito(m))) return false
+      if (aba === 'receber' && (m.tipo !== 'Entrada' || !emAberto(m))) return false
+      if (aba === 'pagar' && (m.tipo !== 'Saída' || !emAberto(m))) return false
       if (aba === 'mov') {
         if (filtroTipo && m.tipo !== filtroTipo) return false
         const v = vencimentoDe(m)
@@ -140,14 +143,14 @@ export default function Financeiro() {
     // Contas a receber/pagar: o que vence primeiro fica em cima, a menos que a pessoa escolha outra coluna
     const dir: Direcao = aba !== 'mov' && ordem.coluna === 'vencimento' && ordem.direcao === 'desc' ? 'asc' : ordem.direcao
     l = ordenar(l, CHAVES[ordem.coluna], dir)
-    const abertos = l.filter(m => !feito(m))
+    const abertos = l.filter(emAberto)
     return { lista: l, abertoTotal: somar(abertos), vencido: somar(abertos.filter(m => vencimentoDe(m) < hoje)) }
   }, [movs, aba, de, ate, filtroTipo, filtroCategoria, busca, ordem, hoje])
 
   const entRecebidas = somar(lista.filter(m => m.tipo === 'Entrada' && feito(m)))
   const saiPagas = somar(lista.filter(m => m.tipo === 'Saída' && feito(m)))
-  const aReceber = somar(lista.filter(m => m.tipo === 'Entrada' && !feito(m)))
-  const aPagar = somar(lista.filter(m => m.tipo === 'Saída' && !feito(m)))
+  const aReceber = somar(lista.filter(m => m.tipo === 'Entrada' && emAberto(m)))
+  const aPagar = somar(lista.filter(m => m.tipo === 'Saída' && emAberto(m)))
 
   const categoriasFiltro = useMemo(() => {
     const por = new Map<string, Set<string>>()
@@ -282,7 +285,7 @@ export default function Financeiro() {
               {loading && <tr><td colSpan={13} className="text-center py-8 text-gray-400">Carregando...</td></tr>}
               {!loading && lista.length === 0 && <tr><td colSpan={13} className="text-center py-8 text-gray-400">{aba === 'mov' ? 'Nenhum lançamento no período.' : 'Nada em aberto.'}</td></tr>}
               {pagination.paginatedItems.map(m => {
-                const atrasado = !feito(m) && vencimentoDe(m) < hoje
+                const atrasado = emAberto(m) && vencimentoDe(m) < hoje
                 return (
                   <tr key={m.id} className="group h-12 hover:bg-[#7DC421]/[0.06] transition-colors">
                     <td className="px-3">
@@ -296,9 +299,9 @@ export default function Financeiro() {
                     <td className={`px-3 tabular-nums ${atrasado ? 'text-red-600 font-semibold' : 'text-gray-700'}`} title={atrasado ? 'Vencido' : undefined}>{dataBr(vencimentoDe(m))}</td>
                     <td className={`px-3 text-right font-semibold tabular-nums ${m.tipo === 'Entrada' ? 'text-green-600' : 'text-red-600'}`}>{m.tipo === 'Saída' ? '− ' : ''}{moeda(Number(m.valor))}</td>
                     <td className="px-3 text-center">
-                      <span title={feito(m) ? m.status ?? '' : m.tipo === 'Entrada' ? 'A receber' : 'A pagar'}
-                        className={`inline-flex min-w-[3rem] justify-center px-2.5 py-1 rounded-full text-xs font-semibold ${feito(m) ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'}`}>
-                        {feito(m) ? 'Sim' : 'Não'}
+                      <span title={estornado(m) ? 'Estornado: o valor foi devolvido' : feito(m) ? m.status ?? '' : m.tipo === 'Entrada' ? 'A receber' : 'A pagar'}
+                        className={`inline-flex min-w-[3rem] justify-center px-2.5 py-1 rounded-full text-xs font-semibold ${estornado(m) ? 'bg-gray-100 text-gray-500' : feito(m) ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'}`}>
+                        {estornado(m) ? 'Estornado' : feito(m) ? 'Sim' : 'Não'}
                       </span>
                     </td>
                     <td className="px-3 text-gray-700">{m.forma_pagamento ?? '—'}</td>

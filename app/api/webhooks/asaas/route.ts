@@ -149,7 +149,7 @@ export async function POST(request: NextRequest) {
       forma_pagamento: formaPagamento,
       data: dataPagamento,
       data_pagamento: dataPagamento,
-      data_vencimento: payment.dueDate ?? null,
+      data_vencimento: payment.dueDate ?? dataPagamento, // o banco exige vencimento
       status: 'Recebido',
       aluno_ref_id: pagamento.aluno_id,
       origem: 'Asaas',
