@@ -105,6 +105,10 @@ export default function Alunos() {
   })
   const [salvandoPgto, setSalvandoPgto] = useState(false)
   const [valorParcial, setValorParcial] = useState('')
+  // Produtos retirados e ainda não pagos: podem ser quitados junto, na mesma janela
+  const [produtosModal, setProdutosModal] = useState<{ id: string; valor: number; descricao: string | null }[]>([])
+  const [marcados, setMarcados] = useState<Set<string>>(new Set())
+  const [receberMensalidade, setReceberMensalidade] = useState(true)
   const [gerandoId, setGerandoId] = useState<string | null>(null)
   const [idAsaasAberto, setIdAsaasAberto] = useState<{ nome: string; id: string } | null>(null)
   const [copiado, setCopiado] = useState(false)
@@ -267,6 +271,18 @@ export default function Alunos() {
       .gte('data_pagamento', `${mesAtual}-01`)
       .lte('data_pagamento', `${mesAtual}-31`)
 
+    const { data: prods } = await supabase
+      .from('movimentacoes')
+      .select('id, valor, descricao')
+      .eq('aluno_ref_id', aluno.id)
+      .eq('tipo', 'Entrada')
+      .eq('origem', 'Estoque')
+      .eq('status', 'Não recebido')
+      .order('data_vencimento')
+    const abertos = (prods ?? []).map(x => ({ id: x.id as string, valor: Number(x.valor), descricao: x.descricao as string | null }))
+    setProdutosModal(abertos)
+    setMarcados(new Set(abertos.map(x => x.id)))
+    setReceberMensalidade(mats.length > 0)
     setMatriculasModal(mats)
     setAlunoModal(aluno)
     setFormPgto({ forma_pagamento: 'Pix', data_pagamento: new Date().toLocaleDateString('en-CA') })
@@ -276,20 +292,38 @@ export default function Alunos() {
 
   async function confirmarPagamento() {
     if (!alunoModal) return
-    if (matriculasModal.length === 0) return alert('Este aluno não tem matrículas cadastradas.')
+    const idsProdutos = produtosModal.filter(x => marcados.has(x.id)).map(x => x.id)
+    if (receberMensalidade && matriculasModal.length === 0) return alert('Este aluno não tem matrículas cadastradas.')
+    if (!receberMensalidade && idsProdutos.length === 0) return alert('Marque a mensalidade ou algum produto para receber.')
     const valorPago = parseFloat(valorParcial.replace(',', '.') || '0')
     setSalvandoPgto(true)
 
-    // Tudo (lançamentos, vencimento, baixa e log) acontece numa operação só no banco: ou entra tudo, ou nada
-    const { error } = await supabase.rpc('baixar_pagamento_manual', {
-      p_aluno_id: alunoModal.id,
-      p_forma: formPgto.forma_pagamento,
-      p_data: formPgto.data_pagamento,
-      p_valor: valorPago,
-      p_vencimento: alunoModal.data_vencimento,
-    })
+    // Mensalidade: tudo (lançamentos, vencimento, baixa e log) acontece numa operação só no banco: ou entra tudo, ou nada
+    if (receberMensalidade) {
+      const { error } = await supabase.rpc('baixar_pagamento_manual', {
+        p_aluno_id: alunoModal.id,
+        p_forma: formPgto.forma_pagamento,
+        p_data: formPgto.data_pagamento,
+        p_valor: valorPago,
+        p_vencimento: alunoModal.data_vencimento,
+      })
+      if (error) { setSalvandoPgto(false); alert(error.message); return }
+    }
+
+    // Produtos marcados: viram recebidos (e saem do Valor do aluno)
+    if (idsProdutos.length > 0) {
+      const { error } = await supabase.from('movimentacoes')
+        .update({ status: 'Recebido', data_pagamento: formPgto.data_pagamento, forma_pagamento: formPgto.forma_pagamento })
+        .in('id', idsProdutos).eq('origem', 'Estoque').eq('status', 'Não recebido')
+      if (error) {
+        setSalvandoPgto(false)
+        alert((receberMensalidade ? 'A mensalidade foi lançada, mas ' : '') + 'não consegui dar baixa nos produtos: ' + error.message + '. Dê baixa pelo Financeiro.')
+        setModalAberto(false); setAlunoModal(null); carregar()
+        return
+      }
+      await registrarLog('Baixa de produtos do aluno', 'alunos', alunoModal.id, alunoModal.nome)
+    }
     setSalvandoPgto(false)
-    if (error) { alert(error.message); return }
 
     setModalAberto(false)
     setAlunoModal(null)
@@ -664,8 +698,33 @@ export default function Alunos() {
                 )}
               </div>
 
+              {/* Produtos em aberto */}
+              {produtosModal.length > 0 && (
+                <div>
+                  <div className="text-th text-gray-400 mb-2">Produtos em aberto</div>
+                  <div className="space-y-1.5">
+                    {produtosModal.map(x => (
+                      <label key={x.id} className="flex items-center justify-between gap-3 bg-amber-50 rounded-lg px-3 py-2 cursor-pointer">
+                        <span className="flex items-center gap-2 min-w-0">
+                          <input type="checkbox" className="h-[18px] w-[18px] accent-blue-600 shrink-0" checked={marcados.has(x.id)}
+                            onChange={e => setMarcados(prev => { const n = new Set(prev); if (e.target.checked) n.add(x.id); else n.delete(x.id); return n })} />
+                          <span className="text-sm text-gray-800 truncate" title={x.descricao ?? ''}>{(x.descricao ?? 'Produto').replace(/^Venda: /, '')}</span>
+                        </span>
+                        <span className="text-sm font-semibold text-amber-700 whitespace-nowrap">R$ {x.valor.toFixed(2).replace('.', ',')}</span>
+                      </label>
+                    ))}
+                  </div>
+                  {matriculasModal.length > 0 && (
+                    <label className="flex items-center gap-2 mt-3 text-sm text-gray-700 cursor-pointer">
+                      <input type="checkbox" className="h-[18px] w-[18px] accent-blue-600" checked={receberMensalidade} onChange={e => setReceberMensalidade(e.target.checked)} />
+                      Receber também a mensalidade
+                    </label>
+                  )}
+                </div>
+              )}
+
               {/* Valor pago */}
-              {matriculasModal.length > 0 && (
+              {matriculasModal.length > 0 && receberMensalidade && (
                 <div>
                   <label className="text-label text-gray-500 block mb-1">Valor pago</label>
                   <input
@@ -735,7 +794,7 @@ export default function Alunos() {
               </button>
               <button
                 onClick={confirmarPagamento}
-                disabled={salvandoPgto || matriculasModal.length === 0}
+                disabled={salvandoPgto || (matriculasModal.length === 0 && marcados.size === 0)}
                 className="px-4 py-2 text-sm bg-[#7DC421] text-white rounded-lg hover:bg-[#6ab01a] disabled:opacity-50"
               >
                 {salvandoPgto ? 'Salvando...' : 'Confirmar Pagamento'}
