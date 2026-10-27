@@ -11,6 +11,7 @@ import { supabase } from '@/lib/supabase'
 import { buscarTudo } from '@/lib/buscar-tudo'
 import { useUnidade } from '@/components/layout/UnidadeProvider'
 import FluxoDeCaixa from '@/components/dashboard/FluxoDeCaixa'
+import { FiltroPeriodo, PRESETS, TemaRecolhivel, usePeriodo } from '@/components/dashboard/FiltroPeriodo'
 import type { MovFluxo } from '@/lib/fluxo-caixa'
 import {
   alunosDaModalidade, aparaMesesVazios, calcularKpis, faixasDeAtraso, gastosDoPeriodo, itensFinanceiros, mesesDaJanela,
@@ -51,14 +52,6 @@ const eixoY = { width: 52, tick: { fontSize: 12 }, tickLine: false, axisLine: fa
 const eixoX = { tick: { fontSize: 12 }, tickLine: false } as const
 const legenda = { wrapperStyle: { fontSize: 12, paddingTop: 6 } } as const
 const Grade = () => <CartesianGrid strokeDasharray="3 3" stroke="#eee" vertical={false} />
-
-const PRESETS: { id: Preset; nome: string }[] = [
-  { id: 'mes_atual', nome: 'Mês atual' },
-  { id: 'mes_anterior', nome: 'Mês anterior' },
-  { id: '3m', nome: '3 meses' },
-  { id: '6m', nome: '6 meses' },
-  { id: 'custom', nome: 'Personalizado' },
-]
 
 /* ---------- peças visuais ---------- */
 function Delta({ atual, anterior, subiuEhBom = true }: { atual: number; anterior: number; subiuEhBom?: boolean }) {
@@ -102,18 +95,6 @@ function Aux({ children }: { children: React.ReactNode }) {
   return <div className="text-xs text-gray-500 leading-4">{children}</div>
 }
 
-function Secao({ titulo, subtitulo, children }: { titulo: string; subtitulo?: string; children: React.ReactNode }) {
-  return (
-    <section className="mb-8">
-      <div className="mb-3">
-        <h2 className="text-section-title text-gray-900">{titulo}</h2>
-        {subtitulo && <p className="text-sm text-gray-500">{subtitulo}</p>}
-      </div>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">{children}</div>
-    </section>
-  )
-}
-
 function Grafico({ titulo, nota, vazio, mensagemVazio, carregando, altura = ALTURA, children, largo }: { titulo: string; nota?: string; vazio?: boolean; mensagemVazio?: string; carregando?: boolean; altura?: number; children: React.ReactNode; largo?: boolean }) {
   return (
     <div className={`bg-white border border-gray-200 rounded-xl p-4 ${largo ? 'lg:col-span-2' : ''}`}>
@@ -146,6 +127,12 @@ export default function PainelGerencial() {
   const [de, setDe] = useState('')
   const [ate, setAte] = useState('')
   const [modalidade, setModalidade] = useState('')
+  // Cada tema tem o seu próprio período; o do topo vale só para os indicadores principais
+  const pFin = usePeriodo(hoje)
+  const pFlu = usePeriodo(hoje)
+  const pAlu = usePeriodo(hoje)
+  const pMod = usePeriodo(hoje)
+  const pPag = usePeriodo(hoje)
 
   const [loading, setLoading] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
@@ -216,7 +203,8 @@ export default function PainelGerencial() {
   }, [alunos, mats, movs, pags, unidadeId, modalidade])
 
   const periodo = useMemo(() => periodoDe(preset, hoje, de, ate), [preset, hoje, de, ate])
-  const meses = useMemo(() => mesesDaJanela(periodo.inicio, periodo.fim, 6), [periodo])
+  const mesesFin = useMemo(() => mesesDaJanela(pFin.periodo.inicio, pFin.periodo.fim, 6), [pFin.periodo])
+  const mesesAlu = useMemo(() => mesesDaJanela(pAlu.periodo.inicio, pAlu.periodo.fim, 6), [pAlu.periodo])
 
   const alunosP: AlunoP[] = useMemo(() => dados.alunosF.map(a => ({
     id: a.id, status: a.status, data_cadastro: a.data_cadastro, data_inativacao: a.data_inativacao ?? null, data_vencimento: a.data_vencimento,
@@ -239,38 +227,44 @@ export default function PainelGerencial() {
   const gastosAnt = useMemo(() => gastosDoPeriodo(movsDaUnidade, periodo.inicioAnt, periodo.fimAnt), [movsDaUnidade, periodo])
 
   const financeira = useMemo(
-    () => aparaMesesVazios(serieFinanceira(itens, meses, hoje), l => l.recebida > 0 || l.anterior > 0 || l.aReceber > 0),
-    [itens, meses, hoje]
+    () => aparaMesesVazios(serieFinanceira(itens, mesesFin, hoje), l => l.recebida > 0 || l.anterior > 0 || l.aReceber > 0),
+    [itens, mesesFin, hoje]
   )
   const temAnterior = financeira.some(l => l.anterior > 0)
-  const serieA = useMemo(() => serieAlunos(alunosP, meses), [alunosP, meses])
-  const status = useMemo(() => statusDosPagamentos(itens, periodo, hoje), [itens, periodo, hoje])
+  const serieA = useMemo(() => serieAlunos(alunosP, mesesAlu), [alunosP, mesesAlu])
+  const status = useMemo(() => statusDosPagamentos(itens, pPag.periodo, hoje), [itens, pPag.periodo, hoje])
   const faixas = useMemo(() => faixasDeAtraso(itens, hoje), [itens, hoje])
 
   const movsRel: Mov[] = useMemo(() => dados.movsF.map(m => ({
     tipo: m.tipo, status: m.status, valor: Number(m.valor), data: m.data, data_pagamento: m.data_pagamento,
     professor_id: m.professor_id, professor_nome: m.professores?.nome ?? null, esporte_nome: m.esportes?.nome ?? null,
   })), [dados.movsF])
-  const mesesPeriodo = useMemo(() => mesesDaJanela(periodo.inicio, periodo.fim, 1), [periodo])
+  const mesesPeriodoFin = useMemo(() => mesesDaJanela(pFin.periodo.inicio, pFin.periodo.fim, 1), [pFin.periodo])
+  const mesesPeriodoMod = useMemo(() => mesesDaJanela(pMod.periodo.inicio, pMod.periodo.fim, 1), [pMod.periodo])
   // O lucro usa todas as movimentações da unidade (despesas não pertencem a uma modalidade)
   const movsRelUnidade: Mov[] = useMemo(() => movs.map(m => ({
     tipo: m.tipo, status: m.status, valor: Number(m.valor), data: m.data, data_pagamento: m.data_pagamento,
     professor_id: m.professor_id, professor_nome: m.professores?.nome ?? null, esporte_nome: m.esportes?.nome ?? null,
   })), [movs])
   const movsFluxo: MovFluxo[] = useMemo(() => movs.map(m => ({
-    tipo: m.tipo, status: m.status, valor: Number(m.valor), data: m.data, data_pagamento: m.data_pagamento, conta_id: m.conta_bancaria_id,
+    tipo: m.tipo, status: m.status, valor: Number(m.valor), data: m.data, data_pagamento: m.data_pagamento, data_vencimento: m.data_vencimento, conta_id: m.conta_bancaria_id,
   })), [movs])
+  // Mensalidades dos alunos ativos da unidade toda (o caixa não se divide por modalidade)
+  const mensalidadesUnidade = useMemo(() => {
+    const ativos = new Set(dados.alunosU.filter(a => a.status === 'Ativo').map(a => a.id))
+    return Math.round(dados.matsU.filter(m => ativos.has(m.aluno_id)).reduce((t, m) => t + (Number(m.valor) || 0), 0) * 100) / 100
+  }, [dados.alunosU, dados.matsU])
   const contasFluxo = useMemo(() => {
     const por = new Map<string, string>()
     for (const m of movs) if (m.conta_bancaria_id && m.contas_bancarias?.nome) por.set(m.conta_bancaria_id, m.contas_bancarias.nome)
     return [...por.entries()].map(([id, nome]) => ({ id, nome })).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
   }, [movs])
   const lucro = useMemo(
-    () => aparaMesesVazios(resumoPorMes(movsRelUnidade, meses), l => l.bruto > 0 || l.despesas > 0),
-    [movsRelUnidade, meses]
+    () => aparaMesesVazios(resumoPorMes(movsRelUnidade, mesesFin), l => l.bruto > 0 || l.despesas > 0),
+    [movsRelUnidade, mesesFin]
   )
-  const totaisPeriodo = useMemo(() => totaisDoPeriodo(resumoPorMes(movsRelUnidade, mesesPeriodo)), [movsRelUnidade, mesesPeriodo])
-  const porProfessor = useMemo(() => faturamentoPorProfessor(movsRel, mesesPeriodo), [movsRel, mesesPeriodo])
+  const totaisPeriodo = useMemo(() => totaisDoPeriodo(resumoPorMes(movsRelUnidade, mesesPeriodoFin)), [movsRelUnidade, mesesPeriodoFin])
+  const porProfessor = useMemo(() => faturamentoPorProfessor(movsRel, mesesPeriodoMod), [movsRel, mesesPeriodoMod])
 
   const matsRel = useMemo(() => dados.matsF.map(m => ({
     aluno_id: m.aluno_id, tipo: m.tipo, unidade_id: m.unidade_id, acesso_duas_unidades: m.acesso_duas_unidades, esporte_nome: m.esportes?.nome ?? null,
@@ -295,7 +289,7 @@ export default function PainelGerencial() {
       <div className="flex flex-wrap items-end justify-between gap-3 mb-5">
         <div className="pl-12 md:pl-0">
           <h1 className="text-page-title text-gray-900">Painel</h1>
-          <p className="text-sm text-gray-500">{unidade?.nome ?? ''} · {rotuloPeriodo}{modalidade ? ` · ${nomeModalidade}` : ''}</p>
+          <p className="text-sm text-gray-500">{unidade?.nome ?? ''} · indicadores principais: {rotuloPeriodo}{modalidade ? ` · ${nomeModalidade}` : ''}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <div className="inline-flex max-w-[calc(100vw-2rem)] overflow-x-auto rounded-lg border border-gray-200 bg-white">
@@ -394,7 +388,8 @@ export default function PainelGerencial() {
         <div className="mb-6 rounded-lg border border-gray-200 bg-white px-4 py-6 text-center text-sm text-gray-500">Nenhum aluno ativo neste recorte (unidade/modalidade).</div>
       )}
 
-      <Secao titulo="Financeiro" subtitulo="Pelo mês do pagamento. Mostra pelo menos 3 meses, para dar para ver a tendência.">
+      <TemaRecolhivel titulo="Financeiro" subtitulo="Pelo mês do pagamento. Mostra pelo menos 6 meses, para dar para ver a tendência." filtro={<FiltroPeriodo p={pFin} nome="Financeiro" />}>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Grafico titulo="Receita recebida por mês" nota={temAnterior ? 'Linha cinza: mesmo mês do período anterior' : undefined}
           carregando={loading} vazio={!loading && financeira.every(l => l.recebida === 0 && l.anterior === 0)} mensagemVazio="Nenhuma receita recebida neste período">
           <ResponsiveContainer width="100%" height={ALTURA}>
@@ -440,11 +435,15 @@ export default function PainelGerencial() {
             </BarChart>
           </ResponsiveContainer>
         </Grafico>
-      </Secao>
+      </div>
+      </TemaRecolhivel>
 
-      <FluxoDeCaixa movs={movsFluxo} contas={contasFluxo} inicio={periodo.inicio} fim={periodo.fim} carregando={loading} />
+      <TemaRecolhivel titulo="Fluxo de caixa" subtitulo="O que entrou e saiu, e a previsão dos próximos meses." filtro={<FiltroPeriodo p={pFlu} nome="Fluxo de caixa" />}>
+        <FluxoDeCaixa movs={movsFluxo} contas={contasFluxo} inicio={pFlu.periodo.inicio} fim={pFlu.periodo.fim} hoje={hoje} mensalidades={mensalidadesUnidade} carregando={loading} />
+      </TemaRecolhivel>
 
-      <Secao titulo="Alunos" subtitulo={rastreiaInativacao ? 'Base = alunos cadastrados menos as inativações com data registrada.' : 'As inativações ainda não têm data registrada: a base mostra todos os cadastros.'}>
+      <TemaRecolhivel titulo="Alunos" subtitulo={rastreiaInativacao ? 'Base = alunos cadastrados menos as inativações com data registrada.' : 'As inativações ainda não têm data registrada: a base mostra todos os cadastros.'} filtro={<FiltroPeriodo p={pAlu} nome="Alunos" />}>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Grafico titulo="Base de alunos" nota={inativosSemData > 0 ? `${inativosSemData} aluno(s) inativo(s) sem data de saída continuam contados na base` : undefined}
           carregando={loading} vazio={!loading && serieA.every(l => l.base === 0)} mensagemVazio="Nenhum aluno cadastrado até este período">
           <ResponsiveContainer width="100%" height={ALTURA}>
@@ -471,9 +470,11 @@ export default function PainelGerencial() {
             </BarChart>
           </ResponsiveContainer>
         </Grafico>
-      </Secao>
+      </div>
+      </TemaRecolhivel>
 
-      <Secao titulo="Modalidades" subtitulo="Alunos ativos de hoje. O aluno em combo conta nas duas unidades; quem tem mais de uma modalidade entra em cada uma.">
+      <TemaRecolhivel titulo="Modalidades" subtitulo="Alunos ativos de hoje. O aluno em combo conta nas duas unidades; quem tem mais de uma modalidade entra em cada uma." filtro={<FiltroPeriodo p={pMod} nome="Modalidades" />}>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Grafico titulo="Alunos por modalidade e esporte" largo
           carregando={loading} vazio={!loading && porModalidade.dados.length === 0} mensagemVazio="Nenhuma matrícula ativa neste recorte">
           <div className="flex flex-col md:flex-row md:items-center gap-4">
@@ -513,9 +514,11 @@ export default function PainelGerencial() {
             </BarChart>
           </ResponsiveContainer>
         </Grafico>
-      </Secao>
+      </div>
+      </TemaRecolhivel>
 
-      <Secao titulo="Pagamentos" subtitulo="Pagos e cancelados são do período; a vencer e vencidos são a carteira em aberto de hoje.">
+      <TemaRecolhivel titulo="Pagamentos" subtitulo="Pagos e cancelados são do período; a vencer e vencidos são a carteira em aberto de hoje." filtro={<FiltroPeriodo p={pPag} nome="Pagamentos" />}>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Grafico titulo="Situação dos pagamentos"
           carregando={loading} vazio={!loading && status.every(s => s.qtd === 0)} mensagemVazio="Nenhum pagamento neste período">
           <div className="flex flex-col sm:flex-row items-center gap-4">
@@ -556,7 +559,8 @@ export default function PainelGerencial() {
             </ul>
           )}
         </Grafico>
-      </Secao>
+      </div>
+      </TemaRecolhivel>
 
       <section className="mb-6">
         <div className="flex gap-3 rounded-xl border border-blue-100 bg-blue-50/60 p-4 text-sm text-gray-700">

@@ -76,3 +76,31 @@ test('granularidade automática pelo tamanho do período', () => {
   assert.equal(granularidadeAuto('2026-08-01', '2026-10-27'), 'semana')
   assert.equal(granularidadeAuto('2026-05-01', '2026-10-27'), 'mes')
 })
+
+test('previsão: mensalidades e média das saídas dos 3 meses anteriores', async () => {
+  const { previsaoDeCaixa } = await import('../lib/fluxo-caixa.ts')
+  const movs = [s(300, '2026-07-10'), s(600, '2026-08-10'), s(900, '2026-09-10'), e(1000, '2026-09-05')]
+  const r = previsaoDeCaixa(movs, { hoje: '2026-10-27', mensalidades: 2000 })
+  assert.deepEqual(r.pontos.map(p => [p.rotulo, p.previsto]), [['jul/26', false], ['ago/26', false], ['set/26', false], ['nov/26', true], ['dez/26', true], ['jan/27', true]])
+  assert.equal(r.mediaSaidas, 600)
+  assert.deepEqual(r.pontos.slice(3).map(p => [p.entradas, p.saidas, p.saldo]), [[2000, 600, 1400], [2000, 600, 1400], [2000, 600, 1400]])
+  assert.equal(r.saldoPrevisto, 4200)
+  assert.equal(r.entradasPrevistas, 6000)
+})
+
+test('previsão: lançado em aberto maior que a base vale; não soma duas vezes; ignora cancelado e atrasado', async () => {
+  const { previsaoDeCaixa } = await import('../lib/fluxo-caixa.ts')
+  const movs = [
+    { tipo: 'Entrada', status: 'Não recebido', valor: 3000, data: '2026-10-01', data_pagamento: null, data_vencimento: '2026-11-05' },
+    { tipo: 'Saída', status: 'Pendente', valor: 500, data: '2026-10-01', data_pagamento: null, data_vencimento: '2026-12-05' },
+    { tipo: 'Saída', status: 'Cancelado', valor: 9999, data: '2026-10-01', data_pagamento: null, data_vencimento: '2026-11-05' },
+    { tipo: 'Entrada', status: 'Não recebido', valor: 7777, data: '2026-08-01', data_pagamento: null, data_vencimento: '2026-08-05' },
+  ]
+  const r = previsaoDeCaixa(movs, { hoje: '2026-10-27', mensalidades: 2000 })
+  const f = r.pontos.filter(p => p.previsto)
+  assert.equal(f[0].entradas, 3000)
+  assert.equal(f[1].entradas, 2000)
+  assert.equal(f[0].saidas, 0)
+  assert.equal(f[1].saidas, 500)
+  assert.equal(r.menorSaldoPrevisto.rotulo, 'dez/26')
+})

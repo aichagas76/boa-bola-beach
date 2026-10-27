@@ -11,6 +11,7 @@ export type MovFluxo = {
   valor: number
   data: string
   data_pagamento: string | null
+  data_vencimento?: string | null
   conta_id?: string | null
 }
 export type Granularidade = 'dia' | 'semana' | 'mes'
@@ -127,5 +128,73 @@ export function fluxoDeCaixa(movs: MovFluxo[], opc: { inicio: string; fim: strin
     semConta: { qtd: semConta.qtd, entradas: reais(semConta.ent), saidas: reais(semConta.sai) },
     maiorSaida: comMovimento.reduce<PontoFluxo | null>((a, p) => (p.saidas > 0 && (!a || p.saidas > a.saidas) ? p : a), null),
     menorSaldo: comMovimento.reduce<PontoFluxo | null>((a, p) => (!a || p.saldo < a.saldo ? p : a), null),
+  }
+}
+
+/* ---------- Previsão dos próximos meses ----------
+ * Para cada mês futuro completo (depois do mês atual):
+ *  - entradas = o maior entre (mensalidades dos alunos ativos) e (entradas em aberto lançadas com vencimento no mês);
+ *  - saídas   = o maior entre (média das saídas pagas nos últimos 3 meses completos) e (saídas em aberto lançadas com vencimento no mês).
+ * Usa o MAIOR (e não a soma) para não contar duas vezes uma mensalidade ou despesa que já esteja lançada.
+ * Atrasos de meses anteriores não entram: não dá para saber se serão pagos. */
+
+export type PontoPrevisao = PontoFluxo & { previsto: boolean }
+export type ResumoPrevisao = {
+  pontos: PontoPrevisao[]
+  entradasPrevistas: number
+  saidasPrevistas: number
+  saldoPrevisto: number
+  menorSaldoPrevisto: PontoPrevisao | null
+  mediaSaidas: number
+}
+
+const mesDe = (s: string) => s.slice(0, 7)
+const deslocaMes = (mes: string, n: number) => {
+  const [y, m] = mes.split('-').map(Number)
+  const x = new Date(Date.UTC(y, m - 1 + n, 1))
+  return `${x.getUTCFullYear()}-${dois(x.getUTCMonth() + 1)}`
+}
+const rotuloMes = (mes: string) => `${MESES[Number(mes.slice(5, 7)) - 1]}/${mes.slice(2, 4)}`
+const emAberto = (m: MovFluxo) => !foiRealizado(m) && m.status !== 'Estornado' && m.status !== 'Cancelado'
+
+export function previsaoDeCaixa(movs: MovFluxo[], opc: { hoje: string; mensalidades: number; meses?: number; mesesPassados?: number }): ResumoPrevisao {
+  const { hoje, mensalidades } = opc
+  const n = opc.meses ?? 3
+  const passados = opc.mesesPassados ?? 3
+  const atual = mesDe(hoje)
+
+  // Realizado dos meses completos anteriores (contexto do gráfico e base da média das saídas)
+  const ini = `${deslocaMes(atual, -passados)}-01`
+  const fimPassado = somarDias(`${atual}-01`, -1)
+  const real = fluxoDeCaixa(movs, { inicio: ini, fim: fimPassado, granularidade: 'mes' })
+  const mediaSaidas = reais(Math.round(real.pontos.reduce((a, p) => a + centavos(p.saidas), 0) / Math.max(real.pontos.length, 1)))
+
+  let acum = 0
+  const pontos: PontoPrevisao[] = real.pontos.map(p => { acum += centavos(p.saldo); return { ...p, acumulado: reais(acum), previsto: false } })
+
+  for (let i = 1; i <= n; i++) {
+    const mes = deslocaMes(atual, i)
+    let ent = 0, sai = 0
+    for (const m of movs) {
+      if (!emAberto(m)) continue
+      if (mesDe(m.data_vencimento ?? m.data) !== mes) continue
+      if (m.tipo === 'Entrada') ent += centavos(Number(m.valor))
+      else sai += centavos(Number(m.valor))
+    }
+    const entradas = Math.max(ent, centavos(mensalidades))
+    const saidas = Math.max(sai, centavos(mediaSaidas))
+    const saldo = entradas - saidas
+    acum += saldo
+    pontos.push({ chave: mes, rotulo: rotuloMes(mes), inicio: `${mes}-01`, fim: `${mes}-${dois(ultimoDiaDoMes(Number(mes.slice(0, 4)), Number(mes.slice(5, 7))))}`, entradas: reais(entradas), saidas: reais(saidas), saldo: reais(saldo), acumulado: reais(acum), previsto: true })
+  }
+
+  const fut = pontos.filter(p => p.previsto)
+  return {
+    pontos,
+    entradasPrevistas: reais(fut.reduce((a, p) => a + centavos(p.entradas), 0)),
+    saidasPrevistas: reais(fut.reduce((a, p) => a + centavos(p.saidas), 0)),
+    saldoPrevisto: reais(fut.reduce((a, p) => a + centavos(p.saldo), 0)),
+    menorSaldoPrevisto: fut.reduce<PontoPrevisao | null>((a, p) => (!a || p.saldo < a.saldo ? p : a), null),
+    mediaSaidas,
   }
 }
