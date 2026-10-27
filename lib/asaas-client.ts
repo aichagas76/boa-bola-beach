@@ -96,7 +96,7 @@ export class AsaasClient {
       dueDate: params.dueDate,
       description: params.description,
       externalReference: params.reference,
-      billingType: 'UNDEFINED', // cliente escolhe PIX, boleto ou cartão na página
+      billingType: 'PIX', // o link abre direto no PIX (QR code e copia e cola)
     })
   }
 

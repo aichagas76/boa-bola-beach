@@ -24,7 +24,6 @@ export async function POST(request: NextRequest) {
 
     const customer = await asaas.createCustomer({
       name: nome,
-      email: `${aluno_id}@boabola.com`,
       phone: celular,
       cpf,
     })
