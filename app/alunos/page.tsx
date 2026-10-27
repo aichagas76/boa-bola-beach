@@ -311,31 +311,26 @@ export default function Alunos() {
     if (receberMensalidade && paraMensalidade <= 0) return alert('Informe um valor maior que zero.')
     setSalvandoPgto(true)
 
-    // Mensalidade: tudo (lançamentos, vencimento, baixa e log) acontece numa operação só no banco: ou entra tudo, ou nada
-    if (receberMensalidade) {
-      const { error } = await supabase.rpc('baixar_pagamento_manual', {
-        p_aluno_id: alunoModal.id,
-        p_forma: formPgto.forma_pagamento,
-        p_data: formPgto.data_pagamento,
-        p_valor: paraMensalidade,
-        p_vencimento: alunoModal.data_vencimento,
-      })
-      if (error) { setSalvandoPgto(false); alert(error.message); return }
-    }
-
-    // Produtos marcados: viram recebidos (e saem do Valor do aluno)
-    if (idsAPagar.length > 0) {
-      const { error } = await supabase.from('movimentacoes')
-        .update({ status: 'Recebido', data_pagamento: formPgto.data_pagamento, forma_pagamento: formPgto.forma_pagamento })
-        .in('id', idsAPagar).eq('origem', 'Estoque').eq('status', 'Não recebido')
-      if (error) {
+    // Mensalidade e produtos entram numa operação só no banco: ou entra tudo, ou nada
+    const chamar = (confirmar: boolean) => supabase.rpc('baixar_pagamento_aluno', {
+      p_aluno_id: alunoModal.id,
+      p_forma: formPgto.forma_pagamento,
+      p_data: formPgto.data_pagamento,
+      p_valor: paraMensalidade,
+      p_vencimento: alunoModal.data_vencimento,
+      p_produtos: idsAPagar,
+      p_receber_mensalidade: receberMensalidade,
+      p_confirmar_duplicado: confirmar,
+    })
+    let { error } = await chamar(false)
+    if (error?.message === 'JA_PAGOU_HOJE') {
+      if (!confirm('Este aluno já teve um pagamento lançado neste dia. Lançar outro adianta o vencimento mais um mês. Lançar mesmo assim?')) {
         setSalvandoPgto(false)
-        alert((receberMensalidade ? 'A mensalidade foi lançada, mas ' : '') + 'não consegui dar baixa nos produtos: ' + error.message + '. Dê baixa pelo Financeiro.')
-        setModalAberto(false); setAlunoModal(null); carregar()
         return
       }
-      await registrarLog('Baixa de produtos do aluno', 'alunos', alunoModal.id, alunoModal.nome)
+      ;({ error } = await chamar(true))
     }
+    if (error) { setSalvandoPgto(false); alert(error.message); return }
     setSalvandoPgto(false)
 
     setModalAberto(false)
