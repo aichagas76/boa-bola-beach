@@ -4,6 +4,7 @@ import { Fragment, useEffect, useMemo, useState } from 'react'
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { ChevronDown, ChevronRight, Download, Info } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { buscarTudo } from '@/lib/buscar-tudo'
 import { useUnidade } from '@/components/layout/UnidadeProvider'
 import { mesesDaJanela, periodoDe, rotuloMes, type Preset } from '@/lib/painel'
 import {
@@ -79,17 +80,17 @@ export default function Relatorios() {
       setLoading(true)
       setErro(null)
       const corte = `${new Date().getFullYear() - 2}-01-01`
-      let ra = await supabase.from('alunos').select('id, nome, status, data_cadastro, data_inativacao, data_vencimento, unidade_id')
-      if (ra.error) ra = await supabase.from('alunos').select('id, nome, status, data_cadastro, data_vencimento, unidade_id') as typeof ra
+      let ra = await buscarTudo((de, ate) => supabase.from('alunos').select('id, nome, status, data_cadastro, data_inativacao, data_vencimento, unidade_id').order('id').range(de, ate))
+      if (ra.error) ra = await buscarTudo((de, ate) => supabase.from('alunos').select('id, nome, status, data_cadastro, data_vencimento, unidade_id').order('id').range(de, ate)) as typeof ra
       const [rp, rm, rf] = await Promise.all([
         supabase.from('professores').select('id, nome, comissao_percentual').order('nome'),
-        supabase.from('matriculas').select('aluno_id, tipo, valor, professor_id, professor_nome, unidade_id, acesso_duas_unidades, esportes(nome)'),
-        supabase
+        buscarTudo((de, ate) => supabase.from('matriculas').select('aluno_id, tipo, valor, professor_id, professor_nome, unidade_id, acesso_duas_unidades, esportes(nome)').order('id').range(de, ate)),
+        buscarTudo((de, ate) => supabase
           .from('movimentacoes')
           .select('tipo, status, valor, data, data_pagamento, data_vencimento, aluno_ref_id, esportes(nome)')
           .eq('unidade_id', unidadeId)
           .or(`data.gte.${corte},data_pagamento.gte.${corte}`)
-          .limit(10000),
+          .order('id').range(de, ate)),
       ])
       if (cancelado) return
       if (ra.error || rp.error || rm.error || rf.error) {

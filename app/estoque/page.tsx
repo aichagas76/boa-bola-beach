@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useUnidade } from '@/components/layout/UnidadeProvider'
+import { buscarTudo } from '@/lib/buscar-tudo'
 import { registrarLog } from '@/lib/log'
 import { Plus, ShoppingCart, PackagePlus, Pencil, Undo2, Check } from 'lucide-react'
 import {
@@ -41,7 +42,7 @@ export default function Estoque() {
         .eq('unidade_id', unidadeId).order('data', { ascending: false }).order('created_at', { ascending: false }).limit(300),
       supabase.from('pessoas').select('id, nome').eq('ativo', true).order('nome'),
       supabase.from('professores').select('id, nome').eq('ativo', true).order('nome'),
-      supabase.from('alunos').select('id, nome, data_vencimento').eq('unidade_id', unidadeId).neq('status', 'Inativo').order('nome'),
+      buscarTudo((de, ate) => supabase.from('alunos').select('id, nome, data_vencimento').eq('unidade_id', unidadeId).neq('status', 'Inativo').order('nome').order('id').range(de, ate)),
       supabase.from('bancos').select('id, nome').order('nome'),
     ])
     setProdutos((p.data ?? []) as Produto[])

@@ -8,6 +8,7 @@ import {
 } from 'recharts'
 import { AlertTriangle, ArrowDownRight, ArrowUpRight, CheckCircle2, ChevronRight, Info, Minus } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { buscarTudo } from '@/lib/buscar-tudo'
 import { useUnidade } from '@/components/layout/UnidadeProvider'
 import {
   alunosDaModalidade, aparaMesesVazios, calcularKpis, faixasDeAtraso, gastosDoPeriodo, itensFinanceiros, mesesDaJanela,
@@ -161,20 +162,20 @@ export default function PainelGerencial() {
 
       // data_inativacao só existe depois da atualização do banco: se faltar, o painel segue sem ela
       let rastreia = true
-      let ra = await supabase.from('alunos').select('id, status, data_cadastro, data_inativacao, data_vencimento, unidade_id')
+      let ra = await buscarTudo((de, ate) => supabase.from('alunos').select('id, status, data_cadastro, data_inativacao, data_vencimento, unidade_id').order('id').range(de, ate))
       if (ra.error) {
         rastreia = false
-        ra = await supabase.from('alunos').select('id, status, data_cadastro, data_vencimento, unidade_id') as typeof ra
+        ra = await buscarTudo((de, ate) => supabase.from('alunos').select('id, status, data_cadastro, data_vencimento, unidade_id').order('id').range(de, ate)) as typeof ra
       }
       const [rm, rf, rp] = await Promise.all([
-        supabase.from('matriculas').select('aluno_id, tipo, valor, unidade_id, acesso_duas_unidades, esportes(nome)'),
-        supabase
+        buscarTudo((de, ate) => supabase.from('matriculas').select('aluno_id, tipo, valor, unidade_id, acesso_duas_unidades, esportes(nome)').order('id').range(de, ate)),
+        buscarTudo((de, ate) => supabase
           .from('movimentacoes')
           .select('tipo, status, valor, data, data_pagamento, data_vencimento, aluno_ref_id, professor_id, professores(nome), esportes(nome)')
           .eq('unidade_id', unidadeId)
           .or(`data.gte.${corte},data_pagamento.gte.${corte},status.neq.Recebido`)
-          .limit(10000),
-        supabase.from('pagamentos').select('aluno_id, valor, status, data_vencimento').neq('status', 'Pago'),
+          .order('id').range(de, ate)),
+        buscarTudo((de, ate) => supabase.from('pagamentos').select('aluno_id, valor, status, data_vencimento').neq('status', 'Pago').order('id').range(de, ate)),
       ])
       if (cancelado) return
       if (ra.error || rm.error || rf.error || rp.error) {

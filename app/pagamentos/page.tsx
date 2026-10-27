@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useUnidade } from '@/components/layout/UnidadeProvider'
+import { buscarTudo } from '@/lib/buscar-tudo'
 import { registrarLog } from '@/lib/log'
 import { usePagination } from '@/lib/hooks/usePagination'
 import { Pagination } from '@/components/ui/pagination'
@@ -46,12 +47,11 @@ export default function Pagamentos() {
     if (!unidadeId) return
     setLoading(true)
 
-    const { data } = await supabase
+    const { data } = await buscarTudo((de, ate) => supabase
       .from('movimentacoes')
       .select('*, alunos!movimentacoes_aluno_ref_id_fkey(nome)')
       .eq('unidade_id', unidadeId)
-      .order('data_vencimento', { ascending: false })
-      .limit(1000)
+      .order('data_vencimento', { ascending: false }).order('id').range(de, ate))
 
     setAllData(data ?? [])
     setLoading(false)
@@ -92,7 +92,7 @@ export default function Pagamentos() {
   }
 
   useEffect(() => {
-    supabase.from('alunos').select('id, nome').order('nome').then(({ data }) => {
+    buscarTudo((de, ate) => supabase.from('alunos').select('id, nome').order('nome').order('id').range(de, ate)).then(({ data }) => {
       setAlunos(data ?? [])
     })
     carregar()

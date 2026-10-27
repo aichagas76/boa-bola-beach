@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { useUnidade } from '@/components/layout/UnidadeProvider'
 import { registrarLog } from '@/lib/log'
 import { ordenar, proximaOrdem, type Direcao, type Valor } from '@/lib/ordenacao'
+import { buscarTudo } from '@/lib/buscar-tudo'
 import { ultimosDias } from '@/lib/periodo'
 import { usePagination } from '@/lib/hooks/usePagination'
 import { Pagination } from '@/components/ui/pagination'
@@ -95,15 +96,15 @@ export default function Financeiro() {
     if (!unidadeId) return
     setLoading(true)
     const [m, c, p, ct, b, e, a, pr] = await Promise.all([
-      supabase.from('movimentacoes')
+      buscarTudo((de, ate) => supabase.from('movimentacoes')
         .select('*, categorias_financeiro(categoria, subcategoria), pessoas(nome), contas_bancarias(nome), bancos(nome), professores(nome), alunos!movimentacoes_aluno_ref_id_fkey(nome), esportes(nome)')
-        .eq('unidade_id', unidadeId).order('data_vencimento', { ascending: false }).limit(5000),
+        .eq('unidade_id', unidadeId).order('data_vencimento', { ascending: false }).order('id').range(de, ate)),
       supabase.from('categorias_financeiro').select('id, tipo, categoria, subcategoria').eq('ativo', true),
       supabase.from('pessoas').select('id, nome').order('nome'),
       supabase.from('contas_bancarias').select('id, nome').eq('unidade_id', unidadeId).order('nome'),
       supabase.from('bancos').select('id, nome').eq('ativo', true).order('nome'),
       supabase.from('esportes').select('id, nome').eq('ativo', true).order('nome'),
-      supabase.from('alunos').select('id, nome').eq('unidade_id', unidadeId).order('nome'),
+      buscarTudo((de, ate) => supabase.from('alunos').select('id, nome').eq('unidade_id', unidadeId).order('nome').order('id').range(de, ate)),
       supabase.from('professores').select('id, nome').order('nome'),
     ])
     setMovs((m.data ?? []) as unknown as Movimentacao[])

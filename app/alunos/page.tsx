@@ -12,6 +12,7 @@ import { ordenar, proximaOrdem, type Direcao, type Valor } from '@/lib/ordenacao
 import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react'
 import IconeModalidade from '@/components/alunos/IconeModalidade'
 import { BadgeCheck, Copy, CircleDollarSign, CreditCard, History, Link2, Package, Pencil, Trash2, X } from 'lucide-react'
+import { buscarTudo } from '@/lib/buscar-tudo'
 import { VendaDoAluno } from '@/components/estoque/FormVenda'
 import HistoricoAluno from '@/components/alunos/HistoricoAluno'
 
@@ -164,39 +165,41 @@ export default function Alunos() {
   async function carregar() {
     setLoading(true)
 
-    const { data: alunosData } = await supabase
+    const { data: alunosData } = await buscarTudo((de, ate) => supabase
       .from('alunos')
       .select('id, nome, celular, cpf, status, data_vencimento, asaas_customer_id, unidade_id, responsavel_nome, responsavel_cpf, responsavel_celular')
-      .order('nome')
+      .order('nome').order('id').range(de, ate))
 
-    const { data: pagamentosLinkData } = await supabase
+    const { data: pagamentosLinkData } = await buscarTudo((de, ate) => supabase
       .from('pagamentos')
       .select('aluno_id, link_pagamento')
       .not('link_pagamento', 'is', null)
       .neq('status', 'Pago')
       .neq('status', 'Cancelado')
-      .order('data_vencimento', { ascending: false })
+      .order('data_vencimento', { ascending: false }).order('id').range(de, ate))
 
-    const { data: matriculasData } = await supabase
+    const { data: matriculasData } = await buscarTudo((de, ate) => supabase
       .from('matriculas')
       .select('aluno_id, tipo, valor, professor_nome, unidade_id, acesso_duas_unidades, esportes(nome)')
+      .order('id').range(de, ate))
 
-    const { data: pagamentosData } = await supabase
+    const { data: pagamentosData } = await buscarTudo((de, ate) => supabase
       .from('movimentacoes')
       .select('aluno_ref_id, data_pagamento, valor, descricao')
       .eq('tipo', 'Entrada')
       .eq('status', 'Recebido')
       .not('aluno_ref_id', 'is', null)
-      .order('data_pagamento', { ascending: false })
+      .order('data_pagamento', { ascending: false }).order('id').range(de, ate))
 
     // Produtos retirados e ainda não pagos entram no valor do aluno (para serem cobrados junto com a mensalidade)
-    const { data: produtosData } = await supabase
+    const { data: produtosData } = await buscarTudo((de, ate) => supabase
       .from('movimentacoes')
       .select('aluno_ref_id, valor')
       .eq('tipo', 'Entrada')
       .eq('origem', 'Estoque')
       .eq('status', 'Não recebido')
       .not('aluno_ref_id', 'is', null)
+      .order('id').range(de, ate))
     const produtosPorAluno: Record<string, number> = {}
     for (const x of (produtosData ?? [])) produtosPorAluno[x.aluno_ref_id] = (produtosPorAluno[x.aluno_ref_id] ?? 0) + Number(x.valor)
 
