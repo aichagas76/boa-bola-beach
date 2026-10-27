@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { mesesAtras } from '@/lib/periodo'
 import { X } from 'lucide-react'
 
 type Linha = {
@@ -26,6 +27,7 @@ const ehProduto = (l: Linha) => l.origem === 'Estoque' || /produto/i.test(l.cate
 export default function HistoricoAluno({ aluno, onFechar }: { aluno: { id: string; nome: string }; onFechar: () => void }) {
   const [linhas, setLinhas] = useState<Linha[] | null>(null)
   const [filtro, setFiltro] = useState<'todos' | 'mensalidade' | 'produto'>('todos')
+  const [meses, setMeses] = useState<0 | 1 | 3 | 6>(0) // 0 = todo o histórico
 
   useEffect(() => {
     let ativo = true
@@ -37,7 +39,11 @@ export default function HistoricoAluno({ aluno, onFechar }: { aluno: { id: strin
     return () => { ativo = false }
   }, [aluno.id])
 
-  const lista = (linhas ?? []).filter(l => filtro === 'todos' || (filtro === 'produto' ? ehProduto(l) : !ehProduto(l)))
+  // Últimos N meses: do mesmo dia N meses atrás em diante (o que ainda vai vencer continua aparecendo)
+  const desde = meses ? mesesAtras(new Date().toLocaleDateString('en-CA'), meses) : ''
+  const lista = (linhas ?? [])
+    .filter(l => filtro === 'todos' || (filtro === 'produto' ? ehProduto(l) : !ehProduto(l)))
+    .filter(l => !desde || (l.data_vencimento ?? l.data) >= desde)
   const totalPago = lista.filter(pago).reduce((a, l) => a + Number(l.valor), 0)
   const totalAberto = lista.filter(l => !pago(l)).reduce((a, l) => a + Number(l.valor), 0)
   const chip = (id: typeof filtro, texto: string) => (
@@ -61,6 +67,16 @@ export default function HistoricoAluno({ aluno, onFechar }: { aluno: { id: strin
           <div className="ml-auto flex gap-4 text-sm">
             <span className="text-gray-500">Pago: <b className="text-green-600">{moeda(totalPago)}</b></span>
             <span className="text-gray-500">Em aberto: <b className="text-amber-600">{moeda(totalAberto)}</b></span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 mb-3">
+          <span className="text-label text-gray-500">Período</span>
+          <div className="flex rounded-lg border border-gray-200 overflow-hidden bg-white">
+            {([[0, 'Tudo'], [1, '1 mês'], [3, '3 meses'], [6, '6 meses']] as const).map(([n, texto], i) => (
+              <button key={n} type="button" aria-pressed={meses === n} onClick={() => setMeses(n)}
+                className={`h-9 px-3 text-sm whitespace-nowrap transition-colors ${i > 0 ? 'border-l border-gray-200' : ''} ${meses === n ? 'bg-gray-900 text-white font-medium' : 'text-gray-700 hover:bg-gray-50'}`}>{texto}</button>
+            ))}
           </div>
         </div>
 
