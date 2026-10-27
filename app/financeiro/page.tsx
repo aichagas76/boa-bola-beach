@@ -19,9 +19,10 @@ type Movimentacao = MovimentoEditavel & {
   bancos: { nome: string } | null
   professores: { nome: string } | null
   alunos: { nome: string } | null
+  esportes: { nome: string } | null
 }
 type Aba = 'mov' | 'receber' | 'pagar'
-type ColunaId = 'vencimento' | 'pagamento' | 'tipo' | 'categoria' | 'descricao' | 'pessoa' | 'valor' | 'meio' | 'conta' | 'situacao'
+type ColunaId = 'tipo' | 'categoria' | 'subcategoria' | 'esporte' | 'fornecedor' | 'pagamento' | 'vencimento' | 'valor' | 'pago' | 'meio' | 'aluno' | 'professor'
 
 const moeda = (n: number) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 const dataBr = (iso: string | null) => (iso ? iso.split('-').reverse().join('/') : '—')
@@ -31,33 +32,36 @@ const ultimoDia = () => { const d = new Date(); return new Date(d.getFullYear(),
 
 const feito = (m: Movimentacao) => m.status === 'Recebido' || m.status === 'Pago'
 const vencimentoDe = (m: Movimentacao) => m.data_vencimento ?? m.data
-const pessoaDe = (m: Movimentacao) => m.alunos?.nome ?? m.professores?.nome ?? m.pessoas?.nome ?? null
 const categoriaDe = (m: Movimentacao) => m.categorias_financeiro ? `${m.categorias_financeiro.categoria}${m.categorias_financeiro.subcategoria ? ' / ' + m.categorias_financeiro.subcategoria : ''}` : ''
 const somar = (l: Movimentacao[]) => Math.round(l.reduce((a, m) => a + Number(m.valor), 0) * 100) / 100
 
 const CHAVES: Record<ColunaId, (m: Movimentacao) => Valor> = {
-  vencimento: m => vencimentoDe(m),
-  pagamento: m => m.data_pagamento,
   tipo: m => m.tipo,
-  categoria: m => categoriaDe(m),
-  descricao: m => m.descricao,
-  pessoa: m => pessoaDe(m),
+  categoria: m => m.categorias_financeiro?.categoria ?? null,
+  subcategoria: m => m.categorias_financeiro?.subcategoria ?? null,
+  esporte: m => m.esportes?.nome ?? null,
+  fornecedor: m => m.pessoas?.nome ?? null,
+  pagamento: m => m.data_pagamento,
+  vencimento: m => vencimentoDe(m),
   valor: m => Number(m.valor),
+  pago: m => (feito(m) ? 'Sim' : 'Não'),
   meio: m => m.forma_pagamento,
-  conta: m => m.contas_bancarias?.nome ?? m.bancos?.nome ?? null,
-  situacao: m => (feito(m) ? 'Pago' : 'Em aberto'),
+  aluno: m => m.alunos?.nome ?? null,
+  professor: m => m.professores?.nome ?? null,
 }
 const COLUNAS: { id: ColunaId; titulo: string; alinha?: 'center' | 'right' }[] = [
-  { id: 'vencimento', titulo: 'Vencimento' },
-  { id: 'pagamento', titulo: 'Pagamento' },
   { id: 'tipo', titulo: 'Tipo' },
   { id: 'categoria', titulo: 'Categoria' },
-  { id: 'descricao', titulo: 'Descrição' },
-  { id: 'pessoa', titulo: 'Aluno / Pessoa' },
+  { id: 'subcategoria', titulo: 'Subcategoria' },
+  { id: 'esporte', titulo: 'Esporte' },
+  { id: 'fornecedor', titulo: 'Fornecedor' },
+  { id: 'pagamento', titulo: 'Pagamento' },
+  { id: 'vencimento', titulo: 'Vencimento' },
   { id: 'valor', titulo: 'Valor', alinha: 'right' },
-  { id: 'meio', titulo: 'Meio' },
-  { id: 'conta', titulo: 'Conta' },
-  { id: 'situacao', titulo: 'Situação' },
+  { id: 'pago', titulo: 'Pago?', alinha: 'center' },
+  { id: 'meio', titulo: 'Meio de pagamento' },
+  { id: 'aluno', titulo: 'Aluno' },
+  { id: 'professor', titulo: 'Professor' },
 ]
 
 function Cartao({ titulo, valor, cor, nota }: { titulo: string; valor: number; cor?: string; nota?: string }) {
@@ -89,7 +93,7 @@ export default function Financeiro() {
     setLoading(true)
     const [m, c, p, ct, b, e, a, pr] = await Promise.all([
       supabase.from('movimentacoes')
-        .select('*, categorias_financeiro(categoria, subcategoria), pessoas(nome), contas_bancarias(nome), bancos(nome), professores(nome), alunos!movimentacoes_aluno_ref_id_fkey(nome)')
+        .select('*, categorias_financeiro(categoria, subcategoria), pessoas(nome), contas_bancarias(nome), bancos(nome), professores(nome), alunos!movimentacoes_aluno_ref_id_fkey(nome), esportes(nome)')
         .eq('unidade_id', unidadeId).order('data_vencimento', { ascending: false }).limit(5000),
       supabase.from('categorias_financeiro').select('id, tipo, categoria, subcategoria').eq('ativo', true),
       supabase.from('pessoas').select('id, nome').order('nome'),
@@ -130,7 +134,7 @@ export default function Financeiro() {
         const c = categoriaDe(m).toLowerCase(), f = filtroCategoria.toLowerCase()
         if (c !== f && !c.startsWith(f + ' / ')) return false
       }
-      if (q && !`${m.descricao ?? ''} ${categoriaDe(m)} ${pessoaDe(m) ?? ''} ${m.contas_bancarias?.nome ?? ''} ${m.bancos?.nome ?? ''}`.toLowerCase().includes(q)) return false
+      if (q && !`${m.descricao ?? ''} ${categoriaDe(m)} ${m.esportes?.nome ?? ''} ${m.pessoas?.nome ?? ''} ${m.alunos?.nome ?? ''} ${m.professores?.nome ?? ''} ${m.contas_bancarias?.nome ?? ''} ${m.bancos?.nome ?? ''}`.toLowerCase().includes(q)) return false
       return true
     })
     // Contas a receber/pagar: o que vence primeiro fica em cima, a menos que a pessoa escolha outra coluna
@@ -227,7 +231,7 @@ export default function Financeiro() {
               </optgroup>
             ))}
           </select></label>
-        <input className={`${campoFiltro} flex-1 min-w-[14rem]`} placeholder="Descrição, aluno, categoria, conta" value={busca} onChange={e => setBusca(e.target.value)} />
+        <input className={`${campoFiltro} flex-1 min-w-[14rem]`} placeholder="Descrição, aluno, professor, categoria" value={busca} onChange={e => setBusca(e.target.value)} />
       </div>
 
       <div className="grid gap-4 mb-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))' }}>
@@ -275,28 +279,31 @@ export default function Financeiro() {
               </tr>
             </thead>
             <tbody className="[&>tr>td]:border-b [&>tr>td]:border-gray-100">
-              {loading && <tr><td colSpan={11} className="text-center py-8 text-gray-400">Carregando...</td></tr>}
-              {!loading && lista.length === 0 && <tr><td colSpan={11} className="text-center py-8 text-gray-400">{aba === 'mov' ? 'Nenhum lançamento no período.' : 'Nada em aberto.'}</td></tr>}
+              {loading && <tr><td colSpan={13} className="text-center py-8 text-gray-400">Carregando...</td></tr>}
+              {!loading && lista.length === 0 && <tr><td colSpan={13} className="text-center py-8 text-gray-400">{aba === 'mov' ? 'Nenhum lançamento no período.' : 'Nada em aberto.'}</td></tr>}
               {pagination.paginatedItems.map(m => {
                 const atrasado = !feito(m) && vencimentoDe(m) < hoje
                 return (
                   <tr key={m.id} className="group h-12 hover:bg-[#7DC421]/[0.06] transition-colors">
-                    <td className={`px-3 tabular-nums ${atrasado ? 'text-red-600 font-semibold' : 'text-gray-700'}`} title={atrasado ? 'Vencido' : undefined}>{dataBr(vencimentoDe(m))}</td>
-                    <td className="px-3 tabular-nums text-gray-700">{dataBr(m.data_pagamento)}</td>
                     <td className="px-3">
                       <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-semibold ${m.tipo === 'Entrada' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>{m.tipo}</span>
                     </td>
-                    <td className="px-3 text-gray-700">{categoriaDe(m) || '—'}</td>
-                    <td className="px-3 text-gray-700 max-w-[18rem] truncate" title={m.descricao ?? ''}>{m.descricao || '—'}</td>
-                    <td className="px-3 text-gray-700">{pessoaDe(m) ?? '—'}</td>
+                    <td className="px-3 text-gray-700" title={m.descricao ?? undefined}>{m.categorias_financeiro?.categoria ?? '—'}</td>
+                    <td className="px-3 text-gray-700" title={m.descricao ?? undefined}>{m.categorias_financeiro?.subcategoria ?? '—'}</td>
+                    <td className="px-3 text-gray-700">{m.esportes?.nome ?? '—'}</td>
+                    <td className="px-3 text-gray-700">{m.pessoas?.nome ?? '—'}</td>
+                    <td className="px-3 tabular-nums text-gray-700">{dataBr(m.data_pagamento)}</td>
+                    <td className={`px-3 tabular-nums ${atrasado ? 'text-red-600 font-semibold' : 'text-gray-700'}`} title={atrasado ? 'Vencido' : undefined}>{dataBr(vencimentoDe(m))}</td>
                     <td className={`px-3 text-right font-semibold tabular-nums ${m.tipo === 'Entrada' ? 'text-green-600' : 'text-red-600'}`}>{m.tipo === 'Saída' ? '− ' : ''}{moeda(Number(m.valor))}</td>
-                    <td className="px-3 text-gray-700">{m.forma_pagamento ?? '—'}</td>
-                    <td className="px-3 text-gray-700">{m.contas_bancarias?.nome ?? m.bancos?.nome ?? '—'}</td>
-                    <td className="px-3">
-                      <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${feito(m) ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'}`}>
-                        {feito(m) ? m.status : m.tipo === 'Entrada' ? 'A receber' : 'A pagar'}
+                    <td className="px-3 text-center">
+                      <span title={feito(m) ? m.status ?? '' : m.tipo === 'Entrada' ? 'A receber' : 'A pagar'}
+                        className={`inline-flex min-w-[3rem] justify-center px-2.5 py-1 rounded-full text-xs font-semibold ${feito(m) ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'}`}>
+                        {feito(m) ? 'Sim' : 'Não'}
                       </span>
                     </td>
+                    <td className="px-3 text-gray-700">{m.forma_pagamento ?? '—'}</td>
+                    <td className="px-3 text-gray-700">{m.alunos?.nome ?? '—'}</td>
+                    <td className="px-3 text-gray-700">{m.professores?.nome ?? '—'}</td>
                     <td className="sticky right-0 z-10 bg-white group-hover:bg-[#f6fbee] transition-colors px-3 shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.15)]">
                       <div className="flex items-center justify-center gap-0.5">
                         <button onClick={() => alternarBaixa(m)} title={feito(m) ? 'Desfazer baixa' : 'Dar baixa'} aria-label={feito(m) ? 'Desfazer baixa' : 'Dar baixa'}
