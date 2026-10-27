@@ -229,3 +229,22 @@ test('atenção: inativações só aparecem quando a data é registrada', () => 
   assert.deepEqual(pontosDeAtencao(args(true)).map(p => p.id), ['inativacoes'])
   assert.deepEqual(pontosDeAtencao(args(false)), [])
 })
+
+test('lista de inadimplentes: mesma regra do indicador (cobrança vencida ou vencimento do cadastro passado)', async () => {
+  const { listaInadimplentes } = await import('../lib/painel.ts')
+  const alunos = [
+    { id: 'a', nome: 'Ana', status: 'Ativo', data_vencimento: '2026-12-01' },
+    { id: 'b', nome: 'Bia', status: 'Ativo', data_vencimento: '2026-10-10' },
+    { id: 'c', nome: 'Caio', status: 'Inativo', data_vencimento: '2026-09-01' },
+    { id: 'd', nome: 'Duda', status: 'Ativo', data_vencimento: '2026-12-01' },
+  ]
+  const mats = [{ aluno_id: 'b', tipo: 'Beach Tênis', valor: 300 }, { aluno_id: 'b', tipo: 'Aula', valor: 50 }]
+  const itens = [
+    { alunoId: 'a', valor: 200, estado: 'aberto', vencimento: '2026-10-20', dataEfetiva: '2026-10-20' },
+    { alunoId: 'a', valor: 100, estado: 'aberto', vencimento: '2026-09-20', dataEfetiva: '2026-09-20' },
+    { alunoId: 'a', valor: 999, estado: 'pago', vencimento: '2026-08-20', dataEfetiva: '2026-08-20' },
+    { alunoId: 'd', valor: 80, estado: 'aberto', vencimento: '2026-11-20', dataEfetiva: '2026-11-20' },
+  ]
+  const r = listaInadimplentes({ alunos, mats, itens, hoje: '2026-10-27' })
+  assert.deepEqual(r.map(x => [x.nome, x.origem, x.valor, x.dias, x.qtdCobrancas]), [['Ana', 'cobranca', 300, 37, 2], ['Bia', 'cadastro', 350, 17, 0]])
+})

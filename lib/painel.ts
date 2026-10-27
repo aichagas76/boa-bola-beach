@@ -378,3 +378,41 @@ export function pontosDeAtencao(args: {
 
   return lista.sort((a, b) => (a.nivel === b.nivel ? 0 : a.nivel === 'alto' ? -1 : 1))
 }
+
+/* ---------- lista de inadimplentes (a mesma regra do indicador do Painel) ---------- */
+export type Inadimplente = {
+  alunoId: string
+  nome: string
+  /** Vencimento mais antigo em aberto (cobrança) ou o vencimento do cadastro */
+  vencimento: string
+  dias: number
+  /** Soma das cobranças vencidas em aberto; sem cobrança lançada, a mensalidade do cadastro */
+  valor: number
+  qtdCobrancas: number
+  origem: 'cobranca' | 'cadastro'
+}
+
+/** Aluno ativo com cobrança vencida em aberto OU com o vencimento do cadastro já passado. Do mais atrasado para o menos. */
+export function listaInadimplentes(args: {
+  alunos: { id: string; nome: string; status: string | null; data_vencimento: string | null }[]
+  mats: MatP[]
+  itens: Item[]
+  hoje: string
+}): Inadimplente[] {
+  const { alunos, mats, itens, hoje } = args
+  const lista: Inadimplente[] = []
+  for (const a of alunos) {
+    if (a.status !== 'Ativo') continue
+    const vencidos = itens.filter(x => x.alunoId === a.id && x.estado === 'aberto' && x.vencimento && x.vencimento < hoje)
+    const cadastroVencido = !!a.data_vencimento && a.data_vencimento < hoje
+    if (vencidos.length === 0 && !cadastroVencido) continue
+    if (vencidos.length > 0) {
+      const venc = vencidos.reduce((m, x) => (x.vencimento! < m ? x.vencimento! : m), vencidos[0].vencimento!)
+      lista.push({ alunoId: a.id, nome: a.nome, vencimento: venc, dias: diasEntre(venc, hoje), valor: arredonda(vencidos.reduce((s, x) => s + x.valor, 0)), qtdCobrancas: vencidos.length, origem: 'cobranca' })
+    } else {
+      const mensalidade = arredonda(mats.filter(m => m.aluno_id === a.id).reduce((s, m) => s + (Number(m.valor) || 0), 0))
+      lista.push({ alunoId: a.id, nome: a.nome, vencimento: a.data_vencimento!, dias: diasEntre(a.data_vencimento!, hoje), valor: mensalidade, qtdCobrancas: 0, origem: 'cadastro' })
+    }
+  }
+  return lista.sort((x, y) => y.dias - x.dias || x.nome.localeCompare(y.nome, 'pt-BR'))
+}
