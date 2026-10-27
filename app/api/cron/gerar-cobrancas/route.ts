@@ -4,7 +4,7 @@ import { bearerValido } from '@/lib/seguranca'
 import { enviarAlerta } from '@/lib/alerta'
 import { pagador } from '@/lib/responsavel'
 import { criarCobrancaAsaas } from '@/lib/asaas-cobranca'
-import { dataSaoPaulo, situacaoVencimento, jaTemCobranca, MAX_DIAS_ATRASO_AUTOMATICO } from '@/lib/cobranca-regras'
+import { dataSaoPaulo, situacaoVencimento, jaTemCobranca, cobrancaAutomaticaLigada, MAX_DIAS_ATRASO_AUTOMATICO } from '@/lib/cobranca-regras'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -47,6 +47,12 @@ export async function GET(request: NextRequest) {
       .select('id')
     if (error) console.error('[cron] erro ao marcar atrasados:', error)
     marcadosAtrasados = data?.length ?? 0
+  }
+
+  // Trava de segurança: a geração automática de cobranças só roda com COBRANCA_AUTOMATICA=sim na Vercel.
+  // Sem isso (o padrão), nada é cobrado nem enviado ao Asaas — só o passo 1 acima acontece.
+  if (!simular && !cobrancaAutomaticaLigada(process.env.COBRANCA_AUTOMATICA)) {
+    return NextResponse.json({ ok: true, cobrancaAutomatica: 'desligada', marcadosAtrasados })
   }
 
   // 2) Alunos ativos com vencimento até o limite (inclui os já vencidos)
