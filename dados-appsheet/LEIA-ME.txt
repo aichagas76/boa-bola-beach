@@ -1,0 +1,2 @@
+Coloque aqui a planilha BB 1.0 baixada do Google Planilhas (Arquivo > Fazer download > Microsoft Excel .xlsx).
+Esta pasta NAO vai para o Git (tem dados pessoais dos alunos).

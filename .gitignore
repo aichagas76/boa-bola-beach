@@ -42,3 +42,7 @@ next-env.d.ts
 
 # fluxos n8n com chaves
 /n8n/
+
+# Dados pessoais exportados do AppSheet/planilha (nunca vao para o Git)
+/dados-appsheet/*
+!/dados-appsheet/LEIA-ME.txt
