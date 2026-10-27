@@ -22,7 +22,8 @@ type Aluno = {
   cpf: string
   status: string
   data_vencimento: string
-  valor_total: number
+  valor_total: number // mensalidade (matrículas) + produtos retirados e ainda não pagos
+  produtos_abertos?: number
   esportesMod: { esporte: string; modalidades: string[] }[] // cada esporte do aluno e as modalidades dele nele
   professores_nomes: string
   ultimo_pagamento: string | null
@@ -180,6 +181,17 @@ export default function Alunos() {
       .not('aluno_ref_id', 'is', null)
       .order('data_pagamento', { ascending: false })
 
+    // Produtos retirados e ainda não pagos entram no valor do aluno (para serem cobrados junto com a mensalidade)
+    const { data: produtosData } = await supabase
+      .from('movimentacoes')
+      .select('aluno_ref_id, valor')
+      .eq('tipo', 'Entrada')
+      .eq('origem', 'Estoque')
+      .eq('status', 'Não recebido')
+      .not('aluno_ref_id', 'is', null)
+    const produtosPorAluno: Record<string, number> = {}
+    for (const x of (produtosData ?? [])) produtosPorAluno[x.aluno_ref_id] = (produtosPorAluno[x.aluno_ref_id] ?? 0) + Number(x.valor)
+
     const mesAtual = new Date().toISOString().slice(0, 7)
 
     // Último pagamento, soma total paga e soma parcial no mês por aluno
@@ -210,7 +222,8 @@ export default function Alunos() {
     const alunos = (alunosData ?? []).filter(a => !unidadeId || a.unidade_id === unidadeId ||
       (matriculasData ?? []).some(m => m.aluno_id === a.id && (m.unidade_id === unidadeId || m.acesso_duas_unidades))).map(a => {
       const mats = (matriculasData ?? []).filter(m => m.aluno_id === a.id)
-      const valor_total = mats.reduce((acc, m) => acc + (m.valor ?? 0), 0)
+      const produtos_abertos = Math.round((produtosPorAluno[a.id] ?? 0) * 100) / 100
+      const valor_total = Math.round((mats.reduce((acc, m) => acc + (m.valor ?? 0), 0) + produtos_abertos) * 100) / 100
       const porEsporte = new Map<string, Set<string>>()
       for (const m of mats) {
         const nome = (m.esportes as unknown as { nome: string } | null)?.nome ?? 'Sem esporte'
@@ -219,7 +232,7 @@ export default function Alunos() {
       const esportesMod = Array.from(porEsporte.entries()).map(([esporte, tipos]) => ({ esporte, modalidades: Array.from(tipos) }))
       const professores_nomes = mats.filter(m => m.tipo === 'Aula' && m.professor_nome).map(m => m.professor_nome).join(' / ') || '-'
       return {
-        ...a, valor_total, esportesMod, professores_nomes,
+        ...a, valor_total, produtos_abertos, esportesMod, professores_nomes,
         combo: mats.some(m => m.acesso_duas_unidades),
         ultimo_pagamento: ultimoPorAluno[a.id] ?? null,
         pago_mes: pagoMesPorAluno[a.id] ?? 0,
@@ -463,7 +476,12 @@ export default function Alunos() {
                 </td>
                 <td className="px-2 text-gray-700 max-w-[9rem] truncate" title={aluno.professores_nomes}>{aluno.professores_nomes}</td>
                 <td className="px-2 text-right font-medium text-gray-900 tabular-nums">
-                  {aluno.valor_total > 0 ? `R$ ${aluno.valor_total.toFixed(2).replace('.', ',')}` : '-'}
+                  {aluno.valor_total > 0 ? (
+                    <span title={aluno.produtos_abertos ? `Inclui R$ ${aluno.produtos_abertos.toFixed(2).replace('.', ',')} de produtos retirados e ainda não pagos` : undefined}>
+                      R$ {aluno.valor_total.toFixed(2).replace('.', ',')}
+                      {aluno.produtos_abertos ? <span className="ml-1 align-super text-[10px] font-bold text-amber-600">+P</span> : null}
+                    </span>
+                  ) : '-'}
                 </td>
                 {temParcial && <td className="px-2 text-right font-medium tabular-nums">
                   {aluno.parcial_mes > 0 ? (
