@@ -81,11 +81,11 @@ test('previsão: mensalidades e média das saídas dos 3 meses anteriores', asyn
   const { previsaoDeCaixa } = await import('../lib/fluxo-caixa.ts')
   const movs = [s(300, '2026-07-10'), s(600, '2026-08-10'), s(900, '2026-09-10'), e(1000, '2026-09-05')]
   const r = previsaoDeCaixa(movs, { hoje: '2026-10-27', mensalidades: 2000 })
-  assert.deepEqual(r.pontos.map(p => [p.rotulo, p.previsto]), [['jul/26', false], ['ago/26', false], ['set/26', false], ['nov/26', true], ['dez/26', true], ['jan/27', true]])
+  assert.deepEqual(r.pontos.map(p => [p.rotulo, p.previsto]), [['jul/26', false], ['ago/26', false], ['set/26', false], ['out/26', true], ['nov/26', true], ['dez/26', true], ['jan/27', true]])
   assert.equal(r.mediaSaidas, 600)
-  assert.deepEqual(r.pontos.slice(3).map(p => [p.entradas, p.saidas, p.saldo]), [[2000, 600, 1400], [2000, 600, 1400], [2000, 600, 1400]])
-  assert.equal(r.saldoPrevisto, 4200)
-  assert.equal(r.entradasPrevistas, 6000)
+  assert.deepEqual(r.pontos.slice(3).map(p => [p.entradas, p.saidas, p.saldo]), [[2000, 600, 1400], [2000, 600, 1400], [2000, 600, 1400], [2000, 600, 1400]])
+  assert.equal(r.saldoPrevisto, 5600)
+  assert.equal(r.entradasPrevistas, 8000)
 })
 
 test('previsão: lançado em aberto maior que a base vale; não soma duas vezes; ignora cancelado e atrasado', async () => {
@@ -98,9 +98,16 @@ test('previsão: lançado em aberto maior que a base vale; não soma duas vezes;
   ]
   const r = previsaoDeCaixa(movs, { hoje: '2026-10-27', mensalidades: 2000 })
   const f = r.pontos.filter(p => p.previsto)
-  assert.equal(f[0].entradas, 3000)
-  assert.equal(f[1].entradas, 2000)
-  assert.equal(f[0].saidas, 0)
-  assert.equal(f[1].saidas, 500)
+  assert.equal(f[1].entradas, 3000)
+  assert.equal(f[2].entradas, 2000)
+  assert.equal(f[1].saidas, 0)
+  assert.equal(f[2].saidas, 500)
   assert.equal(r.menorSaldoPrevisto.rotulo, 'dez/26')
+})
+
+test('previsão: mês atual = o que já entrou até hoje + o que está em aberto, nunca menos que a base', async () => {
+  const { previsaoDeCaixa } = await import('../lib/fluxo-caixa.ts')
+  const movs = [e(2500, '2026-10-05'), s(700, '2026-10-06'), { tipo: 'Saída', status: 'Pendente', valor: 400, data: '2026-10-01', data_pagamento: null, data_vencimento: '2026-10-30' }]
+  const o = previsaoDeCaixa(movs, { hoje: '2026-10-27', mensalidades: 2000, meses: 0 }).pontos.find(p => p.rotulo === 'out/26')
+  assert.deepEqual([o.entradas, o.saidas, o.previsto], [2500, 1100, true])
 })

@@ -129,7 +129,6 @@ export default function PainelGerencial() {
   const [modalidade, setModalidade] = useState('')
   // Cada tema tem o seu próprio período; o do topo vale só para os indicadores principais
   const pFin = usePeriodo(hoje)
-  const pFlu = usePeriodo(hoje)
   const pAlu = usePeriodo(hoje)
   const pMod = usePeriodo(hoje)
   const pPag = usePeriodo(hoje)
@@ -254,11 +253,6 @@ export default function PainelGerencial() {
     const ativos = new Set(dados.alunosU.filter(a => a.status === 'Ativo').map(a => a.id))
     return Math.round(dados.matsU.filter(m => ativos.has(m.aluno_id)).reduce((t, m) => t + (Number(m.valor) || 0), 0) * 100) / 100
   }, [dados.alunosU, dados.matsU])
-  const contasFluxo = useMemo(() => {
-    const por = new Map<string, string>()
-    for (const m of movs) if (m.conta_bancaria_id && m.contas_bancarias?.nome) por.set(m.conta_bancaria_id, m.contas_bancarias.nome)
-    return [...por.entries()].map(([id, nome]) => ({ id, nome })).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
-  }, [movs])
   const lucro = useMemo(
     () => aparaMesesVazios(resumoPorMes(movsRelUnidade, mesesFin), l => l.bruto > 0 || l.despesas > 0),
     [movsRelUnidade, mesesFin]
@@ -438,8 +432,8 @@ export default function PainelGerencial() {
       </div>
       </TemaRecolhivel>
 
-      <TemaRecolhivel titulo="Fluxo de caixa" subtitulo="O que entrou e saiu, e a previsão dos próximos meses." filtro={<FiltroPeriodo p={pFlu} nome="Fluxo de caixa" />}>
-        <FluxoDeCaixa movs={movsFluxo} contas={contasFluxo} inicio={pFlu.periodo.inicio} fim={pFlu.periodo.fim} hoje={hoje} mensalidades={mensalidadesUnidade} carregando={loading} />
+      <TemaRecolhivel titulo="Fluxo de caixa" subtitulo="Por mês: o que entrou e saiu e a previsão dos meses à frente.">
+        <FluxoDeCaixa movs={movsFluxo} hoje={hoje} mensalidades={mensalidadesUnidade} carregando={loading} />
       </TemaRecolhivel>
 
       <TemaRecolhivel titulo="Alunos" subtitulo={rastreiaInativacao ? 'Base = alunos cadastrados menos as inativações com data registrada.' : 'As inativações ainda não têm data registrada: a base mostra todos os cadastros.'} filtro={<FiltroPeriodo p={pAlu} nome="Alunos" />}>

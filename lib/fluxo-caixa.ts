@@ -135,7 +135,7 @@ export function fluxoDeCaixa(movs: MovFluxo[], opc: { inicio: string; fim: strin
  * Para cada mês futuro completo (depois do mês atual):
  *  - entradas = o maior entre (mensalidades dos alunos ativos) e (entradas em aberto lançadas com vencimento no mês);
  *  - saídas   = o maior entre (média das saídas pagas nos últimos 3 meses completos) e (saídas em aberto lançadas com vencimento no mês).
- * Usa o MAIOR (e não a soma) para não contar duas vezes uma mensalidade ou despesa que já esteja lançada.
+ * O mês atual conta o que já entrou/saiu até hoje mais o que está em aberto nele. Usa o MAIOR (e não a soma) para não contar duas vezes uma mensalidade ou despesa que já esteja lançada.
  * Atrasos de meses anteriores não entram: não dá para saber se serão pagos. */
 
 export type PontoPrevisao = PontoFluxo & { previsto: boolean }
@@ -167,14 +167,21 @@ export function previsaoDeCaixa(movs: MovFluxo[], opc: { hoje: string; mensalida
   const ini = `${deslocaMes(atual, -passados)}-01`
   const fimPassado = somarDias(`${atual}-01`, -1)
   const real = fluxoDeCaixa(movs, { inicio: ini, fim: fimPassado, granularidade: 'mes' })
-  const mediaSaidas = reais(Math.round(real.pontos.reduce((a, p) => a + centavos(p.saidas), 0) / Math.max(real.pontos.length, 1)))
+  // A média das saídas olha sempre os 3 meses completos anteriores, qualquer que seja o tanto de histórico mostrado
+  const base3 = fluxoDeCaixa(movs, { inicio: `${deslocaMes(atual, -3)}-01`, fim: fimPassado, granularidade: 'mes' })
+  const mediaSaidas = reais(Math.round(base3.pontos.reduce((a, p) => a + centavos(p.saidas), 0) / Math.max(base3.pontos.length, 1)))
 
   let acum = 0
   const pontos: PontoPrevisao[] = real.pontos.map(p => { acum += centavos(p.saldo); return { ...p, acumulado: reais(acum), previsto: false } })
 
-  for (let i = 1; i <= n; i++) {
+  // i = 0 é o mês atual: o que já entrou/saiu até hoje mais o que ainda está lançado em aberto nele
+  for (let i = 0; i <= n; i++) {
     const mes = deslocaMes(atual, i)
     let ent = 0, sai = 0
+    if (i === 0) {
+      const ate = fluxoDeCaixa(movs, { inicio: `${atual}-01`, fim: hoje, granularidade: 'mes' })
+      ent = centavos(ate.entradas); sai = centavos(ate.saidas)
+    }
     for (const m of movs) {
       if (!emAberto(m)) continue
       if (mesDe(m.data_vencimento ?? m.data) !== mes) continue
