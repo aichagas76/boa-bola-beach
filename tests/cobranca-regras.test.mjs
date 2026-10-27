@@ -76,3 +76,11 @@ test('o Asaas vem desligado e só liga com "sim"', () => {
   assert.equal(asaasLigado('sim'), true)
   assert.equal(asaasLigado(' SIM '), true)
 })
+
+test('robô de cobrança automática exige as duas chaves', async () => {
+  const { cobrancaAutomaticaLigada } = await import('../lib/cobranca-regras.ts')
+  assert.equal(cobrancaAutomaticaLigada('sim', undefined), false)
+  assert.equal(cobrancaAutomaticaLigada(undefined, 'sim'), false)
+  assert.equal(cobrancaAutomaticaLigada('sim', 'sim'), true)
+  assert.equal(cobrancaAutomaticaLigada('sim', 'nao'), false)
+})

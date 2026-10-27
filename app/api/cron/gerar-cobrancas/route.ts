@@ -4,7 +4,7 @@ import { bearerValido } from '@/lib/seguranca'
 import { enviarAlerta } from '@/lib/alerta'
 import { pagador } from '@/lib/responsavel'
 import { criarCobrancaAsaas } from '@/lib/asaas-cobranca'
-import { dataSaoPaulo, situacaoVencimento, jaTemCobranca, asaasLigado, MAX_DIAS_ATRASO_AUTOMATICO } from '@/lib/cobranca-regras'
+import { dataSaoPaulo, situacaoVencimento, jaTemCobranca, cobrancaAutomaticaLigada, MAX_DIAS_ATRASO_AUTOMATICO } from '@/lib/cobranca-regras'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -49,9 +49,9 @@ export async function GET(request: NextRequest) {
     marcadosAtrasados = data?.length ?? 0
   }
 
-  // Trava de segurança: a geração automática de cobranças só roda com ASAAS_ATIVO=sim na Vercel.
-  // Sem isso (o padrão), nada é cobrado nem enviado ao Asaas — só o passo 1 acima acontece.
-  if (!simular && !asaasLigado(process.env.ASAAS_ATIVO)) {
+  // Trava de segurança: a geração automática de cobranças só roda com ASAAS_ATIVO=sim E ASAAS_COBRANCA_AUTOMATICA=sim na Vercel.
+  // Sem isso (o padrão), nada é cobrado nem enviado ao Asaas pelo robô — só o passo 1 acima acontece.
+  if (!simular && !cobrancaAutomaticaLigada(process.env.ASAAS_ATIVO, process.env.ASAAS_COBRANCA_AUTOMATICA)) {
     return NextResponse.json({ ok: true, cobrancaAutomatica: 'desligada', marcadosAtrasados })
   }
 
