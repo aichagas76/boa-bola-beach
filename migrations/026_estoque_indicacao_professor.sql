@@ -1,7 +1,7 @@
 -- INDICAÇÃO (professor) na venda de produto: o professor que indicou a venda ganha uma comissão de venda,
 -- calculada pelo produto vendido (% do valor da venda; o % padrão fica no cadastro do produto e pode ser alterado na venda).
 -- A comissão vira uma SAÍDA "A pagar" no Financeiro (Mão de Obra / Comissão de venda), com vencimento no fim do mês.
--- Depende da 025. NÃO APLICADA.
+-- Depende da 025. APLICADA.
 alter table public.estoque_produtos add column if not exists comissao_indicacao numeric(5,2) not null default 0 check (comissao_indicacao >= 0 and comissao_indicacao <= 100);
 alter table public.estoque_retiradas add column if not exists indicacao_professor_id uuid references public.professores(id);
 alter table public.estoque_retiradas add column if not exists indicacao_movimentacao_id uuid references public.movimentacoes(id) on delete set null;

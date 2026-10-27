@@ -1,5 +1,5 @@
 -- O valor da venda do estoque passa a poder ser alterado na hora (o preço do produto continua sendo o padrão).
--- A função ganha o parâmetro p_preco (preço de cada unidade); sem ele, vale o preço do produto como antes. NÃO APLICADA.
+-- A função ganha o parâmetro p_preco (preço de cada unidade); sem ele, vale o preço do produto como antes. APLICADA.
 drop function if exists public.estoque_vender(uuid, integer, text, uuid, uuid, boolean, text, uuid, date, date, uuid, numeric);
 
 create or replace function public.estoque_vender(
