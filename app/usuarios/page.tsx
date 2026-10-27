@@ -18,6 +18,7 @@ export default function Usuarios() {
   const [senha, setSenha] = useState('')
   const [novasUnidades, setNovasUnidades] = useState<string[]>([])
   const [criando, setCriando] = useState(false)
+  const [novaGestora, setNovaGestora] = useState(false)
 
   async function carregar() {
     setLoading(true)
@@ -58,7 +59,7 @@ export default function Usuarios() {
     const res = await fetch('/api/usuarios', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ acao: 'criar', email, senha, unidadeIds: novasUnidades }),
+      body: JSON.stringify({ acao: 'criar', email, senha, unidadeIds: novasUnidades, gestora: novaGestora }),
     })
     const data = await res.json()
     setCriando(false)
@@ -66,7 +67,21 @@ export default function Usuarios() {
     setEmail('')
     setSenha('')
     setNovasUnidades([])
+    setNovaGestora(false)
     carregar()
+  }
+
+  async function alternarGestora(u: Usuario) {
+    setSalvandoId(u.id)
+    const res = await fetch('/api/usuarios', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ acao: 'perfil', userId: u.id, gestora: !u.administrador }),
+    })
+    const data = await res.json()
+    setSalvandoId(null)
+    if (!res.ok) return alert(data.error ?? 'Não consegui salvar.')
+    setUsuarios(lista => lista.map(x => (x.id === u.id ? { ...x, administrador: !u.administrador } : x)))
   }
 
   if (loading) return <div className="text-gray-400 text-sm">Carregando...</div>
@@ -105,6 +120,10 @@ export default function Usuarios() {
             ))}
           </div>
         </div>
+        <label className="mt-3 inline-flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+          <input type="checkbox" className="h-[18px] w-[18px] accent-blue-600" checked={novaGestora} onChange={e => setNovaGestora(e.target.checked)} />
+          Gestora (altera professores, bancos, categorias e modalidades, gerencia logins e vê o histórico)
+        </label>
         <div className="mt-4 flex justify-end">
           <button onClick={criar} disabled={criando} className="h-10 px-5 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">
             {criando ? 'Criando...' : 'Criar usuário'}
@@ -118,6 +137,7 @@ export default function Usuarios() {
             <tr className="bg-gray-50 border-b border-gray-200">
               <th className="text-left px-4 py-3 text-th text-gray-500">Login</th>
               {unidades.map(un => <th key={un.id} className="text-center px-4 py-3 text-th text-gray-500">{un.nome}</th>)}
+              <th className="text-center px-4 py-3 text-th text-gray-500">Gestora</th>
               <th className="text-left px-4 py-3 text-th text-gray-500">Último acesso</th>
             </tr>
           </thead>
@@ -127,7 +147,7 @@ export default function Usuarios() {
                 <td className="px-4 py-3 text-gray-900">
                   {u.email}
                   {u.administrador && (
-                    <span className="ml-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700"><ShieldCheck size={12} /> Administrador</span>
+                    <span className="ml-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700"><ShieldCheck size={12} /> Gestora</span>
                   )}
                   {u.id === eu && <span className="ml-2 text-xs text-gray-400">(você)</span>}
                 </td>
@@ -137,6 +157,11 @@ export default function Usuarios() {
                       disabled={salvandoId === u.id} onChange={() => alternarUnidade(u, un.id)} />
                   </td>
                 ))}
+                <td className="px-4 py-3 text-center">
+                  <input type="checkbox" className="h-[18px] w-[18px] accent-blue-600" checked={u.administrador}
+                    disabled={salvandoId === u.id || u.id === eu} title={u.id === eu ? 'Você não pode tirar a sua própria permissão' : undefined}
+                    onChange={() => alternarGestora(u)} />
+                </td>
                 <td className="px-4 py-3 text-gray-500">{u.ultimoLogin ? new Date(u.ultimoLogin).toLocaleString('pt-BR') : 'Nunca entrou'}</td>
               </tr>
             ))}

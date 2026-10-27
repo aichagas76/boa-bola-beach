@@ -17,3 +17,12 @@ test('acessos: não aceita vazio nem unidade desconhecida', () => {
   assert.match(validarAcessos(['u9'], ['u1', 'u2']), /inválida/)
   assert.equal(validarAcessos(['u1', 'u2'], ['u1', 'u2']), null)
 })
+
+import { validarMudancaPerfil } from '../lib/usuarios-regras.ts'
+test('perfil de gestora: dá para promover, não dá para se rebaixar nem ficar sem gestora', () => {
+  const base = { userId: 'b', eu: 'a', gestoras: ['a', 'c'], virarGestora: false }
+  assert.equal(validarMudancaPerfil({ ...base, virarGestora: true }), null)
+  assert.equal(validarMudancaPerfil({ ...base, userId: 'c' }), null) // outra gestora é rebaixada, sobra a
+  assert.match(validarMudancaPerfil({ ...base, userId: 'a' }), /própria/)
+  assert.match(validarMudancaPerfil({ ...base, userId: 'c', eu: 'x', gestoras: ['c'] }), /pelo menos uma/)
+})

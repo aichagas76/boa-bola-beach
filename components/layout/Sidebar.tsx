@@ -39,10 +39,12 @@ export default function Sidebar() {
   const router = useRouter()
   const [isOpen, setIsOpen] = useState(false)
   const [userEmail, setUserEmail] = useState('')
+  const [gestora, setGestora] = useState<boolean | null>(null) // null = ainda conferindo
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
       setUserEmail(user?.email ?? '')
+      if (user) supabase.from('administradores').select('user_id').eq('user_id', user.id).maybeSingle().then(({ data }) => setGestora(!!data))
     })
   }, [])
 
@@ -55,7 +57,8 @@ export default function Sidebar() {
   const [cadastrosAberto, setCadastrosAberto] = useState(false)
   const [contasAberto, setContasAberto] = useState(false)
 
-  const cadastrosAtivo = cadastrosItems.some(item => pathname === item.href)
+  const itensCadastros = gestora === false ? cadastrosItems.filter(i => i.href === '/contas') : cadastrosItems
+  const cadastrosAtivo = itensCadastros.some(item => pathname === item.href)
   const contasAtivo = contasItems.some(item => pathname === item.href)
 
   useEffect(() => {
@@ -187,7 +190,7 @@ export default function Sidebar() {
 
           {cadastrosAberto && (
             <div className="ml-4 space-y-1 border-l border-[#1a1a1a] pl-3">
-              {cadastrosItems.map((item) => {
+              {itensCadastros.map((item) => {
                 const Icon = item.icon
                 const active = pathname === item.href
                 return (
@@ -211,10 +214,12 @@ export default function Sidebar() {
 
         <div className="p-4 border-t border-[#1a1a1a] space-y-2">
           {userEmail && <div className="text-sm text-gray-400 truncate px-2">{userEmail}</div>}
-          <Link href="/logs" className="flex items-center gap-3 text-sm text-gray-500 hover:text-[#7DC421] transition-colors">
-            <ClipboardList size={16} />
-            <span>Logs</span>
-          </Link>
+          {gestora !== false && (
+            <Link href="/logs" className="flex items-center gap-3 text-sm text-gray-500 hover:text-[#7DC421] transition-colors">
+              <ClipboardList size={16} />
+              <span>Logs</span>
+            </Link>
+          )}
           <button
             onClick={sair}
             className="w-full flex items-center gap-3 text-sm text-gray-500 hover:text-red-400 transition-colors"
