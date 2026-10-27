@@ -104,11 +104,16 @@ export default function Alunos() {
     data_pagamento: new Date().toLocaleDateString('en-CA'),
   })
   const [salvandoPgto, setSalvandoPgto] = useState(false)
-  const [valorParcial, setValorParcial] = useState('')
+  const [valorParcial, setValorParcial] = useState<string | null>(null) // null = valor sugerido (mensalidade + produtos marcados)
   // Produtos retirados e ainda não pagos: podem ser quitados junto, na mesma janela
   const [produtosModal, setProdutosModal] = useState<{ id: string; valor: number; descricao: string | null }[]>([])
   const [marcados, setMarcados] = useState<Set<string>>(new Set())
   const [receberMensalidade, setReceberMensalidade] = useState(true)
+  // Valor sugerido no pagamento: mensalidade + produtos marcados (o que o aluno deve de fato)
+  const totalMens = matriculasModal.reduce((acc, m) => acc + (m.valor ?? 0), 0)
+  const totalProdMarcados = produtosModal.filter(x => marcados.has(x.id)).reduce((acc, x) => acc + x.valor, 0)
+  const totalDevido = Math.round(((receberMensalidade ? totalMens : 0) + totalProdMarcados) * 100) / 100
+  const valorTexto = valorParcial ?? totalDevido.toFixed(2).replace('.', ',')
   const [gerandoId, setGerandoId] = useState<string | null>(null)
   const [idAsaasAberto, setIdAsaasAberto] = useState<{ nome: string; id: string } | null>(null)
   const [copiado, setCopiado] = useState(false)
@@ -286,7 +291,7 @@ export default function Alunos() {
     setMatriculasModal(mats)
     setAlunoModal(aluno)
     setFormPgto({ forma_pagamento: 'Pix', data_pagamento: new Date().toLocaleDateString('en-CA') })
-    setValorParcial(total.toFixed(2).replace('.', ','))
+    setValorParcial(null)
     setModalAberto(true)
   }
 
@@ -295,7 +300,15 @@ export default function Alunos() {
     const idsProdutos = produtosModal.filter(x => marcados.has(x.id)).map(x => x.id)
     if (receberMensalidade && matriculasModal.length === 0) return alert('Este aluno não tem matrículas cadastradas.')
     if (!receberMensalidade && idsProdutos.length === 0) return alert('Marque a mensalidade ou algum produto para receber.')
-    const valorPago = parseFloat(valorParcial.replace(',', '.') || '0')
+    const valorPago = parseFloat(valorTexto.replace(',', '.') || '0')
+    // O valor pago cobre primeiro a mensalidade; o que sobrar quita os produtos marcados (só os que ficam inteiros pagos)
+    const paraMensalidade = receberMensalidade ? Math.min(valorPago, totalMens) : 0
+    let resto = receberMensalidade ? Math.round((valorPago - paraMensalidade) * 100) / 100 : Infinity
+    const idsAPagar: string[] = []
+    for (const x of produtosModal.filter(y => marcados.has(y.id))) {
+      if (x.valor <= resto + 0.005) { idsAPagar.push(x.id); resto -= x.valor }
+    }
+    if (receberMensalidade && paraMensalidade <= 0) return alert('Informe um valor maior que zero.')
     setSalvandoPgto(true)
 
     // Mensalidade: tudo (lançamentos, vencimento, baixa e log) acontece numa operação só no banco: ou entra tudo, ou nada
@@ -304,17 +317,17 @@ export default function Alunos() {
         p_aluno_id: alunoModal.id,
         p_forma: formPgto.forma_pagamento,
         p_data: formPgto.data_pagamento,
-        p_valor: valorPago,
+        p_valor: paraMensalidade,
         p_vencimento: alunoModal.data_vencimento,
       })
       if (error) { setSalvandoPgto(false); alert(error.message); return }
     }
 
     // Produtos marcados: viram recebidos (e saem do Valor do aluno)
-    if (idsProdutos.length > 0) {
+    if (idsAPagar.length > 0) {
       const { error } = await supabase.from('movimentacoes')
         .update({ status: 'Recebido', data_pagamento: formPgto.data_pagamento, forma_pagamento: formPgto.forma_pagamento })
-        .in('id', idsProdutos).eq('origem', 'Estoque').eq('status', 'Não recebido')
+        .in('id', idsAPagar).eq('origem', 'Estoque').eq('status', 'Não recebido')
       if (error) {
         setSalvandoPgto(false)
         alert((receberMensalidade ? 'A mensalidade foi lançada, mas ' : '') + 'não consegui dar baixa nos produtos: ' + error.message + '. Dê baixa pelo Financeiro.')
@@ -729,28 +742,22 @@ export default function Alunos() {
                   <label className="text-label text-gray-500 block mb-1">Valor pago</label>
                   <input
                     type="text"
-                    value={valorParcial}
+                    value={valorTexto}
                     onChange={e => {
-                      const totalMats = matriculasModal.reduce((acc, m) => acc + (m.valor ?? 0), 0)
                       const masked = mascaraValor(e.target.value)
                       const num = parseFloat(masked.replace(',', '.')) || 0
-                      if (num > totalMats) {
-                        setValorParcial(totalMats.toFixed(2).replace('.', ','))
-                      } else {
-                        setValorParcial(masked)
-                      }
+                      setValorParcial(num > totalDevido ? totalDevido.toFixed(2).replace('.', ',') : masked)
                     }}
                     className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
                     placeholder="0,00"
                   />
                   {(() => {
-                    const total = matriculasModal.reduce((acc, m) => acc + m.valor, 0)
-                    const pago = parseFloat(valorParcial.replace(',', '.')) || 0
-                    if (pago > 0 && pago < total) {
-                      return <p className="text-xs text-yellow-600 mt-1">Pagamento parcial — R$ {(total - pago).toFixed(2).replace('.', ',')} restante</p>
+                    const pago = parseFloat(valorTexto.replace(',', '.')) || 0
+                    if (pago > 0 && pago < totalDevido) {
+                      return <p className="text-xs text-yellow-600 mt-1">Pagamento parcial — R$ {(totalDevido - pago).toFixed(2).replace('.', ',')} restante</p>
                     }
-                    if (pago >= total) {
-                      return <p className="text-xs text-green-600 mt-1">✓ Pagamento total</p>
+                    if (pago >= totalDevido && totalDevido > 0) {
+                      return <p className="text-xs text-green-600 mt-1">✓ Pagamento total{totalProdMarcados > 0 ? ' (mensalidade + produtos)' : ''}</p>
                     }
                     return null
                   })()}
