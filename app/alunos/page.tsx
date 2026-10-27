@@ -11,8 +11,9 @@ import IconeEsporte from '@/components/alunos/IconeEsporte'
 import { ordenar, proximaOrdem, type Direcao, type Valor } from '@/lib/ordenacao'
 import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react'
 import IconeModalidade from '@/components/alunos/IconeModalidade'
-import { BadgeCheck, Copy, CircleDollarSign, CreditCard, Link2, Package, Pencil, Trash2, X } from 'lucide-react'
+import { BadgeCheck, Copy, CircleDollarSign, CreditCard, History, Link2, Package, Pencil, Trash2, X } from 'lucide-react'
 import { VendaDoAluno } from '@/components/estoque/FormVenda'
+import HistoricoAluno from '@/components/alunos/HistoricoAluno'
 
 type Aluno = {
   id: string
@@ -108,6 +109,7 @@ export default function Alunos() {
   const [copiado, setCopiado] = useState(false)
   const [responsavelAberto, setResponsavelAberto] = useState<Aluno | null>(null)
   const [retiradaAluno, setRetiradaAluno] = useState<Aluno | null>(null)
+  const [historicoAluno, setHistoricoAluno] = useState<Aluno | null>(null)
 
   async function copiarId(id: string) {
     try {
@@ -513,6 +515,12 @@ export default function Alunos() {
                     className="inline-flex h-8 w-8 items-center justify-center rounded-lg transition-colors text-[#5a9217] hover:bg-green-50"
                   ><CircleDollarSign size={18} /></button>
                   <button
+                    onClick={() => setHistoricoAluno(aluno)}
+                    title="Histórico de pagamentos (mensalidades e produtos)"
+                    aria-label={`Histórico de pagamentos de ${aluno.nome}`}
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg transition-colors text-gray-500 hover:bg-gray-100 hover:text-gray-800"
+                  ><History size={18} /></button>
+                  <button
                     onClick={() => setRetiradaAluno(aluno)}
                     title="Retirar produto (estoque)"
                     aria-label={`Retirar produto para ${aluno.nome}`}
@@ -540,6 +548,9 @@ export default function Alunos() {
           onPageChange={pagination.goToPage}
         />
       </div>
+
+      {/* Histórico de pagamentos do aluno */}
+      {historicoAluno && <HistoricoAluno aluno={{ id: historicoAluno.id, nome: historicoAluno.nome }} onFechar={() => setHistoricoAluno(null)} />}
 
       {/* Retirada de produto do estoque para o aluno */}
       {retiradaAluno && (
