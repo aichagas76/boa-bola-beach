@@ -1,341 +1,319 @@
 'use client'
 
-import { useEffect, useState, useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useUnidade } from '@/components/layout/UnidadeProvider'
-import Link from 'next/link'
-import { Trash2, Edit2, Check } from 'lucide-react'
+import { registrarLog } from '@/lib/log'
+import { ordenar, proximaOrdem, type Direcao, type Valor } from '@/lib/ordenacao'
 import { usePagination } from '@/lib/hooks/usePagination'
 import { Pagination } from '@/components/ui/pagination'
-type Movimentacao = {
-  id: string
-  data: string
-  tipo: string
-  descricao: string
-  valor: number
-  forma_pagamento: string
-  status: string
-  data_vencimento: string | null
-  data_pagamento: string | null
-  origem: string
-  categorias_financeiro: { categoria: string; subcategoria: string } | null
+import MovimentoDialog, { type Catalogos, type MovimentoEditavel, type TipoMov } from '@/components/financeiro/MovimentoDialog'
+import { ArrowDown, ArrowUp, ArrowUpDown, Check, Pencil, Trash2, Undo2 } from 'lucide-react'
+
+type Movimentacao = MovimentoEditavel & {
+  origem: string | null
+  categorias_financeiro: { categoria: string; subcategoria: string | null } | null
   pessoas: { nome: string } | null
   contas_bancarias: { nome: string } | null
+  bancos: { nome: string } | null
   professores: { nome: string } | null
   alunos: { nome: string } | null
+}
+type Aba = 'mov' | 'receber' | 'pagar'
+type ColunaId = 'vencimento' | 'pagamento' | 'tipo' | 'categoria' | 'descricao' | 'pessoa' | 'valor' | 'meio' | 'conta' | 'situacao'
+
+const moeda = (n: number) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+const dataBr = (iso: string | null) => (iso ? iso.split('-').reverse().join('/') : '—')
+const hojeIso = () => new Date().toLocaleDateString('en-CA')
+const primeiroDia = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01` }
+const ultimoDia = () => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth() + 1, 0).toLocaleDateString('en-CA') }
+
+const feito = (m: Movimentacao) => m.status === 'Recebido' || m.status === 'Pago'
+const vencimentoDe = (m: Movimentacao) => m.data_vencimento ?? m.data
+const pessoaDe = (m: Movimentacao) => m.alunos?.nome ?? m.professores?.nome ?? m.pessoas?.nome ?? null
+const categoriaDe = (m: Movimentacao) => m.categorias_financeiro ? `${m.categorias_financeiro.categoria}${m.categorias_financeiro.subcategoria ? ' / ' + m.categorias_financeiro.subcategoria : ''}` : ''
+const somar = (l: Movimentacao[]) => Math.round(l.reduce((a, m) => a + Number(m.valor), 0) * 100) / 100
+
+const CHAVES: Record<ColunaId, (m: Movimentacao) => Valor> = {
+  vencimento: m => vencimentoDe(m),
+  pagamento: m => m.data_pagamento,
+  tipo: m => m.tipo,
+  categoria: m => categoriaDe(m),
+  descricao: m => m.descricao,
+  pessoa: m => pessoaDe(m),
+  valor: m => Number(m.valor),
+  meio: m => m.forma_pagamento,
+  conta: m => m.contas_bancarias?.nome ?? m.bancos?.nome ?? null,
+  situacao: m => (feito(m) ? 'Pago' : 'Em aberto'),
+}
+const COLUNAS: { id: ColunaId; titulo: string; alinha?: 'center' | 'right' }[] = [
+  { id: 'vencimento', titulo: 'Vencimento' },
+  { id: 'pagamento', titulo: 'Pagamento' },
+  { id: 'tipo', titulo: 'Tipo' },
+  { id: 'categoria', titulo: 'Categoria' },
+  { id: 'descricao', titulo: 'Descrição' },
+  { id: 'pessoa', titulo: 'Aluno / Pessoa' },
+  { id: 'valor', titulo: 'Valor', alinha: 'right' },
+  { id: 'meio', titulo: 'Meio' },
+  { id: 'conta', titulo: 'Conta' },
+  { id: 'situacao', titulo: 'Situação' },
+]
+
+function Cartao({ titulo, valor, cor, nota }: { titulo: string; valor: number; cor?: string; nota?: string }) {
+  return (
+    <div className="bg-white border border-[#7DC421] rounded-xl px-5 py-3 flex flex-col justify-center min-h-[84px]">
+      <div className="text-sm font-medium text-gray-600">{titulo}</div>
+      <div className={`text-kpi ${cor ?? 'text-gray-900'}`}>{moeda(valor)}</div>
+      {nota && <div className="text-xs text-gray-500">{nota}</div>}
+    </div>
+  )
 }
 
 export default function Financeiro() {
   const { unidadeId } = useUnidade()
-  const [movimentacoes, setMovimentacoes] = useState<Movimentacao[]>([])
+  const [movs, setMovs] = useState<Movimentacao[]>([])
+  const [catalogos, setCatalogos] = useState<Catalogos>({ categorias: [], pessoas: [], contas: [], bancos: [], esportes: [], alunos: [], professores: [] })
   const [loading, setLoading] = useState(true)
-  const [filtroTipo, setFiltroTipo] = useState('Todos')
-  const [filtroMes, setFiltroMes] = useState(() => String(new Date().getMonth() + 1).padStart(2, '0'))
-  const [filtroAno, setFiltroAno] = useState(() => String(new Date().getFullYear()))
-  const filtroPeriodo = filtroMes && filtroAno ? `${filtroAno}-${filtroMes}` : ''
-  const [ordenacao, setOrdenacao] = useState<{ coluna: 'data' | 'valor' | 'status' | 'vencimento', direcao: 'asc' | 'desc' }>({ coluna: 'data', direcao: 'desc' })
+  const [aba, setAba] = useState<Aba>('mov')
+  const [de, setDe] = useState(primeiroDia)
+  const [ate, setAte] = useState(ultimoDia)
+  const [filtroTipo, setFiltroTipo] = useState<'' | TipoMov>('')
+  const [filtroCategoria, setFiltroCategoria] = useState('')
+  const [busca, setBusca] = useState('')
+  const [ordem, setOrdem] = useState<{ coluna: ColunaId; direcao: Direcao }>({ coluna: 'vencimento', direcao: 'desc' })
+  const [modal, setModal] = useState<null | { tipo: TipoMov; movimento?: Movimentacao }>(null)
 
-  async function carregar() {
+  const carregar = useCallback(async () => {
     if (!unidadeId) return
     setLoading(true)
-
-    const { data } = await supabase
-      .from('movimentacoes')
-      .select('*, categorias_financeiro(categoria, subcategoria), pessoas(nome), contas_bancarias(nome), professores(nome), alunos!movimentacoes_aluno_ref_id_fkey(nome)')
-      .eq('unidade_id', unidadeId)
-      .order('data', { ascending: false })
-      .limit(100)
-
-    setMovimentacoes(data ?? [])
+    const [m, c, p, ct, b, e, a, pr] = await Promise.all([
+      supabase.from('movimentacoes')
+        .select('*, categorias_financeiro(categoria, subcategoria), pessoas(nome), contas_bancarias(nome), bancos(nome), professores(nome), alunos!movimentacoes_aluno_ref_id_fkey(nome)')
+        .eq('unidade_id', unidadeId).order('data_vencimento', { ascending: false }).limit(5000),
+      supabase.from('categorias_financeiro').select('id, tipo, categoria, subcategoria').eq('ativo', true),
+      supabase.from('pessoas').select('id, nome').order('nome'),
+      supabase.from('contas_bancarias').select('id, nome').eq('unidade_id', unidadeId).order('nome'),
+      supabase.from('bancos').select('id, nome').eq('ativo', true).order('nome'),
+      supabase.from('esportes').select('id, nome').eq('ativo', true).order('nome'),
+      supabase.from('alunos').select('id, nome').eq('unidade_id', unidadeId).order('nome'),
+      supabase.from('professores').select('id, nome').order('nome'),
+    ])
+    setMovs((m.data ?? []) as unknown as Movimentacao[])
+    setCatalogos({
+      categorias: (c.data ?? []) as Catalogos['categorias'], pessoas: p.data ?? [], contas: ct.data ?? [], bancos: b.data ?? [],
+      esportes: e.data ?? [], alunos: a.data ?? [], professores: pr.data ?? [],
+    })
     setLoading(false)
-  }
+  }, [unidadeId])
 
-  async function deletar(id: string) {
-    if (!confirm('Excluir esta movimentação?')) return
-
-    const { error } = await supabase
-      .from('movimentacoes')
-      .delete()
-      .eq('id', id)
-
-    if (error) {
-      alert('Erro ao excluir: ' + error.message)
-      return
-    }
-
-    carregar()
-  }
-
-  async function darBaixa(mov: Movimentacao) {
-    if (!confirm('Confirmar baixa desta movimentação?')) return
-
-    const novoStatus = mov.tipo === 'Entrada' ? 'Recebido' : 'Pago'
-    const hoje = new Date().toISOString().split('T')[0]
-
-    const { error } = await supabase
-      .from('movimentacoes')
-      .update({
-        status: novoStatus,
-        data_pagamento: hoje,
-      })
-      .eq('id', mov.id)
-
-    if (error) {
-      alert('Erro ao dar baixa: ' + error.message)
-      return
-    }
-
-    carregar()
-  }
-
-  function alternarOrdenacao(coluna: 'data' | 'valor' | 'status' | 'vencimento') {
-    if (ordenacao.coluna === coluna) {
-      setOrdenacao({ ...ordenacao, direcao: ordenacao.direcao === 'asc' ? 'desc' : 'asc' })
-    } else {
-      setOrdenacao({ coluna, direcao: 'desc' })
-    }
-  }
-
+  useEffect(() => { carregar() }, [carregar])
   useEffect(() => {
-    carregar()
-  }, [unidadeId]) // eslint-disable-line react-hooks/exhaustive-deps
+    // As telas antigas Contas a receber / Contas a pagar levam para cá com ?aba=
+    const a = new URLSearchParams(window.location.search).get('aba')
+    if (a === 'receber' || a === 'pagar') setAba(a)
+  }, [])
 
-  const { filtrados, totais } = useMemo(() => {
-    let filtrados = movimentacoes.filter(m => {
-      const matchTipo = filtroTipo === 'Todos' || m.tipo === filtroTipo
-      const dataMes = m.data.substring(0, 7)
-      const matchPeriodo = !filtroPeriodo || dataMes === filtroPeriodo
-      return matchTipo && matchPeriodo
-    })
-
-    filtrados = filtrados.sort((a, b) => {
-      const dir = ordenacao.direcao === 'asc' ? 1 : -1
-      if (ordenacao.coluna === 'data') return (a.data > b.data ? 1 : -1) * dir
-      if (ordenacao.coluna === 'valor') return (a.valor - b.valor) * dir
-      if (ordenacao.coluna === 'status') return ((a.status || '') > (b.status || '') ? 1 : -1) * dir
-      if (ordenacao.coluna === 'vencimento') return ((a.data_vencimento ?? '') > (b.data_vencimento ?? '') ? 1 : -1) * dir
-      return 0
-    })
-
-    const entradasTotal = filtrados.filter(m => m.tipo === 'Entrada').reduce((acc, m) => acc + m.valor, 0)
-    const saidasTotal = filtrados.filter(m => m.tipo === 'Saída').reduce((acc, m) => acc + m.valor, 0)
-
-    return {
-      filtrados,
-      totais: {
-        entradas: entradasTotal,
-        saidas: saidasTotal,
-        saldo: entradasTotal - saidasTotal,
+  const hoje = hojeIso()
+  const { lista, abertoTotal, vencido } = useMemo(() => {
+    const q = busca.trim().toLowerCase()
+    let l = movs.filter(m => {
+      if (aba === 'receber' && (m.tipo !== 'Entrada' || feito(m))) return false
+      if (aba === 'pagar' && (m.tipo !== 'Saída' || feito(m))) return false
+      if (aba === 'mov') {
+        if (filtroTipo && m.tipo !== filtroTipo) return false
+        const v = vencimentoDe(m)
+        const noPeriodo = (v >= de && v <= ate) || (!!m.data_pagamento && m.data_pagamento >= de && m.data_pagamento <= ate)
+        if (!noPeriodo) return false
       }
-    }
-  }, [movimentacoes, filtroTipo, filtroPeriodo, ordenacao])
+      if (filtroCategoria) {
+        const c = categoriaDe(m).toLowerCase(), f = filtroCategoria.toLowerCase()
+        if (c !== f && !c.startsWith(f + ' / ')) return false
+      }
+      if (q && !`${m.descricao ?? ''} ${categoriaDe(m)} ${pessoaDe(m) ?? ''} ${m.contas_bancarias?.nome ?? ''} ${m.bancos?.nome ?? ''}`.toLowerCase().includes(q)) return false
+      return true
+    })
+    // Contas a receber/pagar: o que vence primeiro fica em cima, a menos que a pessoa escolha outra coluna
+    const dir: Direcao = aba !== 'mov' && ordem.coluna === 'vencimento' && ordem.direcao === 'desc' ? 'asc' : ordem.direcao
+    l = ordenar(l, CHAVES[ordem.coluna], dir)
+    const abertos = l.filter(m => !feito(m))
+    return { lista: l, abertoTotal: somar(abertos), vencido: somar(abertos.filter(m => vencimentoDe(m) < hoje)) }
+  }, [movs, aba, de, ate, filtroTipo, filtroCategoria, busca, ordem, hoje])
 
-  const pagination = usePagination(filtrados, 20)
+  const entRecebidas = somar(lista.filter(m => m.tipo === 'Entrada' && feito(m)))
+  const saiPagas = somar(lista.filter(m => m.tipo === 'Saída' && feito(m)))
+  const aReceber = somar(lista.filter(m => m.tipo === 'Entrada' && !feito(m)))
+  const aPagar = somar(lista.filter(m => m.tipo === 'Saída' && !feito(m)))
+
+  const categoriasFiltro = useMemo(() => {
+    const por = new Map<string, Set<string>>()
+    for (const c of catalogos.categorias) {
+      if (!por.has(c.categoria)) por.set(c.categoria, new Set())
+      if (c.subcategoria) por.get(c.categoria)!.add(c.subcategoria)
+    }
+    return [...por.entries()].sort((a, b) => a[0].localeCompare(b[0]))
+  }, [catalogos.categorias])
+
+  const pagination = usePagination(lista, 20)
+
+  async function alternarBaixa(m: Movimentacao) {
+    const concluido = feito(m)
+    if (!confirm(concluido ? 'Desfazer a baixa desta movimentação?' : 'Confirmar baixa desta movimentação?')) return
+    const { error } = await supabase.from('movimentacoes').update({
+      status: concluido ? (m.tipo === 'Entrada' ? 'Não recebido' : 'Pendente') : (m.tipo === 'Entrada' ? 'Recebido' : 'Pago'),
+      data_pagamento: concluido ? null : hoje,
+    }).eq('id', m.id)
+    if (error) return alert('Erro ao dar baixa: ' + error.message)
+    await registrarLog(concluido ? 'Baixa desfeita' : 'Baixa de movimentação', 'movimentacoes', m.id)
+    carregar()
+  }
+
+  async function excluir(m: Movimentacao) {
+    if (!confirm('Excluir esta movimentação? Não dá para desfazer.')) return
+    const { error } = await supabase.from('movimentacoes').delete().eq('id', m.id)
+    if (error) return alert('Erro ao excluir: ' + error.message)
+    await registrarLog('Movimentação excluída', 'movimentacoes', m.id, m.descricao ?? undefined)
+    carregar()
+  }
+
+  const abaBtn = (id: Aba, texto: string) => (
+    <button onClick={() => setAba(id)}
+      className={`px-4 h-10 text-sm font-medium rounded-lg transition-colors ${aba === id ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>{texto}</button>
+  )
+  const campoFiltro = 'h-10 border border-gray-200 rounded-lg px-3 text-sm bg-white'
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <h1 className="text-page-title text-gray-900">Financeiro</h1>
-        <Link
-          href="/financeiro/novo"
-          className="px-4 py-2.5 text-sm bg-[#7DC421] text-white font-medium rounded-lg hover:bg-[#6ab01a] transition-colors"
-        >
-          + Nova movimentação
-        </Link>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="bg-white border border-[#7DC421] rounded-xl p-6">
-          <div className="text-sm font-medium text-gray-600 mb-2">Total Entradas</div>
-          <div className="text-kpi text-green-600">
-            R$ {totais.entradas.toFixed(2).replace('.', ',')}
-          </div>
-        </div>
-
-        <div className="bg-white border border-[#7DC421] rounded-xl p-6">
-          <div className="text-sm font-medium text-gray-600 mb-2">Total Saídas</div>
-          <div className="text-kpi text-red-600">
-            R$ {totais.saidas.toFixed(2).replace('.', ',')}
-          </div>
-        </div>
-
-        <div className="bg-white border border-[#7DC421] rounded-xl p-6">
-          <div className="text-sm font-medium text-gray-600 mb-2">Saldo</div>
-          <div className={`text-kpi ${totais.saldo >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
-            R$ {totais.saldo.toFixed(2).replace('.', ',')}
-          </div>
+        <div className="flex gap-2">
+          <button onClick={() => setModal({ tipo: 'Entrada' })} className="h-10 min-w-[7rem] px-5 text-sm font-semibold text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors">Entrada</button>
+          <button onClick={() => setModal({ tipo: 'Saída' })} className="h-10 min-w-[7rem] px-5 text-sm font-semibold text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors">Saída</button>
         </div>
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-xl p-6 mb-6">
-        <div className="flex gap-4">
-          <div>
-            <label className="text-label text-gray-500 block mb-1">Mês</label>
-            <select
-              value={filtroMes}
-              onChange={e => setFiltroMes(e.target.value)}
-              className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"
-            >
-              <option value="">Todos</option>
-              <option value="01">Janeiro</option>
-              <option value="02">Fevereiro</option>
-              <option value="03">Março</option>
-              <option value="04">Abril</option>
-              <option value="05">Maio</option>
-              <option value="06">Junho</option>
-              <option value="07">Julho</option>
-              <option value="08">Agosto</option>
-              <option value="09">Setembro</option>
-              <option value="10">Outubro</option>
-              <option value="11">Novembro</option>
-              <option value="12">Dezembro</option>
-            </select>
-          </div>
-          <div>
-            <label className="text-label text-gray-500 block mb-1">Ano</label>
-            <select
-              value={filtroAno}
-              onChange={e => setFiltroAno(e.target.value)}
-              className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"
-            >
-              <option value="">Todos</option>
-              <option value="2024">2024</option>
-              <option value="2025">2025</option>
-              <option value="2026">2026</option>
-              <option value="2027">2027</option>
-            </select>
-          </div>
-          <div>
-            <label className="text-label text-gray-500 block mb-1">Tipo</label>
-            <select
-              value={filtroTipo}
-              onChange={e => setFiltroTipo(e.target.value)}
-              className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"
-            >
-              <option value="Todos">Todos</option>
-              <option value="Entrada">Entradas</option>
-              <option value="Saída">Saídas</option>
-            </select>
-          </div>
-        </div>
+      <div className="inline-flex gap-1 p-1 mb-4 rounded-xl border border-gray-200 bg-white">
+        {abaBtn('mov', 'Movimentação')}{abaBtn('receber', 'Contas a receber')}{abaBtn('pagar', 'Contas a pagar')}
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+      <div className="flex flex-wrap items-end gap-3 mb-4">
+        {aba === 'mov' && (
+          <>
+            <label><span className="text-label text-gray-500 block mb-1">De</span><input type="date" className={campoFiltro} value={de} onChange={e => setDe(e.target.value)} /></label>
+            <label><span className="text-label text-gray-500 block mb-1">Até</span><input type="date" className={campoFiltro} value={ate} onChange={e => setAte(e.target.value)} /></label>
+            <label><span className="text-label text-gray-500 block mb-1">Tipo</span>
+              <select className={campoFiltro} value={filtroTipo} onChange={e => setFiltroTipo(e.target.value as '' | TipoMov)}>
+                <option value="">Entradas e saídas</option><option value="Entrada">Só entradas</option><option value="Saída">Só saídas</option>
+              </select></label>
+          </>
+        )}
+        <label><span className="text-label text-gray-500 block mb-1">Categoria</span>
+          <select className={`${campoFiltro} min-w-[14rem]`} value={filtroCategoria} onChange={e => setFiltroCategoria(e.target.value)}>
+            <option value="">Todas as categorias</option>
+            {categoriasFiltro.map(([nome, subs]) => (
+              <optgroup key={nome} label={nome}>
+                <option value={nome}>Toda a categoria {nome}</option>
+                {[...subs].sort().map(s => <option key={s} value={`${nome} / ${s}`}>{s}</option>)}
+              </optgroup>
+            ))}
+          </select></label>
+        <input className={`${campoFiltro} flex-1 min-w-[14rem]`} placeholder="Descrição, aluno, categoria, conta" value={busca} onChange={e => setBusca(e.target.value)} />
+      </div>
+
+      <div className="grid gap-4 mb-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))' }}>
+        {aba === 'mov' ? (
+          <>
+            <Cartao titulo="Entradas recebidas" valor={entRecebidas} cor="text-green-600" />
+            <Cartao titulo="Saídas pagas" valor={saiPagas} cor="text-red-600" />
+            <Cartao titulo="Saldo do período" valor={Math.round((entRecebidas - saiPagas) * 100) / 100} cor={entRecebidas - saiPagas >= 0 ? 'text-blue-600' : 'text-red-600'} nota="recebido − pago" />
+            <Cartao titulo="A receber no período" valor={aReceber} />
+            <Cartao titulo="A pagar no período" valor={aPagar} />
+          </>
+        ) : (
+          <>
+            <Cartao titulo={aba === 'receber' ? 'Total a receber' : 'Total a pagar'} valor={abertoTotal} cor={aba === 'receber' ? 'text-green-600' : 'text-red-600'} nota={`${lista.length} lançamento(s) em aberto`} />
+            <Cartao titulo="Vencido" valor={vencido} cor="text-red-600" />
+            <Cartao titulo="A vencer" valor={Math.round((abertoTotal - vencido) * 100) / 100} cor="text-blue-600" />
+          </>
+        )}
+      </div>
+
+      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-full">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-200">
-                <th
-                  onClick={() => alternarOrdenacao('data')}
-                  className="text-left px-4 py-3 text-th text-gray-500 cursor-pointer hover:bg-gray-100"
-                >
-                  Data {ordenacao.coluna === 'data' && (ordenacao.direcao === 'asc' ? '↑' : '↓')}
-                </th>
-              <th className="text-left px-4 py-3 text-th text-gray-500">Tipo</th>
-              <th className="text-left px-4 py-3 text-th text-gray-500">Categoria</th>
-              <th className="text-left px-4 py-3 text-th text-gray-500">Subcategoria</th>
-              <th className="text-left px-4 py-3 text-th text-gray-500">Descrição</th>
-              <th className="text-left px-4 py-3 text-th text-gray-500">Professor</th>
-              <th className="text-left px-4 py-3 text-th text-gray-500">Aluno</th>
-              <th className="text-left px-4 py-3 text-th text-gray-500">Competência</th>
-              <th
-                onClick={() => alternarOrdenacao('status')}
-                className="text-left px-4 py-3 text-th text-gray-500 cursor-pointer hover:bg-gray-100"
-              >
-                Status {ordenacao.coluna === 'status' && (ordenacao.direcao === 'asc' ? '↑' : '↓')}
-              </th>
-              <th className="text-left px-4 py-3 text-th text-gray-500">Pagamento</th>
-              <th
-                onClick={() => alternarOrdenacao('vencimento')}
-                className="text-left px-4 py-3 text-th text-gray-500 cursor-pointer hover:bg-gray-100"
-              >
-                Vencimento {ordenacao.coluna === 'vencimento' && (ordenacao.direcao === 'asc' ? '↑' : '↓')}
-              </th>
-              <th
-                onClick={() => alternarOrdenacao('valor')}
-                className="text-left px-4 py-3 text-th text-gray-500 cursor-pointer hover:bg-gray-100"
-              >
-                Valor {ordenacao.coluna === 'valor' && (ordenacao.direcao === 'asc' ? '↑' : '↓')}
-              </th>
-              <th className="text-left px-4 py-3 text-th text-gray-500">Ações</th>
+          <table className="w-full text-sm whitespace-nowrap border-separate border-spacing-0">
+            <thead className="[&>tr>th]:border-b [&>tr>th]:border-gray-200">
+              <tr className="bg-gray-50/80">
+                {COLUNAS.map(c => {
+                  const ativa = ordem.coluna === c.id
+                  return (
+                    <th key={c.id} onClick={() => setOrdem(o => proximaOrdem(o, c.id))} title="Clique para ordenar"
+                      aria-sort={ativa ? (ordem.direcao === 'asc' ? 'ascending' : 'descending') : 'none'}
+                      className={`${c.alinha === 'right' ? 'text-right' : 'text-left'} px-3 h-11 text-th text-gray-600 cursor-pointer select-none hover:bg-gray-100`}>
+                      <span className="inline-flex items-center gap-1">
+                        {c.titulo}
+                        {ativa ? (ordem.direcao === 'asc' ? <ArrowUp size={13} className="text-blue-600" /> : <ArrowDown size={13} className="text-blue-600" />) : <ArrowUpDown size={12} className="text-gray-300" />}
+                      </span>
+                    </th>
+                  )
+                })}
+                <th className="sticky right-0 z-20 bg-gray-50 text-center px-3 h-11 text-th text-gray-600 shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.15)]">Ações</th>
               </tr>
             </thead>
-            <tbody>
-              {loading && (
-                <tr><td colSpan={13} className="text-center py-8 text-gray-400">Carregando...</td></tr>
-              )}
-              {!loading && filtrados.length === 0 && (
-                <tr><td colSpan={13} className="text-center py-8 text-gray-400">Nenhuma movimentação encontrada.</td></tr>
-              )}
-              {pagination.paginatedItems.map((m, i) => (
-                <tr key={m.id} className={`border-b border-gray-100 hover:bg-gray-50 ${i === pagination.paginatedItems.length - 1 && pagination.currentPage === pagination.totalPages ? 'border-0' : ''}`}>
-                <td className="px-4 py-3 text-gray-600">
-                  {new Date(m.data + 'T00:00:00').toLocaleDateString('pt-BR')}
-                </td>
-                <td className="px-4 py-3">
-                  <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${
-                    m.tipo === 'Entrada' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
-                  }`}>
-                    {m.tipo}
-                  </span>
-                </td>
-                <td className="px-4 py-3 text-gray-600">{m.categorias_financeiro?.categoria ?? '-'}</td>
-                <td className="px-4 py-3 text-gray-600">{m.categorias_financeiro?.subcategoria ?? '-'}</td>
-                <td className="px-4 py-3 text-gray-600">{m.descricao || '-'}</td>
-                <td className="px-4 py-3 text-gray-600">{m.professores?.nome ?? '-'}</td>
-                <td className="px-4 py-3 text-gray-600">{m.alunos?.nome ?? '-'}</td>
-                <td className="px-4 py-3 text-gray-600">
-                  {m.data_vencimento ? new Date(m.data_vencimento + 'T00:00:00').toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' }) : '-'}
-                </td>
-                <td className="px-4 py-3">
-                  {m.status && (
-                    <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${
-                      m.status === 'Recebido' || m.status === 'Pago'
-                        ? 'bg-green-50 text-green-700'
-                        : 'bg-yellow-50 text-yellow-700'
-                    }`}>
-                      {m.status}
-                    </span>
-                  )}
-                </td>
-                <td className="px-4 py-3 text-gray-600">
-                  {m.data_pagamento ? new Date(m.data_pagamento + 'T00:00:00').toLocaleDateString('pt-BR') : '-'}
-                </td>
-                <td className="px-4 py-3 text-gray-600">
-                  {m.data_vencimento ? new Date(m.data_vencimento + 'T00:00:00').toLocaleDateString('pt-BR') : '-'}
-                </td>
-                <td className={`px-4 py-3 font-medium ${m.tipo === 'Entrada' ? 'text-green-600' : 'text-red-600'}`}>
-                  {m.tipo === 'Entrada' ? '+' : '-'} R$ {m.valor.toFixed(2).replace('.', ',')}
-                </td>
-                <td className="px-4 py-3 flex gap-2">
-                  {(m.status === 'Pendente' || m.status === 'Não recebido') ? (
-                    <button onClick={() => darBaixa(m)} className="text-green-600 hover:text-green-800" title="Dar baixa">
-                      <Check size={16} />
-                    </button>
-                  ) : (
-                    <div className="w-4" />
-                  )}
-                  <Link href={`/financeiro/${m.id}/editar`} className="text-blue-600 hover:text-blue-800">
-                    <Edit2 size={16} />
-                  </Link>
-                  <button onClick={() => deletar(m.id)} className="text-red-600 hover:text-red-800">
-                    <Trash2 size={16} />
-                  </button>
-                </td>
-              </tr>
-            ))}
+            <tbody className="[&>tr>td]:border-b [&>tr>td]:border-gray-100">
+              {loading && <tr><td colSpan={11} className="text-center py-8 text-gray-400">Carregando...</td></tr>}
+              {!loading && lista.length === 0 && <tr><td colSpan={11} className="text-center py-8 text-gray-400">{aba === 'mov' ? 'Nenhum lançamento no período.' : 'Nada em aberto.'}</td></tr>}
+              {pagination.paginatedItems.map(m => {
+                const atrasado = !feito(m) && vencimentoDe(m) < hoje
+                return (
+                  <tr key={m.id} className="group h-12 hover:bg-[#7DC421]/[0.06] transition-colors">
+                    <td className={`px-3 tabular-nums ${atrasado ? 'text-red-600 font-semibold' : 'text-gray-700'}`} title={atrasado ? 'Vencido' : undefined}>{dataBr(vencimentoDe(m))}</td>
+                    <td className="px-3 tabular-nums text-gray-700">{dataBr(m.data_pagamento)}</td>
+                    <td className="px-3">
+                      <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-semibold ${m.tipo === 'Entrada' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>{m.tipo}</span>
+                    </td>
+                    <td className="px-3 text-gray-700">{categoriaDe(m) || '—'}</td>
+                    <td className="px-3 text-gray-700 max-w-[18rem] truncate" title={m.descricao ?? ''}>{m.descricao || '—'}</td>
+                    <td className="px-3 text-gray-700">{pessoaDe(m) ?? '—'}</td>
+                    <td className={`px-3 text-right font-semibold tabular-nums ${m.tipo === 'Entrada' ? 'text-green-600' : 'text-red-600'}`}>{m.tipo === 'Saída' ? '− ' : ''}{moeda(Number(m.valor))}</td>
+                    <td className="px-3 text-gray-700">{m.forma_pagamento ?? '—'}</td>
+                    <td className="px-3 text-gray-700">{m.contas_bancarias?.nome ?? m.bancos?.nome ?? '—'}</td>
+                    <td className="px-3">
+                      <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${feito(m) ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'}`}>
+                        {feito(m) ? m.status : m.tipo === 'Entrada' ? 'A receber' : 'A pagar'}
+                      </span>
+                    </td>
+                    <td className="sticky right-0 z-10 bg-white group-hover:bg-[#f6fbee] transition-colors px-3 shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.15)]">
+                      <div className="flex items-center justify-center gap-0.5">
+                        <button onClick={() => alternarBaixa(m)} title={feito(m) ? 'Desfazer baixa' : 'Dar baixa'} aria-label={feito(m) ? 'Desfazer baixa' : 'Dar baixa'}
+                          className={`inline-flex h-8 w-8 items-center justify-center rounded-lg transition-colors ${feito(m) ? 'text-gray-400 hover:bg-gray-100 hover:text-gray-700' : 'text-green-600 hover:bg-green-50'}`}>
+                          {feito(m) ? <Undo2 size={17} /> : <Check size={18} />}
+                        </button>
+                        <button onClick={() => setModal({ tipo: m.tipo, movimento: m })} title="Editar" aria-label="Editar"
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 hover:bg-blue-50 hover:text-blue-600 transition-colors"><Pencil size={17} /></button>
+                        <button onClick={() => excluir(m)} title="Excluir" aria-label="Excluir"
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors"><Trash2 size={17} /></button>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
-
-        <Pagination
-          currentPage={pagination.currentPage}
-          totalPages={pagination.totalPages}
-          totalItems={pagination.totalItems}
-          pageSize={pagination.pageSize}
-          onPageChange={pagination.goToPage}
-        />
+        <Pagination currentPage={pagination.currentPage} totalPages={pagination.totalPages} totalItems={pagination.totalItems} pageSize={pagination.pageSize} onPageChange={pagination.goToPage} />
       </div>
+      {aba === 'mov' && <p className="mt-3 text-xs text-gray-500">O período considera o vencimento ou a data do pagamento.</p>}
+
+      {modal && unidadeId && (
+        <MovimentoDialog
+          key={modal.movimento?.id ?? modal.tipo}
+          tipo={modal.tipo}
+          movimento={modal.movimento}
+          unidadeId={unidadeId}
+          catalogos={catalogos}
+          onFechar={() => setModal(null)}
+          onSalvo={() => { setModal(null); carregar() }}
+        />
+      )}
     </div>
   )
 }
