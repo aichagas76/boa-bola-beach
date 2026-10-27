@@ -79,7 +79,13 @@ export function FormVenda({ produtos, saldos, inicial, alunos, professores, banc
   const [salvando, setSalvando] = useState(false)
 
   const produto = produtos.find(p => p.id === produtoId)
-  const preco = produto ? precoUnitario(produto, comprador) : 0
+  const precoPadrao = produto ? precoUnitario(produto, comprador) : 0
+  // O valor pode ser alterado na venda; ao trocar de produto ou de comprador volta ao preço do cadastro
+  const chavePreco = `${produtoId}|${comprador}`
+  const [manual, setManual] = useState<{ chave: string; texto: string } | null>(null)
+  const textoPreco = manual && manual.chave === chavePreco ? manual.texto : String(precoPadrao).replace('.', ',')
+  const editou = !!manual && manual.chave === chavePreco && Number.isFinite(numero(manual.texto))
+  const preco = editou ? numero(manual!.texto) : precoPadrao
   const q = parseInt(qtd) || 0
   const aluno = alunoFixo ?? alunos.find(a => a.id === alunoId)
   const vencimento = comprador === 'aluno' ? vencimentoNaMensalidade(hojeIso(), aluno?.data_vencimento) : vencimentoProfessor(hojeIso())
@@ -95,6 +101,7 @@ export function FormVenda({ produtos, saldos, inicial, alunos, professores, banc
       p_pago: pago, p_forma: forma, p_banco: pago ? banco || null : null, p_vencimento: pago ? null : vencimento, p_data: data,
       p_comissao_professor: produto.encordoamento ? comissaoProf || null : null,
       p_comissao_valor: produto.encordoamento && comissaoValor.trim() !== '' ? numero(comissaoValor) : null,
+      ...(editou ? { p_preco: preco } : {}),
     })
     setSalvando(false)
     if (error) return alert('Erro: ' + error.message)
@@ -126,8 +133,12 @@ export function FormVenda({ produtos, saldos, inicial, alunos, professores, banc
         )}
         <Rotulo texto="Quantidade"><input className={campo} inputMode="numeric" value={qtd} onChange={e => setQtd(e.target.value)} /></Rotulo>
         <Rotulo texto="Data"><input type="date" className={campo} value={data} onChange={e => setData(e.target.value)} /></Rotulo>
-        <div className="col-span-2 rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-700">
-          {produto ? <>Preço {comprador === 'professor' ? 'do professor' : 'do aluno'}: <b>{moeda(preco)}</b> · Total: <b>{moeda(totalVenda(preco, q))}</b></> : 'Escolha o produto para ver o valor.'}
+        <Rotulo texto={`Valor de cada (R$) — ${comprador === 'professor' ? 'preço do professor' : 'preço do aluno'}, pode alterar`}>
+          <input className={campo} inputMode="decimal" disabled={!produto} value={produto ? textoPreco : ''} placeholder="0,00"
+            onChange={e => setManual({ chave: chavePreco, texto: e.target.value })} />
+        </Rotulo>
+        <div className="rounded-lg bg-gray-50 px-3 flex flex-col justify-center text-sm text-gray-700 self-end h-10">
+          {produto ? <span>Total: <b>{moeda(totalVenda(preco, q))}</b>{editou && preco !== precoPadrao ? <span className="ml-2 text-xs text-amber-600">(alterado)</span> : null}</span> : 'Escolha o produto'}
         </div>
         <div className="col-span-2 flex gap-2">
           <button type="button" onClick={() => setPago(true)} className={`flex-1 h-10 rounded-lg border text-sm ${pago ? 'border-green-500 bg-green-50 text-green-800' : 'border-gray-200 text-gray-600'}`}>Pago agora</button>
