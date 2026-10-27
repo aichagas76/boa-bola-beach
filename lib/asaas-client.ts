@@ -79,8 +79,14 @@ export class AsaasClient {
       email: params.email || undefined,
       mobilePhone: params.phone?.replace(/\D/g, '') || undefined,
       cpfCnpj: params.cpf?.replace(/\D/g, '') || undefined,
-      notificationDisabled: false,
+      // Nenhuma notificação do Asaas (e-mail, SMS, WhatsApp): toda a comunicação com o cliente é feita pelo n8n
+      notificationDisabled: true,
     })
+  }
+
+  /** Desliga as notificações de um cliente que já existe no Asaas. */
+  async disableCustomerNotifications(customerId: string) {
+    return this.request(`/customers/${customerId}`, 'PUT', { notificationDisabled: true })
   }
 
   async createPayment(params: CreatePaymentParams): Promise<AsaasPayment> {
