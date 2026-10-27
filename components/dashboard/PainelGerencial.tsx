@@ -283,9 +283,13 @@ export default function PainelGerencial() {
       <div className="flex flex-wrap items-end justify-between gap-3 mb-5">
         <div className="pl-12 md:pl-0">
           <h1 className="text-page-title text-gray-900">Painel</h1>
-          <p className="text-sm text-gray-500">{unidade?.nome ?? ''} · indicadores principais: {rotuloPeriodo}{modalidade ? ` · ${nomeModalidade}` : ''}</p>
+          <p className="text-sm text-gray-500">{unidade?.nome ?? ''} · {preset === 'custom' && (!de || !ate) ? 'escolha as duas datas' : rotuloPeriodo}{modalidade ? ` · ${nomeModalidade}` : ''}</p>
+          <select value={modalidade} onChange={e => setModalidade(e.target.value)} className="mt-2 block h-9 border border-gray-200 rounded-lg px-2 text-sm bg-white" aria-label="Modalidade">
+            <option value="">Todas as modalidades</option>
+            {modalidadesDisponiveis.map(m => <option key={m} value={m}>{m === 'Aula' ? 'Aulas' : m}</option>)}
+          </select>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
           <div className="inline-flex max-w-[calc(100vw-2rem)] overflow-x-auto rounded-lg border border-gray-200 bg-white">
             {PRESETS.map(p => (
               <button key={p.id} type="button" onClick={() => setPreset(p.id)}
@@ -295,23 +299,16 @@ export default function PainelGerencial() {
             ))}
           </div>
           {preset === 'custom' && (
-            <div className="inline-flex items-center gap-2 text-sm text-gray-600">
-              <input type="date" value={de} max={hoje} onChange={e => setDe(e.target.value)} className="h-9 border border-gray-200 rounded-lg px-2 text-sm bg-white" aria-label="De" />
+            <div className="inline-flex shrink-0 items-center gap-2 text-sm text-gray-600">
+              <input type="date" value={de} max={hoje} onChange={e => setDe(e.target.value)} className="h-9 w-[8.25rem] border border-gray-200 rounded-lg px-2 text-sm bg-white" aria-label="De" />
               até
-              <input type="date" value={ate} max={hoje} onChange={e => setAte(e.target.value)} className="h-9 border border-gray-200 rounded-lg px-2 text-sm bg-white" aria-label="Até" />
+              <input type="date" value={ate} max={hoje} onChange={e => setAte(e.target.value)} className="h-9 w-[8.25rem] border border-gray-200 rounded-lg px-2 text-sm bg-white" aria-label="Até" />
             </div>
           )}
-          <select value={modalidade} onChange={e => setModalidade(e.target.value)} className="h-9 border border-gray-200 rounded-lg px-2 text-sm bg-white" aria-label="Modalidade">
-            <option value="">Todas as modalidades</option>
-            {modalidadesDisponiveis.map(m => <option key={m} value={m}>{m === 'Aula' ? 'Aulas' : m}</option>)}
-          </select>
         </div>
       </div>
 
       {erro && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{erro}</div>}
-      {preset === 'custom' && (!de || !ate) && (
-        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">Escolha as duas datas do intervalo. Enquanto isso, o painel mostra o dia de hoje.</div>
-      )}
 
       {/* Indicadores principais */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-3">

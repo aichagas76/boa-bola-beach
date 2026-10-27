@@ -24,8 +24,8 @@ export type EstadoPeriodo = ReturnType<typeof usePeriodo>
 
 export function FiltroPeriodo({ p, nome }: { p: EstadoPeriodo; nome: string }) {
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <div className="inline-flex max-w-[calc(100vw-2rem)] overflow-x-auto rounded-lg border border-gray-200 bg-white" role="group" aria-label={`Período de ${nome}`}>
+    <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
+      <div className="inline-flex shrink-0 max-w-[calc(100vw-2rem)] overflow-x-auto rounded-lg border border-gray-200 bg-white" role="group" aria-label={`Período de ${nome}`}>
         {PRESETS.map(x => (
           <button key={x.id} type="button" aria-pressed={p.preset === x.id} onClick={() => p.setPreset(x.id)}
             className={`px-3 h-9 text-sm font-medium whitespace-nowrap transition-colors ${p.preset === x.id ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-50'}`}>
@@ -34,10 +34,10 @@ export function FiltroPeriodo({ p, nome }: { p: EstadoPeriodo; nome: string }) {
         ))}
       </div>
       {p.preset === 'custom' && (
-        <div className="inline-flex items-center gap-2 text-sm text-gray-600">
-          <input type="date" value={p.de} max={p.hoje} onChange={e => p.setDe(e.target.value)} className="h-9 border border-gray-200 rounded-lg px-2 text-sm bg-white" aria-label={`De (${nome})`} />
+        <div className="inline-flex shrink-0 items-center gap-2 text-sm text-gray-600">
+          <input type="date" value={p.de} max={p.hoje} onChange={e => p.setDe(e.target.value)} className="h-9 w-[8.25rem] border border-gray-200 rounded-lg px-2 text-sm bg-white" aria-label={`De (${nome})`} />
           até
-          <input type="date" value={p.ate} max={p.hoje} onChange={e => p.setAte(e.target.value)} className="h-9 border border-gray-200 rounded-lg px-2 text-sm bg-white" aria-label={`Até (${nome})`} />
+          <input type="date" value={p.ate} max={p.hoje} onChange={e => p.setAte(e.target.value)} className="h-9 w-[8.25rem] border border-gray-200 rounded-lg px-2 text-sm bg-white" aria-label={`Até (${nome})`} />
         </div>
       )}
     </div>
