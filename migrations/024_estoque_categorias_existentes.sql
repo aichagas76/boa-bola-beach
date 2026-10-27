@@ -3,7 +3,7 @@
 --   compra   -> Saída:   Compra Produto Loja / Outros
 --   comissão -> Saída:   Mão de Obra / Comissão de encordoamento (já existia)
 -- Os lançamentos feitos com as categorias duplicadas (021) são movidos para as certas e as duplicadas são apagadas.
--- NÃO APLICADA.
+-- APLICADA.
 update public.movimentacoes set categoria_id = (select id from public.categorias_financeiro where tipo = 'Entrada' and categoria = 'Venda Produto Loja' and subcategoria = 'Outros')
   where categoria_id in (select id from public.categorias_financeiro where tipo = 'Entrada' and categoria = 'Venda de Produtos' and subcategoria = 'Loja');
 update public.movimentacoes set categoria_id = (select id from public.categorias_financeiro where tipo = 'Saída' and categoria = 'Compra Produto Loja' and subcategoria = 'Outros')
