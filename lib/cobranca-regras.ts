@@ -41,3 +41,26 @@ export function jaTemCobranca(pagamentos: PagamentoResumo[], vencimento: string,
 export function dataSaoPaulo(somarDias = 0) {
   return new Date(Date.now() + somarDias * 86400000).toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' })
 }
+
+type DecisaoAcesso = { ok: true } | { ok: false; status: number; erro: string }
+
+/** O login pode mexer neste aluno? Só se estiver logado e tiver acesso à unidade do aluno. */
+export function decidirAcessoAluno(p: { logado: boolean; alunoExiste: boolean; alunoUnidade: string | null | undefined; unidadesDoLogin: string[] }): DecisaoAcesso {
+  if (!p.logado) return { ok: false, status: 401, erro: 'Não autenticado' }
+  if (!p.alunoExiste) return { ok: false, status: 404, erro: 'Aluno não encontrado' }
+  if (!p.alunoUnidade || !p.unidadesDoLogin.includes(p.alunoUnidade)) {
+    return { ok: false, status: 403, erro: 'Seu login não tem acesso à unidade deste aluno' }
+  }
+  return { ok: true }
+}
+
+/** O valor de uma cobrança nova nunca pode passar do que o aluno deve (mensalidades + produtos em aberto). Mensagem de erro, ou null. */
+export function validarValorCobranca(valor: unknown, devido: number): string | null {
+  const v = Number(valor)
+  if (!Number.isFinite(v) || v <= 0) return 'Valor inválido'
+  if (!(devido > 0)) return 'Este aluno não tem valor a cobrar'
+  if (v > Math.round(devido * 100) / 100 + 0.005) {
+    return `Valor acima do que o aluno deve (R$ ${devido.toFixed(2).replace('.', ',')})`
+  }
+  return null
+}

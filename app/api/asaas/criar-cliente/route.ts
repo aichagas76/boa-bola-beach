@@ -1,21 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
 import { getAsaasClient } from '@/lib/asaas-client'
+import { autorizarAluno } from '@/lib/acesso-aluno'
 
 export async function POST(request: NextRequest) {
   try {
-    // Só quem está logado cria cliente no Asaas (o menu deixa esta rota fora da checagem de login)
-    const cookieStore = await cookies()
-    const auth = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
-      { cookies: { getAll: () => cookieStore.getAll(), setAll: () => {} } }
-    )
-    const { data: { user } } = await auth.auth.getUser()
-    if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
-
     const { nome, celular, cpf, aluno_id } = await request.json()
+
+    // Só quem está logado e tem acesso à unidade do aluno cria o cliente dele no Asaas
+    const acesso = await autorizarAluno(aluno_id)
+    if (!acesso.ok) return NextResponse.json({ error: acesso.erro }, { status: acesso.status })
 
     if (!nome || !cpf) {
       return NextResponse.json(
@@ -34,7 +27,7 @@ export async function POST(request: NextRequest) {
     })
 
     return NextResponse.json({
-      id: (customer as any).id,
+      id: (customer as { id: string }).id,
       success: true,
     })
   } catch (error) {

@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
 import { getSupabaseAdmin } from '@/lib/supabase-admin'
 import { criarCobrancaAsaas, CobrancaError } from '@/lib/asaas-cobranca'
+import { autorizarAluno } from '@/lib/acesso-aluno'
+import { validarValorCobranca } from '@/lib/cobranca-regras'
 
 export async function POST(request: NextRequest) {
   let criadoAgora: string | null = null
@@ -15,28 +15,30 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'pagamentoId ou alunoId obrigatório' }, { status: 400 })
     }
 
-    // Exige usuário logado
-    const cookieStore = await cookies()
-    const auth = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
-      { cookies: { getAll: () => cookieStore.getAll(), setAll: () => {} } }
-    )
-    const { data: { user } } = await auth.auth.getUser()
-    if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
+    // De quem é a cobrança? (com pagamentoId, o aluno vem do próprio registro, não do que o navegador mandou)
+    let alunoId: string | undefined = body.alunoId
+    if (pagamentoId) {
+      const { data: pag } = await db.from('pagamentos').select('aluno_id').eq('id', pagamentoId).maybeSingle()
+      if (!pag) return NextResponse.json({ error: 'Pagamento não encontrado' }, { status: 404 })
+      alunoId = pag.aluno_id
+    }
+
+    // Exige login com acesso à unidade do aluno (esta rota usa a chave administrativa, que ignora o controle por unidade)
+    const acesso = await autorizarAluno(alunoId)
+    if (!acesso.ok) return NextResponse.json({ error: acesso.erro }, { status: acesso.status })
 
     // Sem pagamento existente: cria um registro novo para o aluno
     if (!pagamentoId) {
+      // O valor vem da tela, mas nunca pode passar do que o aluno deve
+      const erroValor = validarValorCobranca(body.valor, acesso.devido)
+      if (erroValor) return NextResponse.json({ error: erroValor }, { status: 400 })
       const valor = Number(body.valor)
-      if (!valor || valor <= 0) {
-        return NextResponse.json({ error: 'Valor inválido' }, { status: 400 })
-      }
       const venc: string = body.dataVencimento || new Date().toLocaleDateString('en-CA')
       // Já existe pagamento deste aluno para este vencimento? Reaproveita em vez de duplicar
       const { data: existente } = await db
         .from('pagamentos')
         .select('id, status')
-        .eq('aluno_id', body.alunoId)
+        .eq('aluno_id', alunoId)
         .eq('data_vencimento', venc)
         .order('created_at', { ascending: false })
       if (existente && existente.length > 0) {
@@ -50,7 +52,7 @@ export async function POST(request: NextRequest) {
       const { data: novo, error: novoError } = await db
         .from('pagamentos')
         .insert({
-          aluno_id: body.alunoId,
+          aluno_id: alunoId,
           valor,
           data_vencimento: venc,
           competencia: venc.slice(0, 7),
