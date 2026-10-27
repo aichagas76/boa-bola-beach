@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { useUnidade } from '@/components/layout/UnidadeProvider'
 import { registrarLog } from '@/lib/log'
 import { ordenar, proximaOrdem, type Direcao, type Valor } from '@/lib/ordenacao'
+import { ultimosDias } from '@/lib/periodo'
 import { usePagination } from '@/lib/hooks/usePagination'
 import { Pagination } from '@/components/ui/pagination'
 import MovimentoDialog, { type Catalogos, type MovimentoEditavel, type TipoMov } from '@/components/financeiro/MovimentoDialog'
@@ -183,13 +184,7 @@ export default function Financeiro() {
 
   return (
     <div>
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-        <h1 className="text-page-title text-gray-900">Financeiro</h1>
-        <div className="flex gap-2">
-          <button onClick={() => setModal({ tipo: 'Entrada' })} className="h-10 min-w-[7rem] px-5 text-sm font-semibold text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors">Entrada</button>
-          <button onClick={() => setModal({ tipo: 'Saída' })} className="h-10 min-w-[7rem] px-5 text-sm font-semibold text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors">Saída</button>
-        </div>
-      </div>
+      <h1 className="text-page-title text-gray-900 mb-4">Financeiro</h1>
 
       <div className="inline-flex gap-1 p-1 mb-4 rounded-xl border border-gray-200 bg-white">
         {abaBtn('mov', 'Movimentação')}{abaBtn('receber', 'Contas a receber')}{abaBtn('pagar', 'Contas a pagar')}
@@ -200,6 +195,22 @@ export default function Financeiro() {
           <>
             <label><span className="text-label text-gray-500 block mb-1">De</span><input type="date" className={campoFiltro} value={de} onChange={e => setDe(e.target.value)} /></label>
             <label><span className="text-label text-gray-500 block mb-1">Até</span><input type="date" className={campoFiltro} value={ate} onChange={e => setAte(e.target.value)} /></label>
+            <div>
+              <span className="text-label text-gray-500 block mb-1">Consulta rápida</span>
+              <div className="flex rounded-lg border border-gray-200 overflow-hidden bg-white">
+                {[1, 3, 7].map((n, i) => {
+                  const r = ultimosDias(hoje, n)
+                  const ativo = de === r.de && ate === r.ate
+                  return (
+                    <button key={n} type="button" aria-pressed={ativo} onClick={() => { setDe(r.de); setAte(r.ate) }}
+                      title={n === 1 ? 'Só hoje' : `Últimos ${n} dias (com hoje)`}
+                      className={`h-10 px-3 text-sm whitespace-nowrap transition-colors ${i > 0 ? 'border-l border-gray-200' : ''} ${ativo ? 'bg-gray-900 text-white font-medium' : 'text-gray-700 hover:bg-gray-50'}`}>
+                      {n} {n === 1 ? 'dia' : 'dias'}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
             <label><span className="text-label text-gray-500 block mb-1">Tipo</span>
               <select className={campoFiltro} value={filtroTipo} onChange={e => setFiltroTipo(e.target.value as '' | TipoMov)}>
                 <option value="">Entradas e saídas</option><option value="Entrada">Só entradas</option><option value="Saída">Só saídas</option>
@@ -235,6 +246,11 @@ export default function Financeiro() {
             <Cartao titulo="A vencer" valor={Math.round((abertoTotal - vencido) * 100) / 100} cor="text-blue-600" />
           </>
         )}
+      </div>
+
+      <div className="flex gap-2 justify-end mb-2">
+        <button onClick={() => setModal({ tipo: 'Entrada' })} className="h-10 min-w-[7rem] px-5 text-sm font-semibold text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors">Entrada</button>
+        <button onClick={() => setModal({ tipo: 'Saída' })} className="h-10 min-w-[7rem] px-5 text-sm font-semibold text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors">Saída</button>
       </div>
 
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
