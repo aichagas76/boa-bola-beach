@@ -80,7 +80,7 @@ export default function Bancos() {
             type="text"
             value={novoNome}
             onChange={e => setNovoNome(e.target.value)}
-            className="flex-1 h-10 border border-gray-200 rounded-lg px-3 text-sm"
+            className="flex-1 min-w-0 h-10 border border-gray-200 rounded-lg px-3 text-sm"
             placeholder="Nome do banco (ex: Itaú, Nubank, Banco do Brasil...)"
             onKeyDown={e => e.key === 'Enter' && adicionar()}
           />
@@ -93,7 +93,7 @@ export default function Bancos() {
         </div>
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+      <div className="bg-white border border-gray-200 rounded-xl overflow-x-auto">
         {loading ? (
           <div className="text-center py-8 text-gray-400">Carregando...</div>
         ) : bancos.length === 0 ? (

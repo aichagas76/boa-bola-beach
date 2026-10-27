@@ -195,7 +195,7 @@ export default function Categorias() {
                               type="text"
                               value={editandoValor}
                               onChange={e => setEditandoValor(e.target.value)}
-                              className="flex-1 border border-gray-200 rounded px-2 py-1 text-sm"
+                              className="flex-1 min-w-0 border border-gray-200 rounded px-2 py-1 text-sm"
                               autoFocus
                             />
                             <button
@@ -252,7 +252,7 @@ export default function Categorias() {
                   value={novaCategoria}
                   onChange={e => setNovaCategoria(e.target.value)}
                   placeholder="Nova"
-                  className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                  className="flex-1 min-w-0 border border-gray-200 rounded-lg px-3 py-2 text-sm"
                   onKeyPress={e => e.key === 'Enter' && adicionarCategoria()}
                 />
                 <button
@@ -286,7 +286,7 @@ export default function Categorias() {
                             type="text"
                             value={editandoValor}
                             onChange={e => setEditandoValor(e.target.value)}
-                            className="flex-1 border border-gray-200 rounded px-2 py-1 text-sm"
+                            className="flex-1 min-w-0 border border-gray-200 rounded px-2 py-1 text-sm"
                             autoFocus
                           />
                           <button
@@ -335,7 +335,7 @@ export default function Categorias() {
                   value={novaSubcategoria}
                   onChange={e => setNovaSubcategoria(e.target.value)}
                   placeholder="Nova"
-                  className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                  className="flex-1 min-w-0 border border-gray-200 rounded-lg px-3 py-2 text-sm"
                   onKeyPress={e => e.key === 'Enter' && adicionarSubcategoria()}
                 />
                 <button

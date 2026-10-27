@@ -109,7 +109,7 @@ export default function Modalidades() {
             type="text"
             value={novoNome}
             onChange={e => setNovoNome(e.target.value)}
-            className="flex-1 h-10 border border-gray-200 rounded-lg px-3 text-sm"
+            className="flex-1 min-w-0 h-10 border border-gray-200 rounded-lg px-3 text-sm"
             placeholder="Nome da modalidade (ex: Day Use, Torneio...)"
             onKeyDown={e => e.key === 'Enter' && adicionar()}
           />

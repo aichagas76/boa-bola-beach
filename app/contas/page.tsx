@@ -87,7 +87,7 @@ export default function Contas() {
             type="text"
             value={novaNome}
             onChange={e => setNovaNome(e.target.value)}
-            className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm"
+            className="flex-1 min-w-0 border border-gray-200 rounded-lg px-3 py-2 text-sm"
             placeholder="Nome da conta (ex: Banco do Brasil, Caixa Eletrônico...)"
             onKeyPress={e => e.key === 'Enter' && adicionar()}
           />
