@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { Trash2, Edit2, Check, X } from 'lucide-react'
+import { Trash2, Edit2 } from 'lucide-react'
 import { usePagination } from '@/lib/hooks/usePagination'
 import { Pagination } from '@/components/ui/pagination'
 

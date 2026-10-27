@@ -71,7 +71,6 @@ const ALINHA: Record<ColunaId, Alinha> = {
   valor: 'right', parcial: 'right', asaas: 'center', link: 'center', status: 'center',
 }
 const CLASSE_ALINHA: Record<Alinha, string> = { left: 'text-left', center: 'text-center', right: 'text-right' }
-const JUSTIFICA: Record<Alinha, string> = { left: 'justify-start', center: 'justify-center', right: 'justify-end' }
 
 const COLUNAS: { id: ColunaId; titulo: string; dica?: string }[] = [
   { id: 'nome', titulo: 'Nome' },
@@ -264,17 +263,6 @@ export default function Alunos() {
       .eq('aluno_id', aluno.id)
 
     const mats = data ?? []
-    const total = mats.reduce((acc, m) => acc + (m.valor ?? 0), 0)
-
-    // Soma pagamentos já feitos no mês atual para este aluno
-    const mesAtual = new Date().toLocaleDateString('en-CA').substring(0, 7) // YYYY-MM
-    const { data: pgtos } = await supabase
-      .from('movimentacoes')
-      .select('valor')
-      .eq('aluno_ref_id', aluno.id)
-      .eq('status', 'Recebido')
-      .gte('data_pagamento', `${mesAtual}-01`)
-      .lte('data_pagamento', `${mesAtual}-31`)
 
     const { data: prods } = await supabase
       .from('movimentacoes')

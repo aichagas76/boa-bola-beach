@@ -5,7 +5,7 @@ export interface ValidationRule {
   minLength?: number
   maxLength?: number
   pattern?: RegExp
-  validate?: (value: any) => boolean | string
+  validate?: (value: unknown) => boolean | string
   message?: string
 }
 
@@ -22,7 +22,7 @@ export function useFormValidation(rules: ValidationRules) {
   const [touched, setTouched] = useState<{ [field: string]: boolean }>({})
 
   const validateField = useCallback(
-    (fieldName: string, value: any): string | null => {
+    (fieldName: string, value: unknown): string | null => {
       const fieldRules = rules[fieldName]
       if (!fieldRules) return null
 
@@ -35,18 +35,19 @@ export function useFormValidation(rules: ValidationRules) {
         }
 
         if (value) {
+          const texto = String(value)
           // Validação de comprimento mínimo
-          if (rule.minLength && value.length < rule.minLength) {
+          if (rule.minLength && texto.length < rule.minLength) {
             return rule.message || `Mínimo de ${rule.minLength} caracteres`
           }
 
           // Validação de comprimento máximo
-          if (rule.maxLength && value.length > rule.maxLength) {
+          if (rule.maxLength && texto.length > rule.maxLength) {
             return rule.message || `Máximo de ${rule.maxLength} caracteres`
           }
 
           // Validação de padrão
-          if (rule.pattern && !rule.pattern.test(value)) {
+          if (rule.pattern && !rule.pattern.test(texto)) {
             return rule.message || `Formato inválido`
           }
 
@@ -65,7 +66,7 @@ export function useFormValidation(rules: ValidationRules) {
   )
 
   const validate = useCallback(
-    (formData: { [key: string]: any }): boolean => {
+    (formData: { [key: string]: unknown }): boolean => {
       const newErrors: ValidationErrors = {}
 
       for (const field in rules) {
@@ -80,7 +81,7 @@ export function useFormValidation(rules: ValidationRules) {
   )
 
   const validateFieldOnChange = useCallback(
-    (fieldName: string, value: any) => {
+    (fieldName: string, value: unknown) => {
       const error = validateField(fieldName, value)
       setErrors(prev => ({ ...prev, [fieldName]: error }))
     },
@@ -92,7 +93,7 @@ export function useFormValidation(rules: ValidationRules) {
   }, [])
 
   const handleChange = useCallback(
-    (fieldName: string, value: any) => {
+    (fieldName: string, value: unknown) => {
       if (touched[fieldName]) {
         validateFieldOnChange(fieldName, value)
       }

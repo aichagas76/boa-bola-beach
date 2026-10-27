@@ -1,0 +1,32 @@
+# Verificação automática: roda a cada envio para o GitHub e em cada pedido de mudança.
+# Falhou = não publicar. (A Vercel publica sozinha após o envio; esta verificação mostra o problema na hora.)
+name: Verificação
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # Valores de mentira, só para o build não reclamar de variável ausente (nada é acessado)
+      NEXT_PUBLIC_SUPABASE_URL: https://exemplo.supabase.co
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: chave-de-mentira
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Tipos (TypeScript)
+        run: npx tsc --noEmit
+      - name: Lint (erros travam; avisos não)
+        run: npx eslint .
+      - name: Testes automáticos
+        run: npm test
+      - name: Build do site
+        run: npm run build

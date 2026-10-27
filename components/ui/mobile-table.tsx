@@ -4,8 +4,8 @@ interface MobileTableProps {
     label: string
     mobile?: boolean
   }>
-  data: Array<Record<string, any>>
-  renderCell?: (key: string, value: any, row: Record<string, any>) => React.ReactNode
+  data: Array<Record<string, unknown>>
+  renderCell?: (key: string, value: unknown, row: Record<string, unknown>) => React.ReactNode
 }
 
 export function MobileTable({ columns, data, renderCell }: MobileTableProps) {
@@ -26,7 +26,7 @@ export function MobileTable({ columns, data, renderCell }: MobileTableProps) {
               <div className="text-sm text-gray-900 text-right flex-1">
                 {renderCell
                   ? renderCell(col.key, row[col.key], row)
-                  : row[col.key]}
+                  : String(row[col.key] ?? '')}
               </div>
             </div>
           ))}

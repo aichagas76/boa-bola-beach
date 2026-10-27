@@ -34,7 +34,7 @@ export default function Pagamentos() {
   function obterDatasFiltro(periodo: string) {
     const hoje = new Date()
     hoje.setHours(0, 0, 0, 0)
-    let dataInicio = new Date(hoje)
+    const dataInicio = new Date(hoje)
 
     if (periodo === 'semana') dataInicio.setDate(dataInicio.getDate() - 7)
     else if (periodo === 'mes') dataInicio.setDate(1)

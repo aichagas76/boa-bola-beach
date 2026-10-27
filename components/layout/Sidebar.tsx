@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { LayoutDashboard, Users, CreditCard, AlertCircle, Settings, Menu, X, TrendingUp, Folder, Tags, Banknote, Landmark, ListChecks, UserCog, FileText, ChevronDown, ArrowUp, ArrowDown, LogOut, ClipboardList, Package, LucideIcon } from 'lucide-react'
+import { LayoutDashboard, Users, CreditCard, AlertCircle, Menu, X, TrendingUp, Folder, Tags, Banknote, Landmark, ListChecks, UserCog, FileText, ChevronDown, ArrowUp, ArrowDown, LogOut, ClipboardList, Package, LucideIcon } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useUnidade } from '@/components/layout/UnidadeProvider'
 

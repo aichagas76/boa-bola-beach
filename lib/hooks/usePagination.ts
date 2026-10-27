@@ -16,11 +16,8 @@ export function usePagination<T>(
   const paginationState = useMemo(() => {
     const totalItems = items.length
     const totalPages = Math.ceil(totalItems / pageSize)
+    // A página sempre fica dentro do intervalo (ex.: depois de filtrar e sobrar menos páginas)
     const validPage = Math.min(currentPage, Math.max(1, totalPages))
-
-    if (validPage !== currentPage) {
-      setCurrentPage(validPage)
-    }
 
     return {
       currentPage: validPage,

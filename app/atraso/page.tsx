@@ -30,7 +30,7 @@ export default function AtrasoPage() {
       .eq('status', 'Atrasado')
       .order('data_vencimento', { ascending: false })
 
-    const lista = (data ?? []).filter((p: any) => !unidadeId || p.alunos?.unidade_id === unidadeId).map((p: any) => ({
+    const lista = (data ?? []).filter(p => !unidadeId || p.alunos?.unidade_id === unidadeId).map(p => ({
       ...p,
       aluno_nome: p.alunos?.nome ?? '-',
     }))
