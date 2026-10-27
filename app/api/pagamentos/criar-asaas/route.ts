@@ -2,9 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/supabase-admin'
 import { criarCobrancaAsaas, CobrancaError } from '@/lib/asaas-cobranca'
 import { autorizarAluno } from '@/lib/acesso-aluno'
-import { validarValorCobranca } from '@/lib/cobranca-regras'
+import { asaasLigado, validarValorCobranca } from '@/lib/cobranca-regras'
 
 export async function POST(request: NextRequest) {
+  // O Asaas está desligado por padrão: só funciona com ASAAS_ATIVO=sim na Vercel
+  if (!asaasLigado(process.env.ASAAS_ATIVO)) {
+    return NextResponse.json({ error: 'O Asaas está desligado por enquanto. Registre o pagamento pelo botão de pagamento do aluno.' }, { status: 503 })
+  }
   let criadoAgora: string | null = null
   const db = getSupabaseAdmin()
 

@@ -65,5 +65,5 @@ export function validarValorCobranca(valor: unknown, devido: number): string | n
   return null
 }
 
-/** Geração automática de cobranças no Asaas: só liga com COBRANCA_AUTOMATICA=sim (qualquer outra coisa = desligada). */
-export const cobrancaAutomaticaLigada = (valor: string | undefined) => (valor ?? '').trim().toLowerCase() === 'sim'
+/** Integração com o Asaas (cobranças, clientes e avisos de pagamento): só liga com ASAAS_ATIVO=sim na Vercel; qualquer outra coisa = desligada. */
+export const asaasLigado = (valor: string | undefined) => (valor ?? '').trim().toLowerCase() === 'sim'

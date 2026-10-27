@@ -67,12 +67,12 @@ test('valor da cobrança: positivo e no máximo o que o aluno deve', () => {
   assert.match(validarValorCobranca(10, 0), /não tem valor/)
 })
 
-import { cobrancaAutomaticaLigada } from '../lib/cobranca-regras.ts'
-test('cobrança automática vem desligada e só liga com "sim"', () => {
-  assert.equal(cobrancaAutomaticaLigada(undefined), false)
-  assert.equal(cobrancaAutomaticaLigada(''), false)
-  assert.equal(cobrancaAutomaticaLigada('nao'), false)
-  assert.equal(cobrancaAutomaticaLigada('true'), false)
-  assert.equal(cobrancaAutomaticaLigada('sim'), true)
-  assert.equal(cobrancaAutomaticaLigada(' SIM '), true)
+import { asaasLigado } from '../lib/cobranca-regras.ts'
+test('o Asaas vem desligado e só liga com "sim"', () => {
+  assert.equal(asaasLigado(undefined), false)
+  assert.equal(asaasLigado(''), false)
+  assert.equal(asaasLigado('nao'), false)
+  assert.equal(asaasLigado('true'), false)
+  assert.equal(asaasLigado('sim'), true)
+  assert.equal(asaasLigado(' SIM '), true)
 })

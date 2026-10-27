@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/supabase-admin'
 import { textoIgual } from '@/lib/seguranca'
 import { enviarAlerta } from '@/lib/alerta'
-import { dataSaoPaulo } from '@/lib/cobranca-regras'
+import { asaasLigado, dataSaoPaulo } from '@/lib/cobranca-regras'
 import { decidirWebhook } from '@/lib/webhook-regras'
 
 export const runtime = 'nodejs'
@@ -29,6 +29,10 @@ export async function POST(request: NextRequest) {
   // Token configurado no painel do Asaas (obrigatório: sem ele o webhook recusa tudo)
   if (!textoIgual(request.headers.get('asaas-access-token'), process.env.ASAAS_WEBHOOK_TOKEN)) {
     return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
+  }
+  // Desligado por padrão (só liga com ASAAS_ATIVO=sim): não registra nada; o Asaas tenta de novo quando for ligado
+  if (!asaasLigado(process.env.ASAAS_ATIVO)) {
+    return NextResponse.json({ error: 'Integração com o Asaas desligada' }, { status: 503 })
   }
 
   try {
