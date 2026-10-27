@@ -2,7 +2,7 @@
 -- os cadastros compartilhados entre as unidades (professores, fornecedores/clientes, bancos, categorias,
 -- modalidades) e lê o histórico (Logs). As demais logins continuam usando alunos, financeiro e estoque da
 -- própria unidade normalmente e só LEEM esses cadastros. Quem já existe hoje continua administradora.
--- Também ajusta 3 regras que recalculavam o usuário a cada linha (aviso de desempenho do Supabase). NÃO APLICADA.
+-- Também ajusta 3 regras que recalculavam o usuário a cada linha (aviso de desempenho do Supabase). APLICADA.
 create or replace function public.eh_gestora() returns boolean
   language sql stable security definer set search_path = public, pg_temp as $$
   select exists (select 1 from public.administradores where user_id = (select auth.uid()))

@@ -1,7 +1,7 @@
 -- Pagamento do aluno (mensalidade + produtos em aberto) numa operação só: ou entra tudo, ou nada.
 -- Também avisa quando o aluno já pagou um ciclo no mesmo dia (evita adiantar o vencimento por clique repetido):
 -- a função responde "JA_PAGOU_HOJE" e a tela pede confirmação, repetindo a chamada com p_confirmar_duplicado = true.
--- Roda com as permissões de quem chama (o controle por unidade do banco vale para os produtos). NÃO APLICADA.
+-- Roda com as permissões de quem chama (o controle por unidade do banco vale para os produtos). APLICADA.
 create or replace function public.baixar_pagamento_aluno(
   p_aluno_id uuid, p_forma text, p_data date, p_valor numeric, p_vencimento date,
   p_produtos uuid[] default '{}', p_receber_mensalidade boolean default true, p_confirmar_duplicado boolean default false

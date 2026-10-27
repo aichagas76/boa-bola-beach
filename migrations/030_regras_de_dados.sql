@@ -5,7 +5,7 @@
 -- Também: matrícula sem valor negativo e status de pagamento só os conhecidos.
 -- As regras de valor, vencimento e data de baixa entram como NOT VALID: valem para o que for gravado/alterado de agora em diante;
 -- os 5 lançamentos de TESTE antigos que já as violam continuam como estão até você corrigi-los (depois disso: ver o fim deste arquivo).
--- Compra do estoque com custo zero não lança mais uma saída de R$ 0,00 no Financeiro. NÃO APLICADA.
+-- Compra do estoque com custo zero não lança mais uma saída de R$ 0,00 no Financeiro. APLICADA.
 alter table public.movimentacoes add constraint mov_tipo_valido check (tipo in ('Entrada', 'Saída'));
 alter table public.movimentacoes add constraint mov_status_valido check (status in ('Recebido', 'Pago', 'Não recebido', 'Pendente', 'Estornado'));
 alter table public.movimentacoes add constraint mov_categoria_obrigatoria check (categoria_id is not null or origem = 'Asaas');

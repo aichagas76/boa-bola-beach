@@ -2,7 +2,7 @@
 -- com categoria, professor, esporte e unidade (combo dividido ao meio), para os relatórios e as comissões
 -- baterem nos dois caminhos. Produtos em aberto do aluno são quitados com o que sobrar do valor recebido, e o
 -- que ainda sobrar vira uma entrada "outros valores". Tudo numa operação só (pagamento, entradas, produtos e vencimento).
--- As entradas ficam ligadas à cobrança por movimentacoes.pagamento_id (só a primeira leva o id do Asaas, que é único). NÃO APLICADA.
+-- As entradas ficam ligadas à cobrança por movimentacoes.pagamento_id (só a primeira leva o id do Asaas, que é único). APLICADA.
 alter table public.movimentacoes add column if not exists pagamento_id uuid references public.pagamentos(id) on delete set null;
 create index if not exists movimentacoes_pagamento_id on public.movimentacoes (pagamento_id);
 
