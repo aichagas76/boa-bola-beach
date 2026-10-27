@@ -10,6 +10,8 @@ import { AlertTriangle, ArrowDownRight, ArrowUpRight, CheckCircle2, ChevronRight
 import { supabase } from '@/lib/supabase'
 import { buscarTudo } from '@/lib/buscar-tudo'
 import { useUnidade } from '@/components/layout/UnidadeProvider'
+import FluxoDeCaixa from '@/components/dashboard/FluxoDeCaixa'
+import type { MovFluxo } from '@/lib/fluxo-caixa'
 import {
   alunosDaModalidade, aparaMesesVazios, calcularKpis, faixasDeAtraso, gastosDoPeriodo, itensFinanceiros, mesesDaJanela,
   participacao, periodoDe, pontosDeAtencao, serieAlunos, serieFinanceira, statusDosPagamentos, ticketMedio, variacao,
@@ -133,6 +135,7 @@ type LinhaMat = { aluno_id: string; tipo: string; valor: number | null; unidade_
 type LinhaMov = {
   tipo: string; status: string | null; valor: number; data: string; data_pagamento: string | null; data_vencimento: string | null
   aluno_ref_id: string | null; professor_id: string | null; professores: { nome: string } | null; esportes: { nome: string } | null
+  conta_bancaria_id: string | null; contas_bancarias: { nome: string } | null
 }
 
 export default function PainelGerencial() {
@@ -171,7 +174,7 @@ export default function PainelGerencial() {
         buscarTudo((de, ate) => supabase.from('matriculas').select('aluno_id, tipo, valor, unidade_id, acesso_duas_unidades, esportes(nome)').order('id').range(de, ate)),
         buscarTudo((de, ate) => supabase
           .from('movimentacoes')
-          .select('tipo, status, valor, data, data_pagamento, data_vencimento, aluno_ref_id, professor_id, professores(nome), esportes(nome)')
+          .select('tipo, status, valor, data, data_pagamento, data_vencimento, aluno_ref_id, professor_id, conta_bancaria_id, professores(nome), esportes(nome), contas_bancarias(nome)')
           .eq('unidade_id', unidadeId)
           .or(`data.gte.${corte},data_pagamento.gte.${corte},status.neq.Recebido`)
           .order('id').range(de, ate)),
@@ -254,6 +257,14 @@ export default function PainelGerencial() {
     tipo: m.tipo, status: m.status, valor: Number(m.valor), data: m.data, data_pagamento: m.data_pagamento,
     professor_id: m.professor_id, professor_nome: m.professores?.nome ?? null, esporte_nome: m.esportes?.nome ?? null,
   })), [movs])
+  const movsFluxo: MovFluxo[] = useMemo(() => movs.map(m => ({
+    tipo: m.tipo, status: m.status, valor: Number(m.valor), data: m.data, data_pagamento: m.data_pagamento, conta_id: m.conta_bancaria_id,
+  })), [movs])
+  const contasFluxo = useMemo(() => {
+    const por = new Map<string, string>()
+    for (const m of movs) if (m.conta_bancaria_id && m.contas_bancarias?.nome) por.set(m.conta_bancaria_id, m.contas_bancarias.nome)
+    return [...por.entries()].map(([id, nome]) => ({ id, nome })).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+  }, [movs])
   const lucro = useMemo(
     () => aparaMesesVazios(resumoPorMes(movsRelUnidade, meses), l => l.bruto > 0 || l.despesas > 0),
     [movsRelUnidade, meses]
@@ -430,6 +441,8 @@ export default function PainelGerencial() {
           </ResponsiveContainer>
         </Grafico>
       </Secao>
+
+      <FluxoDeCaixa movs={movsFluxo} contas={contasFluxo} inicio={periodo.inicio} fim={periodo.fim} carregando={loading} />
 
       <Secao titulo="Alunos" subtitulo={rastreiaInativacao ? 'Base = alunos cadastrados menos as inativações com data registrada.' : 'As inativações ainda não têm data registrada: a base mostra todos os cadastros.'}>
         <Grafico titulo="Base de alunos" nota={inativosSemData > 0 ? `${inativosSemData} aluno(s) inativo(s) sem data de saída continuam contados na base` : undefined}
