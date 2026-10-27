@@ -3,7 +3,7 @@ import { getSupabaseAdmin } from '@/lib/supabase-admin'
 import { textoIgual } from '@/lib/seguranca'
 import { enviarAlerta } from '@/lib/alerta'
 import { dataSaoPaulo } from '@/lib/cobranca-regras'
-import { decidirWebhook, somarUmMes } from '@/lib/webhook-regras'
+import { decidirWebhook } from '@/lib/webhook-regras'
 
 export const runtime = 'nodejs'
 
@@ -78,7 +78,8 @@ export async function POST(request: NextRequest) {
         .update({ status: 'Pendente', data_pagamento: null, valor_pago: null })
         .eq('id', pagamento.id)
       if (error) throw error
-      await db.from('movimentacoes').update({ status: 'Estornado' }).eq('id_cobranca_asaas', payment.id)
+      // todas as entradas desta cobrança (uma por matrícula) são estornadas juntas
+      await db.from('movimentacoes').update({ status: 'Estornado' }).or(`id_cobranca_asaas.eq.${payment.id},pagamento_id.eq.${pagamento.id}`)
       await avisarEquipe(db, 'Estorno no Asaas', payment.id, 'Entrada marcada como Estornado. Conferir o vencimento do aluno (não é revertido sozinho).')
       return NextResponse.json({ success: true })
     }
@@ -87,6 +88,31 @@ export async function POST(request: NextRequest) {
     const formaPagamento = FORMA_ASAAS[payment.billingType] ?? 'Asaas'
     const dataPagamento: string = payment.paymentDate || payment.confirmedDate || dataSaoPaulo()
     const { valorPago, parcial } = acao
+
+    // Pagamento total: o banco lança uma entrada por matrícula (categoria, professor, esporte e unidade, como na baixa manual),
+    // quita produtos em aberto do aluno, marca a cobrança como paga e avança o vencimento — tudo numa operação só
+    if (!parcial) {
+      const { data: res, error: rpcError } = await db.rpc('lancar_recebimento_asaas', {
+        p_pagamento: pagamento.id,
+        p_payment_id: payment.id,
+        p_valor: valorPago,
+        p_data: dataPagamento,
+        p_forma: formaPagamento,
+        p_vencimento: payment.dueDate ?? null,
+      })
+      if (rpcError) {
+        // 23505 = o mesmo evento chegou duas vezes ao mesmo tempo; a outra chamada já lançou
+        if (rpcError.code === '23505') return NextResponse.json({ success: true, ignored: 'ja_lancado' })
+        console.error('Erro ao lançar recebimento via webhook:', rpcError)
+        return NextResponse.json({ error: 'Erro ao lançar entrada' }, { status: 500 })
+      }
+      if (res?.ignorado) return NextResponse.json({ success: true, ignored: res.ignorado })
+      if (Number(res?.sobra) > 0) {
+        await avisarEquipe(db, 'Asaas: valor acima da mensalidade', payment.id, `Sobraram R$ ${res.sobra} sem produto em aberto para quitar (lançados como "outros valores"). Conferir.`)
+      }
+      console.log(`[Asaas Webhook] ${event} ${payment.id} -> Pago`)
+      return NextResponse.json({ success: true })
+    }
 
     // Pagamento parcial: registra o valor, mas a cobrança continua em aberto
     const { error: upError } = await db
@@ -140,30 +166,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Erro ao lançar entrada' }, { status: 500 })
     }
 
-    if (parcial) {
-      await avisarEquipe(db, 'Pagamento parcial no Asaas', payment.id, `Recebido R$ ${valorPago} de R$ ${pagamento.valor}. Cobrança segue em aberto.`)
-      return NextResponse.json({ success: true, parcial: true })
-    }
-
-    // Pagamento total: avança o vencimento do aluno em 1 mês (igual ao pagamento manual)
-    const { data: mats } = await db.from('matriculas').select('valor').eq('aluno_id', pagamento.aluno_id)
-    const totalMats = (mats ?? []).reduce((acc, m) => acc + (m.valor ?? 0), 0)
-    if (totalMats > 0 && valorPago >= totalMats) {
-      const { data: aluno } = await db
-        .from('alunos')
-        .select('data_vencimento')
-        .eq('id', pagamento.aluno_id)
-        .single()
-      if (aluno?.data_vencimento) {
-        await db
-          .from('alunos')
-          .update({ data_vencimento: somarUmMes(aluno.data_vencimento) })
-          .eq('id', pagamento.aluno_id)
-      }
-    }
-
-    console.log(`[Asaas Webhook] ${event} ${payment.id} -> Pago`)
-    return NextResponse.json({ success: true })
+    await avisarEquipe(db, 'Pagamento parcial no Asaas', payment.id, `Recebido R$ ${valorPago} de R$ ${pagamento.valor}. Cobrança segue em aberto.`)
+    return NextResponse.json({ success: true, parcial: true })
   } catch (error) {
     console.error('Erro ao processar webhook Asaas:', error)
     await enviarAlerta({ origem: 'Webhook do Asaas', mensagem: 'Um aviso de pagamento do Asaas falhou. O Asaas tenta de novo sozinho; se persistir, conferir.', detalhe: error instanceof Error ? error.message : String(error) })
