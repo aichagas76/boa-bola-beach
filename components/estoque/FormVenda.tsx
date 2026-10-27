@@ -5,12 +5,12 @@ import { supabase } from '@/lib/supabase'
 import { useUnidade } from '@/components/layout/UnidadeProvider'
 import { registrarLog } from '@/lib/log'
 import { X } from 'lucide-react'
-import { precoUnitario, totalVenda, validarVenda, vencimentoNaMensalidade, vencimentoProfessor, type Comprador, type Situacao } from '@/lib/estoque'
+import { comissaoIndicacao, precoUnitario, totalVenda, validarVenda, vencimentoNaMensalidade, vencimentoProfessor, type Comprador, type Situacao } from '@/lib/estoque'
 
 export type Produto = {
   id: string; nome: string; categoria: string | null; fornecedor_id: string | null
   custo: number; preco_aluno: number; preco_professor: number | null; limite_compra: number
-  encordoamento: boolean; comissao_valor: number; comissao_professor_id: string | null; ativo: boolean
+  encordoamento: boolean; comissao_indicacao?: number; comissao_valor: number; comissao_professor_id: string | null; ativo: boolean
 }
 export type Opcao = { id: string; nome: string }
 export type AlunoOpcao = Opcao & { data_vencimento: string | null }
@@ -76,6 +76,8 @@ export function FormVenda({ produtos, saldos, inicial, alunos, professores, banc
   const [data, setData] = useState(hojeIso())
   const [comissaoProf, setComissaoProf] = useState('')
   const [comissaoValor, setComissaoValor] = useState('')
+  const [indicacaoProf, setIndicacaoProf] = useState('')
+  const [indicacaoPct, setIndicacaoPct] = useState<string | null>(null) // null = usa o % do cadastro do produto
   const [salvando, setSalvando] = useState(false)
 
   const produto = produtos.find(p => p.id === produtoId)
@@ -102,6 +104,7 @@ export function FormVenda({ produtos, saldos, inicial, alunos, professores, banc
       p_comissao_professor: produto.encordoamento ? comissaoProf || null : null,
       p_comissao_valor: produto.encordoamento && comissaoValor.trim() !== '' ? numero(comissaoValor) : null,
       ...(editou ? { p_preco: preco } : {}),
+      ...(indicacaoProf ? { p_indicacao_professor: indicacaoProf, ...(indicacaoPct !== null && Number.isFinite(numero(indicacaoPct)) ? { p_indicacao_percentual: numero(indicacaoPct) } : {}) } : {}),
     })
     setSalvando(false)
     if (error) return alert('Erro: ' + error.message)
@@ -154,6 +157,22 @@ export function FormVenda({ produtos, saldos, inicial, alunos, professores, banc
             Fica no Financeiro do mês, a receber em <b>{dataBr(vencimento)}</b>{comprador === 'aluno' ? ' (vencimento da mensalidade)' : ' (fim do mês)'}. Depois é só dar baixa.
           </div>
         )}
+        <Rotulo texto="Indicação (professor)">
+          <select className={campo} value={indicacaoProf} onChange={e => setIndicacaoProf(e.target.value)}>
+            <option value="">Ninguém indicou</option>{professores.map(x => <option key={x.id} value={x.id}>{x.nome}</option>)}
+          </select>
+        </Rotulo>
+        {indicacaoProf ? (() => {
+          const pct = indicacaoPct !== null && Number.isFinite(numero(indicacaoPct)) ? numero(indicacaoPct) : Number(produto?.comissao_indicacao ?? 0)
+          return (
+            <Rotulo texto="Comissão da indicação (%)">
+              <div className="flex items-center gap-2">
+                <input className={campo} inputMode="decimal" value={indicacaoPct ?? String(produto?.comissao_indicacao ?? 0).replace('.', ',')} onChange={e => setIndicacaoPct(e.target.value)} />
+                <span className="text-sm text-gray-600 whitespace-nowrap">= <b>{moeda(comissaoIndicacao(totalVenda(preco, q), pct))}</b></span>
+              </div>
+            </Rotulo>
+          )
+        })() : <div />}
         {produto?.encordoamento && (
           <>
             <Rotulo texto="Comissão para">

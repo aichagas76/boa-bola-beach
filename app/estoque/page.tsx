@@ -230,7 +230,7 @@ function FormProduto({ unidadeId, produto, fornecedores, professores, onFechar, 
     custo: String(produto?.custo ?? ''), preco_aluno: String(produto?.preco_aluno ?? ''),
     preco_professor: produto?.preco_professor != null ? String(produto.preco_professor) : '',
     limite_compra: String(produto?.limite_compra ?? 0), encordoamento: produto?.encordoamento ?? false,
-    comissao_valor: String(produto?.comissao_valor ?? 10), comissao_professor_id: produto?.comissao_professor_id ?? '',
+    comissao_indicacao: String(produto?.comissao_indicacao ?? 0), comissao_valor: String(produto?.comissao_valor ?? 10), comissao_professor_id: produto?.comissao_professor_id ?? '',
     ativo: produto?.ativo ?? true,
   })
   const [salvando, setSalvando] = useState(false)
@@ -245,6 +245,7 @@ function FormProduto({ unidadeId, produto, fornecedores, professores, onFechar, 
       custo: numero(f.custo) >= 0 ? numero(f.custo) : 0, preco_aluno: preco,
       preco_professor: f.preco_professor.trim() === '' ? null : numero(f.preco_professor),
       limite_compra: Math.max(0, parseInt(f.limite_compra) || 0), encordoamento: f.encordoamento,
+      comissao_indicacao: numero(f.comissao_indicacao) >= 0 && numero(f.comissao_indicacao) <= 100 ? numero(f.comissao_indicacao) : 0,
       comissao_valor: numero(f.comissao_valor) >= 0 ? numero(f.comissao_valor) : 10,
       comissao_professor_id: f.encordoamento ? f.comissao_professor_id || null : null, ativo: f.ativo,
     }
@@ -272,6 +273,8 @@ function FormProduto({ unidadeId, produto, fornecedores, professores, onFechar, 
         <Rotulo texto="Comprar quando sobrar até"><input className={campo} inputMode="numeric" value={f.limite_compra} onChange={e => set('limite_compra', e.target.value)} /></Rotulo>
         <Rotulo texto="Preço aluno (R$)"><input className={campo} inputMode="decimal" value={f.preco_aluno} onChange={e => set('preco_aluno', e.target.value)} /></Rotulo>
         <Rotulo texto="Preço professor (R$)"><input className={campo} inputMode="decimal" value={f.preco_professor} onChange={e => set('preco_professor', e.target.value)} placeholder="Igual ao do aluno" /></Rotulo>
+        <Rotulo texto="Comissão de indicação (%)"><input className={campo} inputMode="decimal" value={f.comissao_indicacao} onChange={e => set('comissao_indicacao', e.target.value)} placeholder="0 = não paga" /></Rotulo>
+        <div className="text-xs text-gray-500 self-end pb-2">Para o professor que indicar a venda (valor sobre o total da venda).</div>
         <label className="col-span-2 flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
           <input type="checkbox" className="h-[18px] w-[18px] accent-blue-600" checked={f.encordoamento} onChange={e => set('encordoamento', e.target.checked)} />
           É encordoamento (paga comissão ao professor em cada venda)

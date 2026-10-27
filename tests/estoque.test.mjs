@@ -50,3 +50,11 @@ test('venda não paga do professor vence no fim do mês', () => {
   assert.equal(vencimentoProfessor('2026-02-10'), '2026-02-28')
   assert.equal(vencimentoProfessor('2026-10-26'), '2026-10-31')
 })
+
+import { comissaoIndicacao } from '../lib/estoque.ts'
+test('comissão de indicação é % do valor da venda, em centavos', () => {
+  assert.equal(comissaoIndicacao(200, 10), 20)
+  assert.equal(comissaoIndicacao(50, 5), 2.5)
+  assert.equal(comissaoIndicacao(19.9, 7), 1.39)
+  assert.equal(comissaoIndicacao(100, 0), 0)
+})

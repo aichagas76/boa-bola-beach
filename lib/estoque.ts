@@ -73,3 +73,6 @@ export function vencimentoProfessor(hoje: string): string {
 export function lucroTotal(vendas: { preco_unitario: number; custo_unitario: number; quantidade: number }[]) {
   return arredonda(vendas.reduce((a, v) => a + (v.preco_unitario - v.custo_unitario) * v.quantidade, 0))
 }
+
+/** Comissão de indicação: porcentagem do valor da venda (arredondada em centavos). */
+export const comissaoIndicacao = (totalVenda: number, percentual: number) => arredonda((totalVenda * percentual) / 100)
