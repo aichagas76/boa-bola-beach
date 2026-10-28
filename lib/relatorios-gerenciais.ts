@@ -296,3 +296,71 @@ export function paraCsv(linhas: (string | number)[][]) {
   }
   return '﻿' + linhas.map(l => l.map(celula).join(';')).join('\r\n')
 }
+
+/* ---------- comparação entre períodos ---------- */
+export type MovComparacao = {
+  tipo: string; status: string | null; valor: number; data: string; data_pagamento: string | null; categoria: string | null
+}
+export type AlunoComparacao = { data_cadastro: string | null; data_saida: string | null }
+export type LinhaComparacao = { chave: string; rotulo: string; atual: number; anterior: number; diferenca: number; variacaoPct: number | null; dinheiro: boolean; subiuEhBom: boolean }
+
+const dataDoMov = (m: { data: string; data_pagamento: string | null }) => m.data_pagamento ?? m.data
+const dentroDe = (d: string | null, i: string, f: string) => !!d && d >= i && d <= f
+
+/** Mesmos indicadores em dois períodos, lado a lado, com a diferença e a variação em %. */
+export function compararPeriodos(args: {
+  movs: MovComparacao[]; alunos: AlunoComparacao[]
+  atual: { inicio: string; fim: string }; anterior: { inicio: string; fim: string }
+}): LinhaComparacao[] {
+  const soma = (f: (m: MovComparacao) => boolean, p: { inicio: string; fim: string }) =>
+    arredonda(args.movs.filter(m => f(m) && dentroDe(dataDoMov(m), p.inicio, p.fim)).reduce((s, m) => s + Number(m.valor), 0))
+  const recebido = (m: MovComparacao) => m.tipo === 'Entrada' && m.status === 'Recebido'
+  const pago = (m: MovComparacao) => m.tipo === 'Saída' && m.status === 'Pago'
+  const venda = (m: MovComparacao) => recebido(m) && normaliza(m.categoria).includes('produto')
+  const contagem = (campo: 'data_cadastro' | 'data_saida', p: { inicio: string; fim: string }) => args.alunos.filter(a => dentroDe(a[campo], p.inicio, p.fim)).length
+
+  const linha = (chave: string, rotulo: string, a: number, b: number, dinheiro: boolean, subiuEhBom = true): LinhaComparacao =>
+    ({ chave, rotulo, atual: a, anterior: b, diferenca: arredonda(a - b), variacaoPct: b === 0 ? null : arredonda(((a - b) / Math.abs(b)) * 100), dinheiro, subiuEhBom })
+  const A = args.atual, B = args.anterior
+  const fat = [soma(recebido, A), soma(recebido, B)]
+  const desp = [soma(pago, A), soma(pago, B)]
+  return [
+    linha('faturamento', 'Faturamento (entradas recebidas)', fat[0], fat[1], true),
+    linha('despesas', 'Despesas pagas', desp[0], desp[1], true, false),
+    linha('lucro', 'Lucro líquido', arredonda(fat[0] - desp[0]), arredonda(fat[1] - desp[1]), true),
+    linha('vendas', 'Vendas de produtos', soma(venda, A), soma(venda, B), true),
+    linha('novos', 'Alunos novos', contagem('data_cadastro', A), contagem('data_cadastro', B), false),
+    linha('inativacoes', 'Inativações', contagem('data_saida', A), contagem('data_saida', B), false, false),
+  ]
+}
+
+/* ---------- relatório de estoque ---------- */
+export type ProdutoEstoque = { id: string; nome: string; categoria: string | null; custo: number; limite_compra: number }
+export type RetiradaEstoque = { produto_id: string; data: string; quantidade: number; preco_unitario: number; custo_unitario: number }
+export type CompraEstoque = { produto_id: string; data: string; quantidade: number; custo_unitario: number }
+export type LinhaEstoque = {
+  id: string; nome: string; categoria: string | null; saldo: number; limite: number
+  vendidos: number; faturamento: number; custoVendido: number; lucro: number; comprados: number; gastoCompras: number
+  situacao: 'COMPRAR' | 'ATENÇÃO' | 'OK'
+}
+
+/** Vendas, lucro e compras de cada produto no período, mais o saldo de hoje. Lucro = (preço − custo) × quantidade vendida. */
+export function relatorioEstoque(args: {
+  produtos: ProdutoEstoque[]; retiradas: RetiradaEstoque[]; compras: CompraEstoque[]; saldos: Record<string, number>; inicio: string; fim: string
+}) {
+  const linhas: LinhaEstoque[] = args.produtos.map(p => {
+    const vs = args.retiradas.filter(r => r.produto_id === p.id && dentroDe(r.data, args.inicio, args.fim))
+    const cs = args.compras.filter(c => c.produto_id === p.id && dentroDe(c.data, args.inicio, args.fim))
+    const faturamento = arredonda(vs.reduce((s, r) => s + r.quantidade * r.preco_unitario, 0))
+    const custoVendido = arredonda(vs.reduce((s, r) => s + r.quantidade * r.custo_unitario, 0))
+    const saldo = args.saldos[p.id] ?? 0
+    const situacao: LinhaEstoque['situacao'] = saldo <= 0 ? 'COMPRAR' : saldo <= p.limite_compra ? 'ATENÇÃO' : 'OK'
+    return {
+      id: p.id, nome: p.nome, categoria: p.categoria, saldo, limite: p.limite_compra,
+      vendidos: vs.reduce((s, r) => s + r.quantidade, 0), faturamento, custoVendido, lucro: arredonda(faturamento - custoVendido),
+      comprados: cs.reduce((s, c) => s + c.quantidade, 0), gastoCompras: arredonda(cs.reduce((s, c) => s + c.quantidade * c.custo_unitario, 0)), situacao,
+    }
+  }).sort((a, b) => b.lucro - a.lucro || b.vendidos - a.vendidos || a.nome.localeCompare(b.nome, 'pt-BR'))
+  const soma = (f: (l: LinhaEstoque) => number) => arredonda(linhas.reduce((s, l) => s + f(l), 0))
+  return { linhas, totais: { faturamento: soma(l => l.faturamento), lucro: soma(l => l.lucro), vendidos: soma(l => l.vendidos), gastoCompras: soma(l => l.gastoCompras) } }
+}

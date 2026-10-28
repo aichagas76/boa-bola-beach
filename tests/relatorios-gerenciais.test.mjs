@@ -178,3 +178,41 @@ test('lançamentos de outro mês, cancelados ou sem professor ficam de fora; pro
   }))
   assert.deepEqual([r.linhas.length, r.linhas[0].totalExtras, r.linhas[0].alunos], [1, 12, 0])
 })
+
+test('comparação entre períodos: indicadores lado a lado, diferença e variação', async () => {
+  const { compararPeriodos } = await import('../lib/relatorios-gerenciais.ts')
+  const e = (valor, dia, categoria = 'Mensalidade') => ({ tipo: 'Entrada', status: 'Recebido', valor, data: dia, data_pagamento: dia, categoria })
+  const s = (valor, dia) => ({ tipo: 'Saída', status: 'Pago', valor, data: dia, data_pagamento: dia, categoria: 'Aluguel' })
+  const r = compararPeriodos({
+    movs: [e(1000, '2026-10-05'), e(100, '2026-10-06', 'Venda Produto Loja'), s(400, '2026-10-07'), e(800, '2026-09-05'), s(500, '2026-09-07'), { ...e(50, '2026-10-08'), status: 'Não recebido' }],
+    alunos: [{ data_cadastro: '2026-10-02', data_saida: null }, { data_cadastro: '2026-09-10', data_saida: '2026-10-15' }, { data_cadastro: '2026-09-11', data_saida: null }],
+    atual: { inicio: '2026-10-01', fim: '2026-10-31' }, anterior: { inicio: '2026-09-01', fim: '2026-09-30' },
+  })
+  const por = Object.fromEntries(r.map(l => [l.chave, l]))
+  assert.deepEqual([por.faturamento.atual, por.faturamento.anterior, por.faturamento.diferenca, por.faturamento.variacaoPct], [1100, 800, 300, 37.5])
+  assert.deepEqual([por.despesas.atual, por.despesas.anterior, por.despesas.subiuEhBom], [400, 500, false])
+  assert.deepEqual([por.lucro.atual, por.lucro.anterior], [700, 300])
+  assert.equal(por.vendas.atual, 100)
+  assert.deepEqual([por.novos.atual, por.novos.anterior, por.inativacoes.atual, por.inativacoes.anterior], [1, 2, 1, 0])
+  assert.equal(por.inativacoes.variacaoPct, null)
+})
+
+test('relatório de estoque: vendas, lucro e compras do período, e situação pelo saldo de hoje', async () => {
+  const { relatorioEstoque } = await import('../lib/relatorios-gerenciais.ts')
+  const produtos = [
+    { id: 'p1', nome: 'Bola', categoria: 'Bolas', custo: 5, limite_compra: 10 },
+    { id: 'p2', nome: 'Overgrip', categoria: null, custo: 2, limite_compra: 5 },
+    { id: 'p3', nome: 'Raquete', categoria: null, custo: 100, limite_compra: 2 },
+  ]
+  const r = relatorioEstoque({
+    produtos, saldos: { p1: 8, p2: 30, p3: 0 }, inicio: '2026-10-01', fim: '2026-10-31',
+    retiradas: [
+      { produto_id: 'p1', data: '2026-10-05', quantidade: 2, preco_unitario: 10, custo_unitario: 5 },
+      { produto_id: 'p2', data: '2026-10-06', quantidade: 10, preco_unitario: 5, custo_unitario: 2 },
+      { produto_id: 'p1', data: '2026-09-30', quantidade: 99, preco_unitario: 10, custo_unitario: 5 },
+    ],
+    compras: [{ produto_id: 'p1', data: '2026-10-02', quantidade: 20, custo_unitario: 5 }],
+  })
+  assert.deepEqual(r.linhas.map(l => [l.nome, l.vendidos, l.lucro, l.situacao]), [['Overgrip', 10, 30, 'OK'], ['Bola', 2, 10, 'ATENÇÃO'], ['Raquete', 0, 0, 'COMPRAR']])
+  assert.deepEqual([r.totais.faturamento, r.totais.lucro, r.totais.gastoCompras], [70, 40, 100])
+})

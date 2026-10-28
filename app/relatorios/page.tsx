@@ -7,6 +7,8 @@ import { supabase } from '@/lib/supabase'
 import { buscarTudo } from '@/lib/buscar-tudo'
 import { useUnidade } from '@/components/layout/UnidadeProvider'
 import { BotaoImprimir, CabecalhoImpressao } from '@/components/relatorios/CabecalhoImpressao'
+import ComparacaoPeriodos from '@/components/relatorios/ComparacaoPeriodos'
+import RelatorioEstoque from '@/components/relatorios/RelatorioEstoque'
 import { mesesDaJanela, periodoDe, rotuloMes, type Preset } from '@/lib/painel'
 import {
   comissaoPorProfessor, competenciaDe, faturamentoPorEsporte, paraCsv,
@@ -56,7 +58,7 @@ export default function Relatorios() {
   const { unidadeId, unidade } = useUnidade()
   const hoje = useMemo(() => new Date().toLocaleDateString('en-CA'), [])
 
-  const [aba, setAba] = useState<'comissao' | 'esporte'>('comissao')
+  const [aba, setAba] = useState<'comissao' | 'esporte' | 'comparacao' | 'estoque'>('comissao')
   const [loading, setLoading] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
   const [professores, setProfessores] = useState<ProfessorR[]>([])
@@ -194,8 +196,8 @@ export default function Relatorios() {
         <p className="text-sm text-gray-500">{unidade?.nome ?? ''}</p>
       </div>
 
-      <div className="inline-flex rounded-lg border border-gray-200 bg-white overflow-hidden mb-5 print:hidden">
-        {([['comissao', 'Pagamento dos professores'], ['esporte', 'Faturamento e lucro por esporte']] as const).map(([id, nome]) => (
+      <div className="inline-flex max-w-full overflow-x-auto rounded-lg border border-gray-200 bg-white mb-5 print:hidden">
+        {([['comissao', 'Pagamento dos professores'], ['esporte', 'Faturamento e lucro por esporte'], ['comparacao', 'Comparação entre períodos'], ['estoque', 'Estoque']] as const).map(([id, nome]) => (
           <button key={id} type="button" onClick={() => setAba(id)}
             className={`px-4 h-10 text-sm font-medium transition-colors ${aba === id ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-50'}`}>
             {nome}
@@ -537,6 +539,9 @@ export default function Relatorios() {
           </div>
         </section>
       )}
+
+      {aba === 'comparacao' && <ComparacaoPeriodos hoje={hoje} />}
+      {aba === 'estoque' && <RelatorioEstoque hoje={hoje} />}
     </div>
   )
 }
