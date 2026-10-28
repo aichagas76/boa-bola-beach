@@ -49,13 +49,18 @@ export const rotuloDoPeriodo = (inicio: string, fim: string) =>
   inicio === fim ? inicio.split('-').reverse().join('/') : `${inicio.split('-').reverse().join('/')} a ${fim.split('-').reverse().join('/')}`
 
 /** Tema do Painel que abre e fecha pela setinha. Começa fechado: o conteúdo só é desenhado quando aberto. */
-export function TemaRecolhivel({ titulo, subtitulo, filtro, children }: {
+export function TemaRecolhivel({ titulo, subtitulo, filtro, children, aberto: abertoFora, onAlternar }: {
   titulo: string
   subtitulo?: string
   filtro?: React.ReactNode
   children: React.ReactNode
+  /** Opcional: quem usa controla se está aberto (para só calcular o que está à vista) */
+  aberto?: boolean
+  onAlternar?: () => void
 }) {
-  const [aberto, setAberto] = useState(false)
+  const [abertoLocal, setAbertoLocal] = useState(false)
+  const aberto = abertoFora ?? abertoLocal
+  const setAberto = (f: (v: boolean) => boolean) => { if (onAlternar) onAlternar(); else setAbertoLocal(f) }
   const id = `tema-${titulo.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`
   return (
     <section className="mb-4 rounded-xl border border-gray-200 bg-gray-50/50" aria-label={titulo}>

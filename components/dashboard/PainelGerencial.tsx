@@ -137,6 +137,10 @@ export default function PainelGerencial() {
   const jMod = useJanela(hoje, 6)
   const [profSel, setProfSel] = useState('')
   const pPag = usePeriodo(hoje)
+  // Só o que está à vista é calculado: cada tema começa fechado e só entra na conta quando aberto
+  const [aberto, setAberto] = useState<Record<string, boolean>>({})
+  const alternar = (id: string) => () => setAberto(a => ({ ...a, [id]: !a[id] }))
+  const abFin = !!aberto.fin, abFlu = !!aberto.flu, abAlu = !!aberto.alu, abMod = !!aberto.mod, abPag = !!aberto.pag
 
   const [loading, setLoading] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
@@ -161,12 +165,8 @@ export default function PainelGerencial() {
 
       // data_inativacao só existe depois da atualização do banco: se faltar, o painel segue sem ela
       let rastreia = true
-      let ra = await buscarTudo((de, ate) => supabase.from('alunos').select('id, status, data_cadastro, data_inativacao, data_vencimento, unidade_id').order('id').range(de, ate))
-      if (ra.error) {
-        rastreia = false
-        ra = await buscarTudo((de, ate) => supabase.from('alunos').select('id, status, data_cadastro, data_vencimento, unidade_id').order('id').range(de, ate)) as typeof ra
-      }
-      const [rm, rf, rp, rh, rr, dProf, dEsp, dConta, dCat] = await Promise.all([
+      const [ra0, rm, rf, rp, rh, rr, dProf, dEsp, dConta, dCat] = await Promise.all([
+        buscarTudo((de, ate) => supabase.from('alunos').select('id, status, data_cadastro, data_inativacao, data_vencimento, unidade_id').order('id').range(de, ate)),
         buscarTudo((de, ate) => supabase.from('matriculas').select('aluno_id, tipo, valor, unidade_id, acesso_duas_unidades, esporte_id, esportes(nome)').order('id').range(de, ate)),
         buscarTudo((de, ate) => supabase
           .from('movimentacoes')
@@ -184,6 +184,11 @@ export default function PainelGerencial() {
         supabase.from('contas_bancarias').select('id, nome'),
         supabase.from('categorias_financeiro').select('id, categoria'),
       ])
+      let ra = ra0
+      if (ra.error) {
+        rastreia = false
+        ra = await buscarTudo((de, ate) => supabase.from('alunos').select('id, status, data_cadastro, data_vencimento, unidade_id').order('id').range(de, ate)) as typeof ra
+      }
       if (cancelado) return
       if (ra.error || rm.error || rf.error || rp.error) {
         setErro('Não consegui carregar os dados do painel. Atualize a página; se continuar, avise o suporte.')
@@ -255,23 +260,26 @@ export default function PainelGerencial() {
   const gastosAnt = useMemo(() => gastosDoPeriodo(movsDaUnidade, periodo.inicioAnt, periodo.fimAnt), [movsDaUnidade, periodo])
 
   const financeira = useMemo(
-    () => aparaMesesVazios(serieFinanceira(itens, mesesFin, hoje), l => l.recebida > 0 || l.anterior > 0 || l.aReceber > 0),
-    [itens, mesesFin, hoje]
+    () => (abFin ? aparaMesesVazios(serieFinanceira(itens, mesesFin, hoje), l => l.recebida > 0 || l.anterior > 0 || l.aReceber > 0) : []),
+    [abFin, itens, mesesFin, hoje]
   )
   const temAnterior = financeira.some(l => l.anterior > 0)
   // Esporte escolhido no tema Alunos: só quem tem matrícula nele
   const esportesAlu = useMemo(() => {
+    if (!abAlu) return []
     const por = new Map<string, string>()
     for (const m of dados.matsU) if (m.esporte_id && m.esportes?.nome) por.set(m.esporte_id, m.esportes.nome)
     return [...por.entries()].map(([id, nome]) => ({ id, nome })).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
-  }, [dados.matsU])
+  }, [abAlu, dados.matsU])
   const alunosDoGrafico = useMemo(() => {
+    if (!abAlu) return []
     const doEsporte = esporteAlu ? new Set(dados.matsU.filter(m => m.esporte_id === esporteAlu).map(m => m.aluno_id)) : null
     return alunosP
       .filter(a => !doEsporte || doEsporte.has(a.id))
       .map(a => (a.status === 'Inativo' && !a.data_inativacao && saidas[a.id] ? { ...a, data_inativacao: saidas[a.id] } : a))
-  }, [alunosP, dados.matsU, esporteAlu, saidas])
+  }, [abAlu, alunosP, dados.matsU, esporteAlu, saidas])
   const inativacoesMes = useMemo(() => {
+    if (!abAlu) return []
     const doEsporte = esporteAlu ? new Set(dados.matsU.filter(m => m.esporte_id === esporteAlu).map(m => m.aluno_id)) : null
     const eventos: Evento[] = []
     for (const a of alunosP) {
@@ -280,52 +288,54 @@ export default function PainelGerencial() {
       else if (a.status === 'Inativo' && saidas[a.id]) eventos.push({ data: saidas[a.id], grupo: 'estimada' })
     }
     return serieMensal(eventos, jAlu.janela, ['registrada', 'estimada'])
-  }, [alunosP, dados.matsU, esporteAlu, saidas, jAlu.janela])
+  }, [abAlu, alunosP, dados.matsU, esporteAlu, saidas, jAlu.janela])
   // Novos alunos do mês: cadastros novos (nunca existiram) e reativados (voltaram de inativo)
   const novosMes = useMemo(() => {
+    if (!abAlu) return []
     const doEsporte = esporteAlu ? new Set(dados.matsU.filter(m => m.esporte_id === esporteAlu).map(m => m.aluno_id)) : null
     const ids = new Set(alunosP.map(a => a.id))
     const reativ = serieMensal(reativacoes.filter(r => ids.has(r.aluno_id) && (!doEsporte || doEsporte.has(r.aluno_id))).map<Evento>(r => ({ data: r.data })), jAlu.janela)
     return serieAlunosAtivos(alunosDoGrafico, mesesAlu, hoje).map((l, i) => ({ rotulo: l.rotulo, novos: l.novos, reativados: Number(reativ[i]?.total ?? 0) }))
-  }, [alunosP, alunosDoGrafico, dados.matsU, esporteAlu, reativacoes, jAlu.janela, mesesAlu, hoje])
-  const serieA = useMemo(() => serieAlunosAtivos(alunosDoGrafico, mesesAlu, hoje), [alunosDoGrafico, mesesAlu, hoje])
-  const status = useMemo(() => statusDosPagamentos(itens, pPag.periodo, hoje), [itens, pPag.periodo, hoje])
-  const faixas = useMemo(() => faixasDeAtraso(itens, hoje), [itens, hoje])
+  }, [abAlu, alunosP, alunosDoGrafico, dados.matsU, esporteAlu, reativacoes, jAlu.janela, mesesAlu, hoje])
+  const serieA = useMemo(() => (abAlu ? serieAlunosAtivos(alunosDoGrafico, mesesAlu, hoje) : []), [abAlu, alunosDoGrafico, mesesAlu, hoje])
+  const status = useMemo(() => (abPag ? statusDosPagamentos(itens, pPag.periodo, hoje) : []), [abPag, itens, pPag.periodo, hoje])
+  const faixas = useMemo(() => (abPag ? faixasDeAtraso(itens, hoje) : []), [abPag, itens, hoje])
 
   const mesesPeriodoFin = useMemo(() => mesesDaJanela(pFin.periodo.inicio, pFin.periodo.fim, 1), [pFin.periodo])
   // O lucro usa todas as movimentações da unidade (despesas não pertencem a uma modalidade)
-  const movsRelUnidade: Mov[] = useMemo(() => movs.map(m => ({
+  const movsRelUnidade: Mov[] = useMemo(() => (!abFin ? [] : movs.map(m => ({
     tipo: m.tipo, status: m.status, valor: Number(m.valor), data: m.data, data_pagamento: m.data_pagamento,
     professor_id: m.professor_id, professor_nome: m.professores?.nome ?? null, esporte_nome: m.esportes?.nome ?? null,
-  })), [movs])
-  const movsFluxo: MovFluxo[] = useMemo(() => movs.map(m => ({
+  }))), [abFin, movs])
+  const movsFluxo: MovFluxo[] = useMemo(() => (!abFlu ? [] : movs.map(m => ({
     tipo: m.tipo, status: m.status, valor: Number(m.valor), data: m.data, data_pagamento: m.data_pagamento, data_vencimento: m.data_vencimento, conta_id: m.conta_bancaria_id,
-  })), [movs])
+  }))), [abFlu, movs])
   // Mensalidades dos alunos ativos da unidade toda (o caixa não se divide por modalidade)
   const mensalidadesUnidade = useMemo(() => {
+    if (!abFlu) return 0
     const ativos = new Set(dados.alunosU.filter(a => a.status === 'Ativo').map(a => a.id))
     return Math.round(dados.matsU.filter(m => ativos.has(m.aluno_id)).reduce((t, m) => t + (Number(m.valor) || 0), 0) * 100) / 100
-  }, [dados.alunosU, dados.matsU])
+  }, [abFlu, dados.alunosU, dados.matsU])
   // Despesas pagas por categoria, no período escolhido no Financeiro (a unidade toda: despesa não é de modalidade)
   // Clicar numa categoria (na lista ou na fatia) tira ela do cálculo; clicar de novo traz de volta
   const [categoriasOcultas, setCategoriasOcultas] = useState<string[]>([])
-  const movsDespesa = useMemo(() => movs.map(m => ({
+  const movsDespesa = useMemo(() => (!abFin ? [] : movs.map(m => ({
     tipo: m.tipo, status: m.status, valor: Number(m.valor), data: m.data, data_pagamento: m.data_pagamento, categoria: m.categorias_financeiro?.categoria ?? null,
-  })), [movs])
+  }))), [abFin, movs])
   const despesasCat = useMemo(() => despesasPorCategoria(movsDespesa, { inicio: pFin.periodo.inicio, fim: pFin.periodo.fim }, 8, categoriasOcultas), [movsDespesa, pFin.periodo, categoriasOcultas])
   const despesasOcultas = useMemo(() => despesasPorCategoria(movsDespesa, { inicio: pFin.periodo.inicio, fim: pFin.periodo.fim }, 99).filter(d => categoriasOcultas.includes(d.name)), [movsDespesa, pFin.periodo, categoriasOcultas])
   const alternarCategoria = (nome: string) => { if (nome !== 'Outras') setCategoriasOcultas(l => (l.includes(nome) ? l.filter(x => x !== nome) : [...l, nome])) }
   const totalDespesasCat = despesasCat.reduce((t, d) => t + d.value, 0)
   const lucro = useMemo(
-    () => aparaMesesVazios(resumoPorMes(movsRelUnidade, mesesFin), l => l.bruto > 0 || l.despesas > 0),
-    [movsRelUnidade, mesesFin]
+    () => (abFin ? aparaMesesVazios(resumoPorMes(movsRelUnidade, mesesFin), l => l.bruto > 0 || l.despesas > 0) : []),
+    [abFin, movsRelUnidade, mesesFin]
   )
-  const totaisPeriodo = useMemo(() => totaisDoPeriodo(resumoPorMes(movsRelUnidade, mesesPeriodoFin)), [movsRelUnidade, mesesPeriodoFin])
+  const totaisPeriodo = useMemo(() => (abFin ? totaisDoPeriodo(resumoPorMes(movsRelUnidade, mesesPeriodoFin)) : { bruto: 0, despesas: 0, lucro: 0 }), [abFin, movsRelUnidade, mesesPeriodoFin])
   // Faturamento dos professores: ranking do período e, mês a mês, o valor e os alunos que pagaram
-  const movsProf = useMemo(() => dados.movsF.map(m => ({
+  const movsProf = useMemo(() => (!abMod ? [] : dados.movsF.map(m => ({
     tipo: m.tipo, status: m.status, valor: Number(m.valor), data: m.data, data_pagamento: m.data_pagamento,
     professor_id: m.professor_id, professor_nome: m.professores?.nome ?? null, esporte_nome: m.esportes?.nome ?? null, aluno_ref_id: m.aluno_ref_id,
-  })), [dados.movsF])
+  }))), [abMod, dados.movsF])
   const fatProf = useMemo(() => faturamentoProfessores(movsProf, jMod.janela, profSel), [movsProf, jMod.janela, profSel])
   const professoresFat = useMemo(() => {
     const por = new Map<string, string>()
@@ -334,10 +344,10 @@ export default function PainelGerencial() {
   }, [movsProf])
   const nomeProfSel = professoresFat.find(x => x.id === profSel)?.nome
 
-  const matsRel = useMemo(() => dados.matsF.map(m => ({
+  const matsRel = useMemo(() => (!abMod ? [] : dados.matsF.map(m => ({
     aluno_id: m.aluno_id, tipo: m.tipo, unidade_id: m.unidade_id, acesso_duas_unidades: m.acesso_duas_unidades, esporte_nome: m.esportes?.nome ?? null,
-  })), [dados.matsF])
-  const porModalidade = useMemo(() => alunosPorModalidade(dados.alunosF.map(a => ({ id: a.id, status: a.status })), matsRel, unidadeId), [dados.alunosF, matsRel, unidadeId])
+  }))), [abMod, dados.matsF])
+  const porModalidade = useMemo(() => (abMod ? alunosPorModalidade(dados.alunosF.map(a => ({ id: a.id, status: a.status })), matsRel, unidadeId) : { dados: [], esportes: [] }), [abMod, dados.alunosF, matsRel, unidadeId])
   const fatiasModalidade = useMemo(() => participacao(porModalidade.dados), [porModalidade])
 
   const modalidadesDisponiveis = useMemo(() => Array.from(new Set(dados.matsU.map(m => m.tipo))).sort(), [dados.matsU])
@@ -453,7 +463,7 @@ export default function PainelGerencial() {
         <div className="mb-6 rounded-lg border border-gray-200 bg-white px-4 py-6 text-center text-sm text-gray-500">Nenhum aluno ativo neste recorte (unidade/modalidade).</div>
       )}
 
-      <TemaRecolhivel titulo="Financeiro" subtitulo="Pelo mês do pagamento. Mostra pelo menos 6 meses, para dar para ver a tendência." filtro={<FiltroPeriodo p={pFin} nome="Financeiro" />}>
+      <TemaRecolhivel aberto={abFin} onAlternar={alternar('fin')} titulo="Financeiro" subtitulo="Pelo mês do pagamento. Mostra pelo menos 6 meses, para dar para ver a tendência." filtro={<FiltroPeriodo p={pFin} nome="Financeiro" />}>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Grafico titulo="Receita recebida por mês" nota={temAnterior ? 'Linha cinza: mesmo mês do período anterior' : undefined}
           carregando={loading} vazio={!loading && financeira.every(l => l.recebida === 0 && l.anterior === 0)} mensagemVazio="Nenhuma receita recebida neste período">
@@ -536,11 +546,11 @@ export default function PainelGerencial() {
       </div>
       </TemaRecolhivel>
 
-      <TemaRecolhivel titulo="Fluxo de caixa" subtitulo="Por mês: o que entrou e saiu e a previsão dos meses à frente.">
+      <TemaRecolhivel aberto={abFlu} onAlternar={alternar('flu')} titulo="Fluxo de caixa" subtitulo="Por mês: o que entrou e saiu e a previsão dos meses à frente.">
         <FluxoDeCaixa movs={movsFluxo} hoje={hoje} mensalidades={mensalidadesUnidade} carregando={loading} />
       </TemaRecolhivel>
 
-      <TemaRecolhivel titulo="Alunos" subtitulo="Base = alunos ativos no fim de cada mês. Novos cadastros e inativações do mês." filtro={
+      <TemaRecolhivel aberto={abAlu} onAlternar={alternar('alu')} titulo="Alunos" subtitulo="Base = alunos ativos no fim de cada mês. Novos cadastros e inativações do mês." filtro={
         <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
           <FiltroMeses j={jAlu} nome="Alunos" opcoes={[{ n: 6, nome: '6 meses' }, { n: 12, nome: '1 ano' }]} />
           <div className="inline-flex shrink-0 max-w-[calc(100vw-2rem)] overflow-x-auto rounded-lg border border-gray-200 bg-white" role="group" aria-label="Esporte">
@@ -599,7 +609,7 @@ export default function PainelGerencial() {
         <VendasDeProdutos hoje={hoje} />
       </TemaRecolhivel>
 
-      <TemaRecolhivel titulo="Modalidades" subtitulo="Alunos ativos de hoje (aluno em combo conta nas duas unidades) e o faturamento dos professores no período."
+      <TemaRecolhivel aberto={abMod} onAlternar={alternar('mod')} titulo="Modalidades" subtitulo="Alunos ativos de hoje (aluno em combo conta nas duas unidades) e o faturamento dos professores no período."
         filtro={<FiltroMeses j={jMod} nome="Modalidades" opcoes={[{ n: 1, nome: 'Mês atual' }, { n: 3, nome: '3 meses' }, { n: 6, nome: '6 meses' }, { n: 12, nome: '1 ano' }]} />}>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Grafico titulo="Alunos por modalidade e esporte" nota="Alunos ativos hoje; quem tem mais de uma modalidade entra em cada uma"
@@ -676,7 +686,7 @@ export default function PainelGerencial() {
       </div>
       </TemaRecolhivel>
 
-      <TemaRecolhivel titulo="Pagamentos" subtitulo="Pagos e cancelados são do período; a vencer e vencidos são a carteira em aberto de hoje." filtro={<FiltroPeriodo p={pPag} nome="Pagamentos" />}>
+      <TemaRecolhivel aberto={abPag} onAlternar={alternar('pag')} titulo="Pagamentos" subtitulo="Pagos e cancelados são do período; a vencer e vencidos são a carteira em aberto de hoje." filtro={<FiltroPeriodo p={pPag} nome="Pagamentos" />}>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Grafico titulo="Situação dos pagamentos"
           carregando={loading} vazio={!loading && status.every(s => s.qtd === 0)} mensagemVazio="Nenhum pagamento neste período">
