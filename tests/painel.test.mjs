@@ -248,3 +248,16 @@ test('lista de inadimplentes: mesma regra do indicador (cobrança vencida ou ven
   const r = listaInadimplentes({ alunos, mats, itens, hoje: '2026-10-27' })
   assert.deepEqual(r.map(x => [x.nome, x.origem, x.valor, x.dias, x.qtdCobrancas]), [['Ana', 'cobranca', 300, 37, 2], ['Bia', 'cadastro', 350, 17, 0]])
 })
+
+test('base de alunos ativos por mês: inativo só conta até a data de saída; sem data de saída não entra', async () => {
+  const { serieAlunosAtivos } = await import('../lib/painel.ts')
+  const a = (id, status, cad, inat) => ({ id, status, data_cadastro: cad, data_inativacao: inat ?? null, data_vencimento: null })
+  const alunos = [
+    a('1', 'Ativo', '2026-01-10'),
+    a('2', 'Inativo', '2026-01-15', '2026-09-05'),
+    a('3', 'Inativo', '2026-02-01', null),
+    a('4', 'Ativo', '2026-10-02'),
+  ]
+  const r = serieAlunosAtivos(alunos, ['2026-08', '2026-09', '2026-10'], '2026-10-27')
+  assert.deepEqual(r.map(x => [x.rotulo, x.base, x.novos, x.inativacoes]), [['ago/26', 2, 0, 0], ['set/26', 1, 0, 1], ['out/26', 2, 1, 0]])
+})

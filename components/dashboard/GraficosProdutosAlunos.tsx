@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { supabase } from '@/lib/supabase'
 import { buscarTudo } from '@/lib/buscar-tudo'
 import { useUnidade } from '@/components/layout/UnidadeProvider'
@@ -10,7 +10,7 @@ import { serieMensal, type Evento } from '@/lib/painel-graficos'
 
 const brl = (v: number) => `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 const brlCurto = (v: number) => (Math.abs(v) >= 1000 ? `${(v / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} mil` : String(v))
-const COR = { marca: '#7DC421', vencido: '#DC2626', recebido: '#16A34A', claro: '#FCA5A5' }
+const COR = { marca: '#7DC421' }
 const ALTURA = 260
 const MARGEM = { top: 8, right: 8, left: 0, bottom: 0 }
 
@@ -88,98 +88,6 @@ export function VendasDeProdutos({ hoje }: { hoje: string }) {
           </ResponsiveContainer>
         )}
       </Cartao>
-    </div>
-  )
-}
-
-type Mudanca = { data: string; de_status: string | null; para_status: string; estimado: boolean; alunos: { unidade_id: string | null; matriculas: { esporte_id: string | null }[] | null } | null }
-
-/** Inativações (ativo -> inativo) e reativações (inativo -> ativo) por mês. */
-export function MovimentoDeAlunos({ hoje }: { hoje: string }) {
-  const { unidadeId } = useUnidade()
-  const j = useJanela(hoje)
-  const { inicio, fim } = j.janela
-  const [carregando, setCarregando] = useState(true)
-  const [erro, setErro] = useState(false)
-  const [linhas, setLinhas] = useState<Mudanca[]>([])
-  const [esporte, setEsporte] = useState('')
-  const [esportes, setEsportes] = useState<{ id: string; nome: string }[]>([])
-
-  useEffect(() => {
-    supabase.from('esportes').select('id, nome').eq('ativo', true).order('nome').then(({ data }) => setEsportes(data ?? []))
-  }, [])
-
-  useEffect(() => {
-    if (!unidadeId) return
-    let cancelado = false
-    async function carregar() {
-      setCarregando(true)
-      setErro(false)
-      const r = await buscarTudo((de, ate) => supabase.from('alunos_status_historico').select('data, de_status, para_status, estimado, alunos(unidade_id, matriculas(esporte_id))')
-        .gte('data', inicio).lte('data', fim).order('data').order('id').range(de, ate))
-      if (cancelado) return
-      if (r.error) setErro(true)
-      else setLinhas(((r.data ?? []) as unknown as Mudanca[]).filter(l => l.alunos?.unidade_id === unidadeId))
-      setCarregando(false)
-    }
-    carregar()
-    return () => { cancelado = true }
-  }, [unidadeId, inicio, fim])
-
-  // Esporte escolhido: só os alunos que têm matrícula nele
-  const doEsporte = useMemo(() => (esporte ? linhas.filter(l => (l.alunos?.matriculas ?? []).some(m => m.esporte_id === esporte)) : linhas), [linhas, esporte])
-  const inativacoes = useMemo(() => serieMensal(
-    doEsporte.filter(l => l.para_status === 'Inativo').map<Evento>(l => ({ data: l.data, grupo: l.estimado ? 'estimado' : 'registrado' })), j.janela, ['registrado', 'estimado']), [doEsporte, j.janela])
-  const reativacoes = useMemo(() => serieMensal(
-    doEsporte.filter(l => l.de_status === 'Inativo' && l.para_status === 'Ativo').map<Evento>(l => ({ data: l.data, grupo: 'registrado' })), j.janela, ['registrado']), [doEsporte, j.janela])
-  const totalIn = inativacoes.reduce((s, p) => s + p.total, 0)
-  const totalRe = reativacoes.reduce((s, p) => s + p.total, 0)
-  const estimadas = inativacoes.reduce((s, p) => s + Number(p.estimado), 0)
-
-  return (
-    <div>
-      <div className="mb-3 flex flex-wrap items-center gap-2 sm:flex-nowrap">
-        <FiltroMeses j={j} nome="Inativações e reativações" />
-        <select value={esporte} onChange={e => setEsporte(e.target.value)} aria-label="Esporte" className="h-9 shrink-0 border border-gray-200 rounded-lg px-2 text-sm bg-white">
-          <option value="">Todos os esportes</option>
-          {esportes.map(e => <option key={e.id} value={e.id}>{e.nome}</option>)}
-        </select>
-      </div>
-      <div className="grid gap-3 mb-3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))' }}>
-        <Kpi rotulo="Inativações" valor={carregando ? '...' : String(totalIn)} nota="alunos que passaram de ativo a inativo" />
-        <Kpi rotulo="Reativações" valor={carregando ? '...' : String(totalRe)} nota="alunos que voltaram de inativo a ativo" />
-        <Kpi rotulo="Saldo" valor={carregando ? '...' : `${totalRe - totalIn > 0 ? '+' : ''}${totalRe - totalIn}`} nota="reativações − inativações" />
-      </div>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Cartao titulo="Inativações por mês" nota={estimadas > 0 ? `${estimadas} com data estimada pelo último pagamento (alunos que já vinham inativos da planilha antiga)` : undefined}>
-          {carregando ? <Mensagem texto="Carregando..." /> : erro ? <Mensagem texto="Não consegui carregar. Atualize a página." /> : totalIn === 0 ? <Mensagem texto="Nenhuma inativação neste período" /> : (
-            <ResponsiveContainer width="100%" height={ALTURA}>
-              <BarChart data={inativacoes} margin={MARGEM}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#eee" vertical={false} />
-                <XAxis dataKey="rotulo" tick={{ fontSize: 12 }} tickLine={false} />
-                <YAxis width={40} tick={{ fontSize: 12 }} tickLine={false} axisLine={false} allowDecimals={false} />
-                <Tooltip />
-                <Legend wrapperStyle={{ fontSize: 12, paddingTop: 6 }} />
-                <Bar dataKey="registrado" stackId="i" name="Registrada" fill={COR.vencido} />
-                <Bar dataKey="estimado" stackId="i" name="Data estimada" fill={COR.claro} radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-        </Cartao>
-        <Cartao titulo="Reativações por mês" nota="O sistema passou a registrar as reativações agora; as anteriores não têm data guardada">
-          {carregando ? <Mensagem texto="Carregando..." /> : erro ? <Mensagem texto="Não consegui carregar. Atualize a página." /> : totalRe === 0 ? <Mensagem texto="Nenhuma reativação neste período" /> : (
-            <ResponsiveContainer width="100%" height={ALTURA}>
-              <BarChart data={reativacoes} margin={MARGEM}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#eee" vertical={false} />
-                <XAxis dataKey="rotulo" tick={{ fontSize: 12 }} tickLine={false} />
-                <YAxis width={40} tick={{ fontSize: 12 }} tickLine={false} axisLine={false} allowDecimals={false} />
-                <Tooltip />
-                <Bar dataKey="registrado" name="Reativações" fill={COR.recebido} radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-        </Cartao>
-      </div>
     </div>
   )
 }

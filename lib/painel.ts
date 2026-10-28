@@ -416,3 +416,15 @@ export function listaInadimplentes(args: {
   }
   return lista.sort((x, y) => y.dias - x.dias || x.nome.localeCompare(y.nome, 'pt-BR'))
 }
+
+/** Base de alunos ATIVOS no fim de cada mês (no mês atual, até hoje), com novos cadastros e inativações do mês.
+ *  Inativo sem nenhuma data de saída não entra na base: não dá para saber quando esteve ativo. */
+export function serieAlunosAtivos(alunos: AlunoP[], meses: string[], hoje: string): LinhaAlunos[] {
+  return meses.map(mes => {
+    const fim = mes === mesDe(hoje) ? hoje : `${mes}-31`
+    const novos = alunos.filter(a => a.data_cadastro && mesDe(a.data_cadastro) === mes).length
+    const inativacoes = alunos.filter(a => a.data_inativacao && mesDe(a.data_inativacao) === mes).length
+    const base = alunos.filter(a => a.data_cadastro && a.data_cadastro <= fim && (a.status === 'Inativo' ? !!a.data_inativacao && a.data_inativacao > fim : true)).length
+    return { mes, rotulo: rotuloMes(mes), novos, inativacoes, base }
+  })
+}
