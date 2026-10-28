@@ -58,11 +58,16 @@ export type FiltroPagamentos = {
   alunoId: string
 }
 
+/** Mês de competência no formato 10/26. */
+export const competenciaCurta = (data: string | null) => (data ? `${data.slice(5, 7)}/${data.slice(2, 4)}` : '-')
+
 /** Entradas de alunos no período e nos filtros, da mais recente para a mais antiga. */
 export function filtrarPagamentos(entradas: EntradaAluno[], f: FiltroPagamentos): EntradaAluno[] {
   return entradas
     .filter(e => {
-      if (!e.aluno_ref_id || cancelada(e)) return false
+      if (cancelada(e)) return false
+      // Venda de produto sem aluno (balcão ou professor) também aparece, mas só quando não se escolheu um aluno
+      if (!e.aluno_ref_id && (f.alunoId || tipoDaEntrada(e.categoria) !== 'produto')) return false
       const d = dataDaEntrada(e)
       if (d < f.periodo.inicio || d > f.periodo.fim) return false
       if (f.alunoId && e.aluno_ref_id !== f.alunoId) return false

@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { intervaloDoPeriodo, tipoDaEntrada, filtrarPagamentos, resumoPagamentos, categoriasDeMensalidade } from '../lib/pagamentos-aluno.ts'
+import { intervaloDoPeriodo, tipoDaEntrada, filtrarPagamentos, resumoPagamentos, categoriasDeMensalidade, competenciaCurta } from '../lib/pagamentos-aluno.ts'
 
 const HOJE = '2026-10-28'
 
@@ -37,11 +37,12 @@ test('filtra por período (pagas pela data do pagamento, em aberto pelo vencimen
     e('5', 'a1', 'Aula BT', 100, { data: '2026-09-05', data_vencimento: '2026-09-05', data_pagamento: '2026-09-06' }),
     e('6', 'a1', 'Aula BT', 100, { status: 'Cancelado' }),
     e('7', null, 'Aula BT', 100),
+    e('8', null, 'Venda Produto Loja', 30),
   ]
-  assert.deepEqual(filtrarPagamentos(lista, base).map(x => x.id), ['4', '3', '2', '1'])
-  assert.equal(filtrarPagamentos(lista, base).length, 4) // 5 é de setembro, 6 cancelada, 7 sem aluno
-  assert.deepEqual(filtrarPagamentos(lista, { ...base, alunoId: 'a2' }).map(x => x.id), ['3'])
-  assert.deepEqual(filtrarPagamentos(lista, { ...base, tipo: 'produto' }).map(x => x.id), ['3'])
+  assert.deepEqual(filtrarPagamentos(lista, base).map(x => x.id), ['4', '8', '3', '2', '1'])
+  assert.equal(filtrarPagamentos(lista, base).length, 5) // 5 é de setembro, 6 cancelada, 7 é aula sem aluno; 8 é venda de balcão e entra
+  assert.deepEqual(filtrarPagamentos(lista, { ...base, alunoId: 'a2' }).map(x => x.id), ['3']) // com aluno escolhido, a venda de balcão sai
+  assert.deepEqual(filtrarPagamentos(lista, { ...base, tipo: 'produto' }).map(x => x.id), ['8', '3'])
   assert.deepEqual(filtrarPagamentos(lista, { ...base, tipo: 'mensalidade', categoria: 'Clubinho' }).map(x => x.id), ['2'])
   assert.equal(filtrarPagamentos(lista, { ...base, tipo: 'mensalidade' }).length, 3)
   // histórico inteiro do aluno
@@ -61,4 +62,9 @@ test('resumo: pago, pendente e último pagamento', () => {
 
 test('categorias de mensalidade existentes, sem produto, em ordem', () => {
   assert.deepEqual(categoriasDeMensalidade([e('1', 'a', 'Clubinho', 1), e('2', 'a', 'Aula BT', 1), e('3', 'a', 'Venda Produto Loja', 1), e('4', 'a', 'Clubinho', 1)]), ['Aula BT', 'Clubinho'])
+})
+
+test('competência curta: 10/26', () => {
+  assert.equal(competenciaCurta('2026-10-05'), '10/26')
+  assert.equal(competenciaCurta(null), '-')
 })

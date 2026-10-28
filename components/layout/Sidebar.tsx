@@ -12,7 +12,7 @@ type SubItem = { href: string; label: string; icon: LucideIcon; color?: string }
 const navItems: SubItem[] = [
   { href: '/', label: 'Painel', icon: LayoutDashboard },
   { href: '/alunos', label: 'Alunos', icon: Users },
-  { href: '/pagamentos', label: 'Pagamentos Aluno', icon: CreditCard },
+  { href: '/pagamentos', label: 'Histórico Financeiro Aluno', icon: CreditCard },
   { href: '/atraso', label: 'Em atraso', icon: AlertCircle },
   { href: '/financeiro', label: 'Financeiro', icon: TrendingUp },
   { href: '/estoque', label: 'Estoque', icon: Package },

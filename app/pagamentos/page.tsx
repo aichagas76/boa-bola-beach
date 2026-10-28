@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { Check, Trash2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useUnidade } from '@/components/layout/UnidadeProvider'
 import { buscarTudo } from '@/lib/buscar-tudo'
@@ -11,11 +12,12 @@ import { Modal } from '@/components/ui/modal'
 import { avisar } from '@/lib/avisos-ui'
 import { BotaoImprimir, CabecalhoImpressao } from '@/components/relatorios/CabecalhoImpressao'
 import {
-  categoriasDeMensalidade, filtrarPagamentos, foiRecebida, intervaloDoPeriodo, resumoPagamentos, tipoDaEntrada,
+  categoriasDeMensalidade, competenciaCurta, filtrarPagamentos, foiRecebida, intervaloDoPeriodo, resumoPagamentos, tipoDaEntrada,
   type EntradaAluno, type TipoPeriodo,
 } from '@/lib/pagamentos-aluno'
 
-type Linha = EntradaAluno & { forma_pagamento: string | null; alunos: { nome: string } | null }
+type Linha = EntradaAluno & { forma_pagamento: string | null; alunos: { nome: string } | null; professores: { nome: string } | null }
+type Bruto = Omit<Linha, 'categoria'> & { categorias_financeiro: { categoria: string | null } | null }
 
 const PERIODOS: { id: TipoPeriodo; nome: string }[] = [
   { id: 'dia', nome: 'Do dia' },
@@ -28,11 +30,13 @@ const PERIODOS: { id: TipoPeriodo; nome: string }[] = [
 ]
 
 const brl = (v: number) => `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-const dataBr = (iso: string | null) => (iso ? iso.slice(0, 10).split('-').reverse().join('/') : '-')
+const dataBr = (iso: string | null) => (iso ? iso.slice(0, 10).split('-').reverse().join('/') : '—')
 const grupo = 'inline-flex max-w-full overflow-x-auto rounded-lg border border-gray-200 bg-white'
 const botao = (ativo: boolean) => `px-3 h-9 text-sm font-medium whitespace-nowrap transition-colors ${ativo ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-50'}`
+const rotulo = 'block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1.5'
+const th = 'px-4 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500'
 
-export default function PagamentosAluno() {
+export default function HistoricoFinanceiroAluno() {
   const { unidadeId, unidade } = useUnidade()
   const hoje = useMemo(() => new Date().toLocaleDateString('en-CA'), [])
   const [alunos, setAlunos] = useState<{ id: string; nome: string }[]>([])
@@ -61,16 +65,20 @@ export default function PagamentosAluno() {
     if (!unidadeId) return
     setLoading(true)
     setErro(false)
-    const r = await buscarTudo((a, b) => supabase
-      .from('movimentacoes')
-      .select('id, aluno_ref_id, status, valor, data, data_vencimento, data_pagamento, forma_pagamento, categorias_financeiro(categoria), alunos!movimentacoes_aluno_ref_id_fkey(nome)')
-      .eq('unidade_id', unidadeId)
-      .eq('tipo', 'Entrada')
-      .not('aluno_ref_id', 'is', null)
-      .order('id').range(a, b))
-    if (r.error) { setErro(true); setLoading(false); return }
-    setTodas(((r.data ?? []) as unknown as (Omit<Linha, 'categoria'> & { categorias_financeiro: { categoria: string | null } | null })[])
-      .map(m => ({ ...m, valor: Number(m.valor), categoria: m.categorias_financeiro?.categoria ?? null })))
+    const campos = 'id, aluno_ref_id, status, valor, data, data_vencimento, data_pagamento, forma_pagamento'
+    const [comAluno, semAluno] = await Promise.all([
+      // O que é de aluno: mensalidades e vendas ligadas a ele
+      buscarTudo((a, b) => supabase.from('movimentacoes')
+        .select(`${campos}, categorias_financeiro(categoria), alunos!movimentacoes_aluno_ref_id_fkey(nome), professores(nome)`)
+        .eq('unidade_id', unidadeId).eq('tipo', 'Entrada').not('aluno_ref_id', 'is', null).order('id').range(a, b)),
+      // Venda de produto sem aluno (balcão ou professor)
+      buscarTudo((a, b) => supabase.from('movimentacoes')
+        .select(`${campos}, categorias_financeiro!inner(categoria), alunos!movimentacoes_aluno_ref_id_fkey(nome), professores(nome)`)
+        .eq('unidade_id', unidadeId).eq('tipo', 'Entrada').is('aluno_ref_id', null).ilike('categorias_financeiro.categoria', '%produto%').order('id').range(a, b)),
+    ])
+    if (comAluno.error || semAluno.error) { setErro(true); setLoading(false); return }
+    const brutos = [...((comAluno.data ?? []) as unknown as Bruto[]), ...((semAluno.data ?? []) as unknown as Bruto[])]
+    setTodas(brutos.map(m => ({ ...m, valor: Number(m.valor), categoria: m.categorias_financeiro?.categoria ?? null })))
     setLoading(false)
   }
 
@@ -94,7 +102,8 @@ export default function PagamentosAluno() {
 
   const rotuloPeriodo = periodo === 'tudo' ? 'Todo o histórico'
     : intervalo.inicio === intervalo.fim ? dataBr(intervalo.inicio) : `${dataBr(intervalo.inicio)} a ${dataBr(intervalo.fim)}`
-  const rotuloTipo = tipo === 'todos' ? 'Todos os tipos' : tipo === 'produto' ? 'Venda de produtos' : categoria ? categoria : 'Mensalidades'
+  const rotuloTipo = tipo === 'todos' ? 'Todos os tipos' : tipo === 'produto' ? 'Venda de produtos' : categoria || 'Mensalidades'
+  const quem = (m: Linha) => m.alunos?.nome ?? (m.professores?.nome ? `${m.professores.nome} (professor)` : 'Venda de balcão')
 
   async function darBaixa(m: Linha) {
     setBaixandoId(m.id)
@@ -118,7 +127,7 @@ export default function PagamentosAluno() {
   }
 
   return (
-    <div>
+    <div className="max-w-6xl">
       <Modal
         isOpen={confirmDelete.isOpen}
         title="Deletar pagamento"
@@ -130,128 +139,139 @@ export default function PagamentosAluno() {
         onCancel={() => setConfirmDelete({ isOpen: false, id: null })}
       />
 
-      <CabecalhoImpressao titulo="Pagamentos Aluno" unidade={unidade?.nome}
+      <CabecalhoImpressao titulo="Histórico Financeiro Aluno" unidade={unidade?.nome}
         linhas={[`Período: ${rotuloPeriodo}`, `Tipo: ${rotuloTipo}`, ...(nomeAluno ? [`Aluno: ${nomeAluno}`] : [])]} />
 
-      <div className="flex items-center justify-between gap-3 mb-4 print:hidden pl-12 md:pl-0">
-        <h1 className="text-page-title text-gray-900">Pagamentos Aluno</h1>
+      <div className="flex flex-wrap items-end justify-between gap-3 mb-5 print:hidden pl-12 md:pl-0">
+        <div>
+          <h1 className="text-page-title text-gray-900">Histórico Financeiro Aluno</h1>
+          <p className="text-sm text-gray-500">{unidade?.nome ?? ''} · mensalidades e vendas de produtos, com o que foi pago e o que está em aberto</p>
+        </div>
         <BotaoImprimir desabilitado={loading || lista.length === 0} />
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-xl p-4 mb-4 space-y-4 print:hidden">
-        <div>
-          <label className="text-label text-gray-500 block mb-2">Período</label>
-          <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
-            <div className={grupo} role="group" aria-label="Período">
-              {PERIODOS.map(p => (
-                <button key={p.id} type="button" aria-pressed={periodo === p.id} onClick={() => setPeriodo(p.id)} className={botao(periodo === p.id)}>{p.nome}</button>
-              ))}
-            </div>
-            {periodo === 'data' && (
-              <div className="inline-flex shrink-0 items-center gap-2 text-sm text-gray-600">
-                <input type="date" value={de} onChange={e => setDe(e.target.value)} className="h-9 w-[8.25rem] border border-gray-200 rounded-lg px-2 text-sm bg-white" aria-label="De" />
-                até
-                <input type="date" value={ate} onChange={e => setAte(e.target.value)} className="h-9 w-[8.25rem] border border-gray-200 rounded-lg px-2 text-sm bg-white" aria-label="Até" />
+      <section className="bg-white border border-gray-200 rounded-xl p-4 sm:p-5 mb-5 print:hidden" aria-label="Filtros">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-x-6 gap-y-5">
+          <div className="lg:col-span-2">
+            <span className={rotulo}>Período</span>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className={grupo} role="group" aria-label="Período">
+                {PERIODOS.map(p => (
+                  <button key={p.id} type="button" aria-pressed={periodo === p.id} onClick={() => setPeriodo(p.id)} className={botao(periodo === p.id)}>{p.nome}</button>
+                ))}
               </div>
-            )}
+              {periodo === 'data' && (
+                <div className="inline-flex shrink-0 items-center gap-2 text-sm text-gray-600">
+                  <input type="date" value={de} onChange={e => setDe(e.target.value)} className="h-9 w-[8.25rem] border border-gray-200 rounded-lg px-2 text-sm bg-white" aria-label="De" />
+                  até
+                  <input type="date" value={ate} onChange={e => setAte(e.target.value)} className="h-9 w-[8.25rem] border border-gray-200 rounded-lg px-2 text-sm bg-white" aria-label="Até" />
+                </div>
+              )}
+            </div>
           </div>
-        </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="text-label text-gray-500 block mb-2">Tipo</label>
+            <label htmlFor="filtro-aluno" className={rotulo}>Aluno</label>
+            <select id="filtro-aluno" value={alunoId} onChange={e => escolherAluno(e.target.value)} className="w-full h-9 border border-gray-200 rounded-lg px-3 text-sm bg-white">
+              <option value="">Todos os alunos</option>
+              {alunos.map(a => <option key={a.id} value={a.id}>{a.nome}</option>)}
+            </select>
+            {alunoId && <p className="mt-1 text-xs text-gray-500">Histórico inteiro do aluno. Escolha um período para reduzir.</p>}
+          </div>
+
+          <div className="lg:col-span-3">
+            <span className={rotulo}>Tipo</span>
             <div className="flex flex-wrap items-center gap-2">
               <div className={grupo} role="group" aria-label="Tipo">
                 {([['todos', 'Todos'], ['mensalidade', 'Mensalidades'], ['produto', 'Venda de produtos']] as const).map(([id, nome]) => (
                   <button key={id} type="button" aria-pressed={tipo === id} onClick={() => { setTipo(id); setCategoria('') }} className={botao(tipo === id)}>{nome}</button>
                 ))}
               </div>
+              {tipo === 'mensalidade' && categorias.length > 0 && (
+                <div className={grupo} role="group" aria-label="Tipo de mensalidade">
+                  {['', ...categorias].map(c => (
+                    <button key={c || 'todas'} type="button" aria-pressed={categoria === c} onClick={() => setCategoria(c)}
+                      className={`px-3 h-9 text-sm font-medium whitespace-nowrap transition-colors ${categoria === c ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-50'}`}>{c || 'Todas'}</button>
+                  ))}
+                </div>
+              )}
             </div>
-            {tipo === 'mensalidade' && categorias.length > 0 && (
-              <div className={`${grupo} mt-2`} role="group" aria-label="Tipo de mensalidade">
-                {['', ...categorias].map(c => (
-                  <button key={c || 'todas'} type="button" aria-pressed={categoria === c} onClick={() => setCategoria(c)}
-                    className={`px-3 h-9 text-sm font-medium whitespace-nowrap transition-colors ${categoria === c ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-50'}`}>{c || 'Todas'}</button>
-                ))}
-              </div>
-            )}
-          </div>
-          <div>
-            <label className="text-label text-gray-500 block mb-2">Aluno</label>
-            <select value={alunoId} onChange={e => escolherAluno(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white">
-              <option value="">Todos</option>
-              {alunos.map(a => <option key={a.id} value={a.id}>{a.nome}</option>)}
-            </select>
-            {alunoId && <p className="mt-1 text-xs text-gray-500">Mostrando o histórico inteiro do aluno. Escolha um período acima para reduzir.</p>}
           </div>
         </div>
-      </div>
+      </section>
 
       {erro && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">Não consegui carregar os pagamentos. Atualize a página; se continuar, avise o suporte.</div>}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 break-inside-avoid">
-        <div className="bg-white border border-gray-200 rounded-xl p-4">
-          <div className="text-label text-gray-500 mb-1">Total pago</div>
-          <div className="text-kpi text-green-700">{loading ? '...' : brl(resumo.pago)}</div>
-          <div className="text-xs text-gray-500">{resumo.qtdPagos} {resumo.qtdPagos === 1 ? 'pagamento' : 'pagamentos'}</div>
-        </div>
-        <div className="bg-white border border-gray-200 rounded-xl p-4">
-          <div className="text-label text-gray-500 mb-1">Total pendente</div>
-          <div className="text-kpi text-yellow-700">{loading ? '...' : brl(resumo.pendente)}</div>
-          <div className="text-xs text-gray-500">{resumo.qtdPendentes} em aberto</div>
-        </div>
-        <div className="bg-white border border-gray-200 rounded-xl p-4">
-          <div className="text-label text-gray-500 mb-1">Último pagamento</div>
-          <div className="text-kpi text-gray-700">{loading ? '...' : dataBr(resumo.ultimoPagamento)}</div>
-          <div className="text-xs text-gray-500">dentro do filtro</div>
-        </div>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5 break-inside-avoid">
+        {[
+          { titulo: 'Total pago', valor: brl(resumo.pago), nota: `${resumo.qtdPagos} ${resumo.qtdPagos === 1 ? 'pagamento' : 'pagamentos'}`, cor: 'text-green-700', borda: 'border-l-green-500' },
+          { titulo: 'Em aberto', valor: brl(resumo.pendente), nota: `${resumo.qtdPendentes} ${resumo.qtdPendentes === 1 ? 'lançamento' : 'lançamentos'}`, cor: 'text-amber-700', borda: 'border-l-amber-400' },
+          { titulo: 'Último pagamento', valor: dataBr(resumo.ultimoPagamento), nota: 'dentro do filtro', cor: 'text-gray-800', borda: 'border-l-gray-300' },
+        ].map(k => (
+          <div key={k.titulo} className={`bg-white border border-gray-200 border-l-4 ${k.borda} rounded-xl p-4`}>
+            <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">{k.titulo}</div>
+            <div className={`mt-1 text-kpi ${k.cor}`}>{loading ? '...' : k.valor}</div>
+            <div className="text-xs text-gray-500">{k.nota}</div>
+          </div>
+        ))}
       </div>
 
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-full">
+          <table className="w-full text-sm min-w-[44rem]">
             <thead>
-              <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="text-left px-4 py-3 text-th text-gray-500">Competência</th>
-                <th className="text-left px-4 py-3 text-th text-gray-500">Aluno</th>
-                <th className="text-left px-4 py-3 text-th text-gray-500">Tipo</th>
-                <th className="text-left px-4 py-3 text-th text-gray-500">Valor</th>
-                <th className="text-left px-4 py-3 text-th text-gray-500">Status</th>
-                <th className="text-left px-4 py-3 text-th text-gray-500">Data pagamento</th>
-                <th className="text-left px-4 py-3 text-th text-gray-500">Forma</th>
-                <th className="px-4 py-3 print:hidden"></th>
+              <tr className="bg-gray-50 border-b border-gray-200 text-left">
+                <th className={th}>Comp.</th>
+                <th className={th}>Aluno / comprador</th>
+                <th className={th}>Tipo</th>
+                <th className={`${th} text-right`}>Valor</th>
+                <th className={th}>Status</th>
+                <th className={th}>Pago em</th>
+                <th className={th}>Forma</th>
+                <th className={`${th} text-right print:hidden`}>Ações</th>
               </tr>
             </thead>
             <tbody>
-              {loading && <tr><td colSpan={8} className="text-center py-8 text-gray-400">Carregando...</td></tr>}
-              {!loading && lista.length === 0 && <tr><td colSpan={8} className="text-center py-8 text-gray-400">Nenhum pagamento neste filtro.</td></tr>}
-              {(imprimindo ? lista : pagination.paginatedItems).map(m => (
-                <tr key={m.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50">
-                  <td className="px-4 py-3 text-gray-600">{m.data_vencimento ? new Date(m.data_vencimento + 'T00:00:00').toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' }) : '-'}</td>
-                  <td className="px-4 py-3 text-gray-800">{m.alunos?.nome || '-'}</td>
-                  <td className="px-4 py-3 text-gray-600">
-                    {m.categoria ?? '-'}
-                    {tipoDaEntrada(m.categoria) === 'produto' && <span className="ml-1 text-xs text-gray-400">(produto)</span>}
-                  </td>
-                  <td className="px-4 py-3 text-gray-800 font-medium tabular-nums">{brl(Number(m.valor))}</td>
-                  <td className="px-4 py-3">
-                    <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${foiRecebida(m) ? 'bg-green-50 text-green-700' : 'bg-yellow-50 text-yellow-700'}`}>{m.status}</span>
-                  </td>
-                  <td className="px-4 py-3 text-gray-600">{dataBr(m.data_pagamento)}</td>
-                  <td className="px-4 py-3 text-gray-600">{m.forma_pagamento || '-'}</td>
-                  <td className="px-4 py-3 print:hidden">
-                    <div className="flex gap-2">
-                      {m.status === 'Não recebido' && (
-                        <button onClick={() => darBaixa(m)} disabled={baixandoId === m.id}
-                          className="px-3 py-1 text-sm bg-[#7DC421] text-white rounded-lg hover:bg-[#6ab01a] disabled:opacity-50">{baixandoId === m.id ? '...' : 'Dar baixa'}</button>
-                      )}
-                      <button onClick={() => setConfirmDelete({ isOpen: true, id: m.id })} disabled={baixandoId === m.id}
-                        className="px-3 py-1 text-sm bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50">{baixandoId === m.id ? '...' : 'Deletar'}</button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+              {loading && <tr><td colSpan={8} className="text-center py-10 text-gray-400">Carregando...</td></tr>}
+              {!loading && lista.length === 0 && <tr><td colSpan={8} className="text-center py-10 text-gray-400">Nenhum lançamento neste filtro.</td></tr>}
+              {(imprimindo ? lista : pagination.paginatedItems).map(m => {
+                const produto = tipoDaEntrada(m.categoria) === 'produto'
+                return (
+                  <tr key={m.id} className="border-b border-gray-100 last:border-0 odd:bg-white even:bg-gray-50/40 hover:bg-blue-50/40">
+                    <td className="px-4 py-2.5 tabular-nums text-gray-700">{competenciaCurta(m.data_vencimento ?? m.data)}</td>
+                    <td className="px-4 py-2.5 font-medium text-gray-900">{quem(m)}</td>
+                    <td className="px-4 py-2.5">
+                      <span className={`inline-flex px-2 py-0.5 rounded-md text-xs font-medium ${produto ? 'bg-purple-50 text-purple-700' : 'bg-blue-50 text-blue-700'}`}>{produto ? 'Produto' : (m.categoria ?? 'Mensalidade')}</span>
+                    </td>
+                    <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-gray-900">{brl(Number(m.valor))}</td>
+                    <td className="px-4 py-2.5">
+                      <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${foiRecebida(m) ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'}`}>{foiRecebida(m) ? 'Pago' : (m.status ?? 'Em aberto')}</span>
+                    </td>
+                    <td className="px-4 py-2.5 tabular-nums text-gray-600">{dataBr(m.data_pagamento)}</td>
+                    <td className="px-4 py-2.5 text-gray-600">{m.forma_pagamento || '—'}</td>
+                    <td className="px-4 py-2.5 print:hidden">
+                      <div className="flex justify-end gap-1.5">
+                        {m.status === 'Não recebido' && (
+                          <button onClick={() => darBaixa(m)} disabled={baixandoId === m.id} title="Dar baixa" aria-label="Dar baixa"
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-[#7DC421] text-white hover:bg-[#6ab01a] disabled:opacity-50"><Check size={16} /></button>
+                        )}
+                        <button onClick={() => setConfirmDelete({ isOpen: true, id: m.id })} disabled={baixandoId === m.id} title="Deletar" aria-label="Deletar"
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 text-red-600 hover:bg-red-50 disabled:opacity-50"><Trash2 size={16} /></button>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
+            {lista.length > 0 && (
+              <tfoot>
+                <tr className="bg-gray-50 border-t border-gray-200 font-semibold text-gray-900">
+                  <td className="px-4 py-3" colSpan={3}>Total do filtro ({lista.length})</td>
+                  <td className="px-4 py-3 text-right tabular-nums">{brl(resumo.pago + resumo.pendente)}</td>
+                  <td className="px-4 py-3 text-xs font-normal text-gray-500" colSpan={4}>pago {brl(resumo.pago)} · em aberto {brl(resumo.pendente)}</td>
+                </tr>
+              </tfoot>
+            )}
           </table>
         </div>
         <div className="print:hidden">
