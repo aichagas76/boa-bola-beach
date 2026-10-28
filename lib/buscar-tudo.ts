@@ -8,7 +8,7 @@ type Resposta<T> = { data: T[] | null; error: { message: string } | null }
 
 export const TAMANHO_PAGINA = 1000
 const MAX_PAGINAS = 100 // trava de segurança: 100 mil linhas
-const EM_PARALELO = 4 // páginas pedidas ao mesmo tempo (as de uma rodada voltam em ordem)
+const EM_PARALELO = 6 // páginas pedidas ao mesmo tempo (as de uma rodada voltam em ordem)
 
 export async function buscarTudo<T>(
   consulta: (de: number, ate: number) => PromiseLike<Resposta<T>>,

@@ -27,6 +27,9 @@ export default function UnidadeProvider({ children }: { children: React.ReactNod
   const [pronto, setPronto] = useState(false)
 
   const carregar = useCallback(async () => {
+    // A unidade usada da última vez já vale enquanto a lista não chega: as telas começam a buscar seus dados em paralelo
+    // (o banco só entrega o que esse login pode ver; se a salva não valer mais, a escolha é corrigida abaixo)
+    try { const antes = localStorage.getItem(CHAVE); if (antes) setId(antes) } catch { /* sem armazenamento */ }
     const { unidades: libs } = await carregarCatalogo(supabase)
     setUnidades(libs)
     let salva: string | null = null
@@ -49,7 +52,7 @@ export default function UnidadeProvider({ children }: { children: React.ReactNod
   const unidade = unidades.find(u => u.id === id) ?? null
 
   return (
-    <UnidadeContext.Provider value={{ unidades, unidade, unidadeId: unidade?.id ?? null, trocar, pronto }}>
+    <UnidadeContext.Provider value={{ unidades, unidade, unidadeId: unidade?.id ?? (pronto ? null : id), trocar, pronto }}>
       {children}
     </UnidadeContext.Provider>
   )
