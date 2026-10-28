@@ -1,6 +1,6 @@
 -- 033: (1) esportes de cada professor, para o cadastro de aluno mostrar só os professores do esporte;
 --      (2) histórico de mudança de status do aluno (ativo -> inativo e inativo -> ativo), para os gráficos de
---          inativações e reativações do Painel. NÃO APLICADA ainda (aguarda autorização).
+--          inativações e reativações do Painel. APLICADA em 27/10/2026.
 
 -- ============ (1) professor x esporte ============
 create table if not exists public.professor_esportes (
