@@ -2,18 +2,14 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import {
-  Bar, BarChart, CartesianGrid, Cell, ComposedChart, Legend, LabelList, Line, LineChart, Pie, PieChart,
-  ResponsiveContainer, Tooltip, XAxis, YAxis,
-} from 'recharts'
 import { AlertTriangle, ArrowDownRight, ArrowUpRight, CheckCircle2, ChevronRight, Info, Minus } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { buscarTudo } from '@/lib/buscar-tudo'
 import { useUnidade } from '@/components/layout/UnidadeProvider'
-import FluxoDeCaixa from '@/components/dashboard/FluxoDeCaixa'
-import { VendasDeProdutos } from '@/components/dashboard/GraficosProdutosAlunos'
+import dynamic from 'next/dynamic'
+import { brl, pct } from '@/components/dashboard/painel-ui'
 import { despesasPorCategoria, faturamentoProfessores, mesesEntre, serieMensal, type Evento } from '@/lib/painel-graficos'
-import { FiltroMeses, FiltroPeriodo, PRESETS, TemaRecolhivel, rotuloDoPeriodo, useJanela, usePeriodo } from '@/components/dashboard/FiltroPeriodo'
+import { FiltroMeses, FiltroPeriodo, PRESETS, TemaRecolhivel, useJanela, usePeriodo } from '@/components/dashboard/FiltroPeriodo'
 import type { MovFluxo } from '@/lib/fluxo-caixa'
 import {
   alunosDaModalidade, aparaMesesVazios, calcularKpis, faixasDeAtraso, gastosDoPeriodo, itensFinanceiros, mesesDaJanela,
@@ -24,37 +20,6 @@ import {
   alunosPorModalidade, resumoPorMes, totaisDoPeriodo,
   type Mov,
 } from '@/lib/relatorios'
-
-/* ---------- formatação brasileira ---------- */
-const brl = (v: number) => `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-const brlCurto = (v: number) => (Math.abs(v) >= 1000 ? `${(v / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} mil` : String(v))
-const pct = (v: number) => `${v.toLocaleString('pt-BR', { maximumFractionDigits: Math.abs(v) < 10 ? 1 : 0 })}%`
-const tip = (v: unknown) => brl(Number(v ?? 0))
-
-/* ---------- cores com significado fixo (as mesmas em todo o painel) ---------- */
-const COR = {
-  recebido: '#16A34A', // dinheiro que entrou / positivo
-  marca: '#7DC421', // receita (verde do Boa Bola)
-  aVencer: '#F59E0B', // previsto, ainda no prazo
-  vencido: '#DC2626', // atrasado / despesa / negativo
-  anterior: '#9CA3AF', // comparação com o período anterior
-  base: '#2563EB', // base de alunos
-  cancelado: '#6B7280',
-}
-const COR_ESPORTE: Record<string, string> = {
-  'Beach Tênis': '#F97316', 'Tênis': '#84A60F', Padel: '#2563EB', Pickleball: '#EAB308', 'Sem esporte': '#9CA3AF',
-}
-const corEsporte = (n: string) => COR_ESPORTE[n] ?? '#6B7280'
-const PALETA_CATEGORIAS = ['#2563EB', '#F97316', '#16A34A', '#EAB308', '#9333EA', '#0891B2', '#DB2777', '#84A60F']
-const COR_STATUS: Record<string, string> = { Pagos: COR.recebido, 'A vencer': COR.aVencer, Vencidos: COR.vencido, Cancelados: COR.cancelado }
-
-/* ---------- padrão dos gráficos ---------- */
-const ALTURA = 240
-const MARGEM = { top: 8, right: 8, left: 0, bottom: 0 }
-const eixoY = { width: 52, tick: { fontSize: 12 }, tickLine: false, axisLine: false } as const
-const eixoX = { tick: { fontSize: 12 }, tickLine: false } as const
-const legenda = { wrapperStyle: { fontSize: 12, paddingTop: 6 } } as const
-const Grade = () => <CartesianGrid strokeDasharray="3 3" stroke="#eee" vertical={false} />
 
 /* ---------- peças visuais ---------- */
 function Delta({ atual, anterior, subiuEhBom = true }: { atual: number; anterior: number; subiuEhBom?: boolean }) {
@@ -98,30 +63,24 @@ function Aux({ children }: { children: React.ReactNode }) {
   return <div className="text-xs text-gray-500 leading-4">{children}</div>
 }
 
-function Grafico({ titulo, nota, vazio, mensagemVazio, carregando, altura = ALTURA, children, largo }: { titulo: string; nota?: string; vazio?: boolean; mensagemVazio?: string; carregando?: boolean; altura?: number; children: React.ReactNode; largo?: boolean }) {
-  return (
-    <div className={`bg-white border border-gray-200 rounded-xl p-4 ${largo ? 'lg:col-span-2' : ''}`}>
-      <div className="text-sm font-semibold text-gray-900">{titulo}</div>
-      {nota && <div className="text-xs text-gray-500">{nota}</div>}
-      <div className="mt-3" style={{ minHeight: altura }}>
-        {carregando ? (
-          <div className="flex items-center justify-center text-sm text-gray-400" style={{ height: altura }}>Carregando...</div>
-        ) : vazio ? (
-          <div className="flex items-center justify-center text-center text-sm text-gray-400 px-4" style={{ height: altura }}>{mensagemVazio ?? 'Sem dados neste período'}</div>
-        ) : children}
-      </div>
-    </div>
-  )
-}
 
 type LinhaAluno = { id: string; status: string | null; data_cadastro: string | null; data_inativacao?: string | null; data_vencimento: string | null; unidade_id: string | null }
 type LinhaMat = { aluno_id: string; tipo: string; valor: number | null; unidade_id: string | null; acesso_duas_unidades: boolean | null; esporte_id: string | null; esportes: { nome: string } | null }
 type LinhaMov = {
-  tipo: string; status: string | null; valor: number; data: string; data_pagamento: string | null; data_vencimento: string | null
+  id: string; tipo: string; status: string | null; valor: number; data: string; data_pagamento: string | null; data_vencimento: string | null
   aluno_ref_id: string | null; professor_id: string | null; professores: { nome: string } | null; esportes: { nome: string } | null
   conta_bancaria_id: string | null; contas_bancarias: { nome: string } | null
   categorias_financeiro: { categoria: string | null } | null
 }
+
+// Os gráficos ficam em arquivos à parte, carregados só quando um tema abre (a biblioteca de gráficos não pesa na entrada)
+const carregandoGraficos = () => <div className="py-8 text-center text-sm text-gray-400">Carregando gráficos...</div>
+const GraficosFinanceiro = dynamic(() => import('@/components/dashboard/GraficosDosTemas').then(m => m.GraficosFinanceiro), { ssr: false, loading: carregandoGraficos })
+const GraficosAlunos = dynamic(() => import('@/components/dashboard/GraficosDosTemas').then(m => m.GraficosAlunos), { ssr: false, loading: carregandoGraficos })
+const GraficosModalidades = dynamic(() => import('@/components/dashboard/GraficosDosTemas').then(m => m.GraficosModalidades), { ssr: false, loading: carregandoGraficos })
+const GraficosPagamentos = dynamic(() => import('@/components/dashboard/GraficosDosTemas').then(m => m.GraficosPagamentos), { ssr: false, loading: carregandoGraficos })
+const FluxoDeCaixa = dynamic(() => import('@/components/dashboard/FluxoDeCaixa'), { ssr: false, loading: carregandoGraficos })
+const VendasDeProdutos = dynamic(() => import('@/components/dashboard/GraficosProdutosAlunos').then(m => m.VendasDeProdutos), { ssr: false, loading: carregandoGraficos })
 
 export default function PainelGerencial() {
   const { unidadeId, unidade } = useUnidade()
@@ -143,6 +102,7 @@ export default function PainelGerencial() {
   const abFin = !!aberto.fin, abFlu = !!aberto.flu, abAlu = !!aberto.alu, abMod = !!aberto.mod, abPag = !!aberto.pag
 
   const [loading, setLoading] = useState(true)
+  const [detalhesOk, setDetalhesOk] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
   const [rastreiaInativacao, setRastreiaInativacao] = useState(true)
   const [alunos, setAlunos] = useState<LinhaAluno[]>([])
@@ -160,17 +120,18 @@ export default function PainelGerencial() {
     let cancelado = false
     async function carregar() {
       setLoading(true)
+      setDetalhesOk(false)
       setErro(null)
       const corte = `${new Date().getFullYear() - 2}-01-01`
 
       // data_inativacao só existe depois da atualização do banco: se faltar, o painel segue sem ela
       let rastreia = true
-      const [ra0, rm, rf, rp, rh, rr, dProf, dEsp, dConta, dCat] = await Promise.all([
+      const [ra0, rm, rf, rp, rh, rr] = await Promise.all([
         buscarTudo((de, ate) => supabase.from('alunos').select('id, status, data_cadastro, data_inativacao, data_vencimento, unidade_id').order('id').range(de, ate)),
         buscarTudo((de, ate) => supabase.from('matriculas').select('aluno_id, tipo, valor, unidade_id, acesso_duas_unidades, esporte_id, esportes(nome)').order('id').range(de, ate)),
         buscarTudo((de, ate) => supabase
           .from('movimentacoes')
-          .select('tipo, status, valor, data, data_pagamento, data_vencimento, aluno_ref_id, professor_id, esporte_id, conta_bancaria_id, categoria_id')
+          .select('id, tipo, status, valor, data, data_pagamento, data_vencimento, aluno_ref_id')
           .eq('unidade_id', unidadeId)
           .or(`data.gte.${corte},data_pagamento.gte.${corte},status.neq.Recebido`)
           .order('id').range(de, ate)),
@@ -178,11 +139,6 @@ export default function PainelGerencial() {
         // Se a tabela do histórico ainda não existir no banco, o gráfico segue só com as datas registradas
         buscarTudo((de, ate) => supabase.from('alunos_status_historico').select('aluno_id, data').eq('para_status', 'Inativo').order('data').order('id').range(de, ate)),
         buscarTudo((de, ate) => supabase.from('alunos_status_historico').select('aluno_id, data').eq('de_status', 'Inativo').eq('para_status', 'Ativo').order('data').order('id').range(de, ate)),
-        // Nomes buscados uma vez só (em vez de repetidos em cada lançamento): a carga fica bem menor
-        supabase.from('professores').select('id, nome'),
-        supabase.from('esportes').select('id, nome'),
-        supabase.from('contas_bancarias').select('id, nome'),
-        supabase.from('categorias_financeiro').select('id, categoria'),
       ])
       let ra = ra0
       if (ra.error) {
@@ -198,15 +154,9 @@ export default function PainelGerencial() {
       setRastreiaInativacao(rastreia)
       setAlunos((ra.data ?? []) as unknown as LinhaAluno[])
       setMats((rm.data ?? []) as unknown as LinhaMat[])
-      const nomes = (r: { data: { id: string; nome?: string; categoria?: string }[] | null }, campo: 'nome' | 'categoria') => new Map((r.data ?? []).map(x => [x.id, x[campo] ?? null]))
-      const nProf = nomes(dProf, 'nome'), nEsp = nomes(dEsp, 'nome'), nConta = nomes(dConta, 'nome'), nCat = nomes(dCat, 'categoria')
-      setMovs(((rf.data ?? []) as unknown as (Omit<LinhaMov, 'professores' | 'esportes' | 'contas_bancarias' | 'categorias_financeiro'> & { esporte_id: string | null; categoria_id: string | null })[]).map(m => ({
-        ...m,
-        professores: m.professor_id && nProf.get(m.professor_id) ? { nome: nProf.get(m.professor_id)! } : null,
-        esportes: m.esporte_id && nEsp.get(m.esporte_id) ? { nome: nEsp.get(m.esporte_id)! } : null,
-        contas_bancarias: m.conta_bancaria_id && nConta.get(m.conta_bancaria_id) ? { nome: nConta.get(m.conta_bancaria_id)! } : null,
-        categorias_financeiro: m.categoria_id && nCat.get(m.categoria_id) ? { categoria: nCat.get(m.categoria_id)! } : null,
-      })) as LinhaMov[])
+      setMovs(((rf.data ?? []) as unknown as Pick<LinhaMov, 'id' | 'tipo' | 'status' | 'valor' | 'data' | 'data_pagamento' | 'data_vencimento' | 'aluno_ref_id'>[]).map(m => ({
+        ...m, professor_id: null, professores: null, esportes: null, conta_bancaria_id: null, contas_bancarias: null, categorias_financeiro: null,
+      })))
       setPags((rp.data ?? []) as PagP[])
       setReativacoes(rr.error ? [] : ((rr.data ?? []) as unknown as { aluno_id: string; data: string }[]))
       setSaidas(rh.error ? {} : Object.fromEntries(((rh.data ?? []) as unknown as { aluno_id: string; data: string }[]).map(x => [x.aluno_id, x.data])))
@@ -215,6 +165,45 @@ export default function PainelGerencial() {
     carregar()
     return () => { cancelado = true }
   }, [unidadeId])
+
+  // Professor, esporte, conta e categoria dos lançamentos: só buscados quando um tema que usa abre (Financeiro, Fluxo de caixa, Modalidades)
+  const precisaDetalhes = !!aberto.fin || !!aberto.flu || !!aberto.mod
+  useEffect(() => {
+    if (!unidadeId || loading || !precisaDetalhes || detalhesOk) return
+    let cancelado = false
+    async function carregarDetalhes() {
+      const [rd, dProf, dEsp, dConta, dCat] = await Promise.all([
+        buscarTudo((de, ate) => supabase.from('movimentacoes').select('id, professor_id, esporte_id, conta_bancaria_id, categoria_id')
+          .eq('unidade_id', unidadeId).or(`data.gte.${new Date().getFullYear() - 2}-01-01,data_pagamento.gte.${new Date().getFullYear() - 2}-01-01,status.neq.Recebido`).order('id').range(de, ate)),
+        supabase.from('professores').select('id, nome'),
+        supabase.from('esportes').select('id, nome'),
+        supabase.from('contas_bancarias').select('id, nome'),
+        supabase.from('categorias_financeiro').select('id, categoria'),
+      ])
+      if (cancelado) return
+      if (rd.error) { setErro('Não consegui carregar os detalhes dos lançamentos. Atualize a página.'); return }
+      const nomes = (r: { data: { id: string; nome?: string; categoria?: string }[] | null }, campo: 'nome' | 'categoria') => new Map((r.data ?? []).map(x => [x.id, x[campo] ?? null]))
+      const nProf = nomes(dProf, 'nome'), nEsp = nomes(dEsp, 'nome'), nConta = nomes(dConta, 'nome'), nCat = nomes(dCat, 'categoria')
+      const por = new Map(((rd.data ?? []) as unknown as { id: string; professor_id: string | null; esporte_id: string | null; conta_bancaria_id: string | null; categoria_id: string | null }[]).map(x => [x.id, x]))
+      setMovs(antes => antes.map(m => {
+        const d = por.get(m.id)
+        if (!d) return m
+        return {
+          ...m,
+          professor_id: d.professor_id, conta_bancaria_id: d.conta_bancaria_id,
+          professores: d.professor_id && nProf.get(d.professor_id) ? { nome: nProf.get(d.professor_id)! } : null,
+          esportes: d.esporte_id && nEsp.get(d.esporte_id) ? { nome: nEsp.get(d.esporte_id)! } : null,
+          contas_bancarias: d.conta_bancaria_id && nConta.get(d.conta_bancaria_id) ? { nome: nConta.get(d.conta_bancaria_id)! } : null,
+          categorias_financeiro: d.categoria_id && nCat.get(d.categoria_id) ? { categoria: nCat.get(d.categoria_id)! } : null,
+        }
+      }))
+      setDetalhesOk(true)
+    }
+    carregarDetalhes()
+    return () => { cancelado = true }
+  }, [unidadeId, loading, precisaDetalhes, detalhesOk])
+  // Enquanto os detalhes não chegam, esses temas mostram "Carregando..." em vez de gráfico incompleto
+  const loadingDet = loading || (precisaDetalhes && !detalhesOk)
 
   /* ---------- recortes: unidade e modalidade ---------- */
   const dados = useMemo(() => {
@@ -464,90 +453,11 @@ export default function PainelGerencial() {
       )}
 
       <TemaRecolhivel aberto={abFin} onAlternar={alternar('fin')} titulo="Financeiro" subtitulo="Pelo mês do pagamento. Mostra pelo menos 6 meses, para dar para ver a tendência." filtro={<FiltroPeriodo p={pFin} nome="Financeiro" />}>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Grafico titulo="Receita recebida por mês" nota={temAnterior ? 'Linha cinza: mesmo mês do período anterior' : undefined}
-          carregando={loading} vazio={!loading && financeira.every(l => l.recebida === 0 && l.anterior === 0)} mensagemVazio="Nenhuma receita recebida neste período">
-          <ResponsiveContainer width="100%" height={ALTURA}>
-            <ComposedChart data={financeira} margin={MARGEM}>
-              <Grade />
-              <XAxis dataKey="rotulo" {...eixoX} />
-              <YAxis {...eixoY} tickFormatter={brlCurto} />
-              <Tooltip formatter={tip} />
-              <Legend {...legenda} />
-              <Bar dataKey="recebida" name="Recebida" fill={COR.marca} radius={[4, 4, 0, 0]} />
-              {temAnterior && <Line type="monotone" dataKey="anterior" name="Período anterior" stroke={COR.anterior} strokeWidth={2} dot={{ r: 3 }} />}
-            </ComposedChart>
-          </ResponsiveContainer>
-        </Grafico>
-        <Grafico titulo="Recebido, a vencer e vencido" nota="Soma de cada barra = receita prevista do mês"
-          carregando={loading} vazio={!loading && financeira.every(l => l.prevista === 0)} mensagemVazio="Nada recebido nem a receber neste período">
-          <ResponsiveContainer width="100%" height={ALTURA}>
-            <BarChart data={financeira} margin={MARGEM}>
-              <Grade />
-              <XAxis dataKey="rotulo" {...eixoX} />
-              <YAxis {...eixoY} tickFormatter={brlCurto} />
-              <Tooltip formatter={tip} />
-              <Legend {...legenda} />
-              <Bar dataKey="recebida" stackId="p" name="Recebido" fill={COR.recebido} />
-              <Bar dataKey="aVencer" stackId="p" name="A vencer" fill={COR.aVencer} />
-              <Bar dataKey="vencido" stackId="p" name="Vencido" fill={COR.vencido} radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </Grafico>
-        <Grafico titulo="Lucro líquido por mês" nota={`No período: recebido ${brl(totaisPeriodo.bruto)} − despesas pagas ${brl(totaisPeriodo.despesas)} = ${brl(totaisPeriodo.lucro)}${modalidade ? " (unidade toda: despesas não se dividem por modalidade)" : ""}`}
-          carregando={loading} vazio={!loading && lucro.every(l => l.bruto === 0 && l.despesas === 0)} mensagemVazio="Sem receitas nem despesas pagas neste período">
-          <ResponsiveContainer width="100%" height={ALTURA}>
-            <BarChart data={lucro} margin={MARGEM}>
-              <Grade />
-              <XAxis dataKey="rotulo" {...eixoX} />
-              <YAxis {...eixoY} tickFormatter={brlCurto} />
-              <Tooltip formatter={tip} />
-              <Bar dataKey="lucro" name="Lucro líquido" fill={COR.recebido} radius={[4, 4, 0, 0]}>
-                {lucro.map(l => <Cell key={l.mes} fill={l.lucro < 0 ? COR.vencido : COR.recebido} />)}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </Grafico>
-        <Grafico titulo="Despesas por categoria" nota={`Despesas pagas de ${rotuloDoPeriodo(pFin.periodo.inicio, pFin.periodo.fim)}: ${brl(totalDespesasCat)}. Clique numa categoria para tirá-la do cálculo.`}
-          carregando={loading} vazio={!loading && despesasCat.length === 0 && despesasOcultas.length === 0} mensagemVazio="Nenhuma despesa paga neste período">
-          <div className="flex flex-col sm:flex-row items-center gap-4">
-            <div className="w-full sm:w-1/2">
-              <ResponsiveContainer width="100%" height={ALTURA}>
-                <PieChart>
-                  <Pie data={despesasCat} dataKey="value" nameKey="name" innerRadius={50} outerRadius={90} paddingAngle={2} onClick={(d: { name?: string }) => d.name && alternarCategoria(d.name)} style={{ cursor: 'pointer' }}>
-                    {despesasCat.map((d, i) => <Cell key={d.name} fill={d.name === 'Outras' ? COR.cancelado : PALETA_CATEGORIAS[i % PALETA_CATEGORIAS.length]} />)}
-                  </Pie>
-                  <Tooltip formatter={tip} />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-            <ul className="w-full sm:w-1/2 space-y-1.5 text-sm">
-              {despesasCat.map((d, i) => (
-                <li key={d.name}>
-                  <button type="button" disabled={d.name === 'Outras'} onClick={() => alternarCategoria(d.name)} title={d.name === 'Outras' ? undefined : 'Tirar do cálculo'}
-                    className="flex w-full items-center justify-between gap-2 rounded px-1 py-0.5 text-left enabled:hover:bg-gray-50">
-                    <span className="inline-flex items-center gap-2 min-w-0"><span className="h-3 w-3 shrink-0 rounded-full" style={{ background: d.name === 'Outras' ? COR.cancelado : PALETA_CATEGORIAS[i % PALETA_CATEGORIAS.length] }} /><span className="truncate">{d.name}</span></span>
-                    <span className="shrink-0 text-gray-700">{pct(d.pct)} · {brl(d.value)}</span>
-                  </button>
-                </li>
-              ))}
-              {despesasOcultas.map(d => (
-                <li key={d.name}>
-                  <button type="button" onClick={() => alternarCategoria(d.name)} title="Trazer de volta ao cálculo"
-                    className="flex w-full items-center justify-between gap-2 rounded px-1 py-0.5 text-left text-gray-400 hover:bg-gray-50">
-                    <span className="inline-flex items-center gap-2 min-w-0"><span className="h-3 w-3 shrink-0 rounded-full border border-gray-300" /><span className="truncate line-through">{d.name}</span></span>
-                    <span className="shrink-0 line-through">{brl(d.value)}</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </Grafico>
-      </div>
+      <GraficosFinanceiro financeira={financeira} temAnterior={temAnterior} lucro={lucro} totaisPeriodo={totaisPeriodo} modalidade={modalidade} despesasCat={despesasCat} despesasOcultas={despesasOcultas} totalDespesasCat={totalDespesasCat} alternarCategoria={alternarCategoria} pFin={pFin} loadingDet={loadingDet} />
       </TemaRecolhivel>
 
       <TemaRecolhivel aberto={abFlu} onAlternar={alternar('flu')} titulo="Fluxo de caixa" subtitulo="Por mês: o que entrou e saiu e a previsão dos meses à frente.">
-        <FluxoDeCaixa movs={movsFluxo} hoje={hoje} mensalidades={mensalidadesUnidade} carregando={loading} />
+        <FluxoDeCaixa movs={movsFluxo} hoje={hoje} mensalidades={mensalidadesUnidade} carregando={loadingDet} />
       </TemaRecolhivel>
 
       <TemaRecolhivel aberto={abAlu} onAlternar={alternar('alu')} titulo="Alunos" subtitulo="Base = alunos ativos no fim de cada mês. Novos cadastros e inativações do mês." filtro={
@@ -561,48 +471,7 @@ export default function PainelGerencial() {
           </div>
         </div>
       }>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Grafico titulo="Base de alunos ativos" nota={inativosSemData > 0 ? `${inativosSemData} inativo(s) sem nenhuma data de saída não entram na base` : undefined}
-          carregando={loading} vazio={!loading && serieA.every(l => l.base === 0)} mensagemVazio="Nenhum aluno cadastrado até este período">
-          <ResponsiveContainer width="100%" height={ALTURA}>
-            <LineChart data={serieA} margin={MARGEM}>
-              <Grade />
-              <XAxis dataKey="rotulo" {...eixoX} />
-              <YAxis {...eixoY} allowDecimals={false} />
-              <Tooltip />
-              <Line type="monotone" dataKey="base" name="Alunos na base" stroke={COR.base} strokeWidth={2.5} dot={{ r: 3 }} />
-            </LineChart>
-          </ResponsiveContainer>
-        </Grafico>
-        <Grafico titulo="Novos alunos" nota="Novo = cadastro novo, que nunca existiu. Reativado = voltou de inativo para ativo (o sistema só registra reativações a partir de 27/10/2026)."
-          carregando={loading} vazio={!loading && novosMes.every(l => l.novos === 0 && l.reativados === 0)} mensagemVazio="Nenhum aluno novo ou reativado neste período">
-          <ResponsiveContainer width="100%" height={ALTURA}>
-            <BarChart data={novosMes} margin={MARGEM}>
-              <Grade />
-              <XAxis dataKey="rotulo" {...eixoX} />
-              <YAxis {...eixoY} allowDecimals={false} />
-              <Tooltip />
-              <Legend {...legenda} />
-              <Bar dataKey="novos" stackId="n" name="Novos (nunca existiram)" fill={COR.recebido} />
-              <Bar dataKey="reativados" stackId="n" name="Reativados" fill={COR.base} radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </Grafico>
-        <Grafico titulo="Inativações por mês" nota="Barra clara = data estimada pelo último pagamento (alunos que vieram inativos da planilha antiga)" largo
-          carregando={loading} vazio={!loading && inativacoesMes.every(l => l.total === 0)} mensagemVazio="Nenhuma inativação neste período">
-          <ResponsiveContainer width="100%" height={ALTURA}>
-            <BarChart data={inativacoesMes} margin={MARGEM}>
-              <Grade />
-              <XAxis dataKey="rotulo" {...eixoX} />
-              <YAxis {...eixoY} allowDecimals={false} />
-              <Tooltip />
-              <Legend {...legenda} />
-              <Bar dataKey="registrada" stackId="i" name="Data registrada" fill={COR.vencido} />
-              <Bar dataKey="estimada" stackId="i" name="Data estimada" fill="#FCA5A5" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </Grafico>
-      </div>
+      <GraficosAlunos loading={loading} serieA={serieA} novosMes={novosMes} inativacoesMes={inativacoesMes} inativosSemData={inativosSemData} />
       </TemaRecolhivel>
 
       <TemaRecolhivel titulo="Vendas de produtos" subtitulo="Estoque: quanto foi vendido por mês.">
@@ -611,124 +480,11 @@ export default function PainelGerencial() {
 
       <TemaRecolhivel aberto={abMod} onAlternar={alternar('mod')} titulo="Modalidades" subtitulo="Alunos ativos de hoje (aluno em combo conta nas duas unidades) e o faturamento dos professores no período."
         filtro={<FiltroMeses j={jMod} nome="Modalidades" opcoes={[{ n: 1, nome: 'Mês atual' }, { n: 3, nome: '3 meses' }, { n: 6, nome: '6 meses' }, { n: 12, nome: '1 ano' }]} />}>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Grafico titulo="Alunos por modalidade e esporte" nota="Alunos ativos hoje; quem tem mais de uma modalidade entra em cada uma"
-          carregando={loading} vazio={!loading && porModalidade.dados.length === 0} mensagemVazio="Nenhuma matrícula ativa neste recorte" altura={Math.max(160, porModalidade.dados.length * 54 + 70)}>
-          <ResponsiveContainer width="100%" height={Math.max(160, porModalidade.dados.length * 54 + 70)}>
-            <BarChart data={porModalidade.dados} layout="vertical" margin={{ top: 4, right: 24, left: 0, bottom: 0 }} barSize={26}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#eee" horizontal={false} />
-              <XAxis type="number" allowDecimals={false} tick={{ fontSize: 12 }} tickLine={false} />
-              <YAxis type="category" dataKey="modalidade" width={84} tick={{ fontSize: 13 }} tickLine={false} axisLine={false} />
-              <Tooltip cursor={{ fill: 'rgba(0,0,0,0.04)' }} />
-              <Legend {...legenda} />
-              {porModalidade.esportes.map(e => <Bar key={e} dataKey={e} stackId="m" fill={corEsporte(e)} name={e} />)}
-            </BarChart>
-          </ResponsiveContainer>
-          <ul className="mt-3 divide-y divide-gray-100 text-sm">
-            {fatiasModalidade.map(f => (
-              <li key={f.modalidade} className="flex items-center justify-between gap-2 py-1.5">
-                <span className="text-gray-800">{f.modalidade}</span>
-                <span className="text-gray-600"><strong className="text-gray-900">{f.total}</strong> alunos · {pct(f.pct)}</span>
-              </li>
-            ))}
-          </ul>
-        </Grafico>
-
-        <Grafico titulo="Faturamento por professor" nota="Entradas recebidas no período. Clique numa barra para ver o professor mês a mês."
-          carregando={loading} vazio={!loading && fatProf.ranking.length === 0} mensagemVazio="Nenhuma entrada vinculada a professor neste período"
-          altura={Math.max(160, fatProf.ranking.length * 34 + 30)}>
-          <ResponsiveContainer width="100%" height={Math.max(160, fatProf.ranking.length * 34 + 30)}>
-            <BarChart data={fatProf.ranking} layout="vertical" margin={{ top: 4, right: 70, left: 0, bottom: 0 }} barSize={18}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#eee" horizontal={false} />
-              <XAxis type="number" hide />
-              <YAxis type="category" dataKey="professor" width={96} tick={{ fontSize: 12 }} tickLine={false} axisLine={false} interval={0} />
-              <Tooltip cursor={{ fill: 'rgba(0,0,0,0.04)' }}
-                content={({ active, payload }) => {
-                  if (!active || !payload?.length) return null
-                  const d = payload[0].payload as { professor: string; total: number; qtd: number; porEsporte: Record<string, number> }
-                  return (
-                    <div className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs shadow">
-                      <div className="font-semibold text-gray-900">{d.professor}</div>
-                      <div className="text-gray-700">{brl(d.total)} · {d.qtd} {d.qtd === 1 ? 'pagamento' : 'pagamentos'}</div>
-                      {Object.entries(d.porEsporte).map(([e, v]) => <div key={e} className="text-gray-500">{e}: {brl(v)}</div>)}
-                    </div>
-                  )
-                }} />
-              <Bar dataKey="total" name="Faturamento" radius={[0, 4, 4, 0]} cursor="pointer" onClick={(d: { id?: string }) => d.id && setProfSel(d.id)}>
-                {fatProf.ranking.map(r => <Cell key={r.id} fill={profSel && r.id !== profSel ? '#BBD98A' : COR.marca} />)}
-                <LabelList dataKey="total" position="right" formatter={(v: unknown) => `R$ ${brlCurto(Number(v ?? 0))}`} style={{ fontSize: 12, fill: '#374151' }} />
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </Grafico>
-
-        <Grafico titulo={`Faturamento por mês · ${nomeProfSel ?? 'todos os professores'}`} nota="Colunas: valor recebido no mês. Linha: alunos diferentes que pagaram." largo
-          carregando={loading} vazio={!loading && fatProf.porMes.every(p => p.total === 0)} mensagemVazio="Nenhuma entrada deste professor neste período">
-          <div className="mb-2">
-            <select value={profSel} onChange={e => setProfSel(e.target.value)} aria-label="Professor" className="h-9 border border-gray-200 rounded-lg px-2 text-sm bg-white">
-              <option value="">Todos os professores</option>
-              {professoresFat.map(x => <option key={x.id} value={x.id}>{x.nome}</option>)}
-            </select>
-          </div>
-          <ResponsiveContainer width="100%" height={ALTURA}>
-            <ComposedChart data={fatProf.porMes} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-              <Grade />
-              <XAxis dataKey="rotulo" {...eixoX} />
-              <YAxis yAxisId="valor" {...eixoY} tickFormatter={brlCurto} />
-              <YAxis yAxisId="alunos" orientation="right" width={36} tick={{ fontSize: 12 }} tickLine={false} axisLine={false} allowDecimals={false} />
-              <Tooltip formatter={(v: unknown, nome: unknown) => (nome === 'Alunos que pagaram' ? String(v) : tip(v))} />
-              <Legend {...legenda} />
-              <Bar yAxisId="valor" dataKey="total" name="Faturamento" fill={COR.marca} radius={[4, 4, 0, 0]} maxBarSize={48} />
-              <Line yAxisId="alunos" type="monotone" dataKey="alunos" name="Alunos que pagaram" stroke="#F97316" strokeWidth={2.5} dot={{ r: 3 }} />
-            </ComposedChart>
-          </ResponsiveContainer>
-        </Grafico>
-      </div>
+      <GraficosModalidades loadingDet={loadingDet} porModalidade={porModalidade} fatiasModalidade={fatiasModalidade} fatProf={fatProf} profSel={profSel} setProfSel={setProfSel} professoresFat={professoresFat} nomeProfSel={nomeProfSel} />
       </TemaRecolhivel>
 
       <TemaRecolhivel aberto={abPag} onAlternar={alternar('pag')} titulo="Pagamentos" subtitulo="Pagos e cancelados são do período; a vencer e vencidos são a carteira em aberto de hoje." filtro={<FiltroPeriodo p={pPag} nome="Pagamentos" />}>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Grafico titulo="Situação dos pagamentos"
-          carregando={loading} vazio={!loading && status.every(s => s.qtd === 0)} mensagemVazio="Nenhum pagamento neste período">
-          <div className="flex flex-col sm:flex-row items-center gap-4">
-            <div className="w-full sm:w-1/2">
-              <ResponsiveContainer width="100%" height={ALTURA - 20}>
-                <PieChart>
-                  <Pie data={status.filter(s => s.qtd > 0)} dataKey="valor" nameKey="nome" innerRadius={55} outerRadius={88} paddingAngle={2}>
-                    {status.filter(s => s.qtd > 0).map(s => <Cell key={s.nome} fill={COR_STATUS[s.nome]} />)}
-                  </Pie>
-                  <Tooltip formatter={tip} />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-            <ul className="w-full sm:w-1/2 space-y-2 text-sm">
-              {status.map(s => (
-                <li key={s.nome} className="flex items-center justify-between gap-2">
-                  <span className="inline-flex items-center gap-2"><span className="h-3 w-3 rounded-full" style={{ background: COR_STATUS[s.nome] }} />{s.nome}</span>
-                  <span className="text-gray-700">{s.qtd} · {brl(s.valor)}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </Grafico>
-        <Grafico titulo="Faixas de atraso" nota="Dias desde o vencimento, só do que está vencido e em aberto"
-          carregando={loading} vazio={!loading && faixas.every(f => f.qtd === 0)} mensagemVazio="Nenhuma cobrança vencida em aberto">
-          <ResponsiveContainer width="100%" height={ALTURA - 40}>
-            <BarChart data={faixas} margin={MARGEM}>
-              <Grade />
-              <XAxis dataKey="faixa" {...eixoX} />
-              <YAxis {...eixoY} tickFormatter={brlCurto} />
-              <Tooltip formatter={(v, nome) => (nome === 'Valor em atraso' ? tip(v) : String(v))} />
-              <Bar dataKey="valor" name="Valor em atraso" fill={COR.vencido} radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-          {!loading && (
-            <ul className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-xs text-gray-600">
-              {faixas.map(f => <li key={f.faixa}>{f.faixa}: {f.qtd} cobrança{f.qtd === 1 ? '' : 's'}</li>)}
-            </ul>
-          )}
-        </Grafico>
-      </div>
+      <GraficosPagamentos loading={loading} status={status} faixas={faixas} />
       </TemaRecolhivel>
 
       <section className="mb-6">
