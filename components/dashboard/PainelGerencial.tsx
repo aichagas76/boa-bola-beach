@@ -144,6 +144,8 @@ export default function PainelGerencial() {
   const [pags, setPags] = useState<PagP[]>([])
   // Quando cada aluno foi inativado (registrada ou estimada), para a base de alunos ativos
   const [saidas, setSaidas] = useState<Record<string, string>>({})
+  // Reativações (inativo -> ativo) registradas pelo sistema
+  const [reativacoes, setReativacoes] = useState<{ aluno_id: string; data: string }[]>([])
   const [esporteAlu, setEsporteAlu] = useState('')
 
   useEffect(() => {
@@ -173,6 +175,7 @@ export default function PainelGerencial() {
       ])
       // Se a tabela do histórico ainda não existir no banco, o gráfico segue só com as datas registradas
       const rh = await buscarTudo((de, ate) => supabase.from('alunos_status_historico').select('aluno_id, data').eq('para_status', 'Inativo').order('data').order('id').range(de, ate))
+      const rr = await buscarTudo((de, ate) => supabase.from('alunos_status_historico').select('aluno_id, data').eq('de_status', 'Inativo').eq('para_status', 'Ativo').order('data').order('id').range(de, ate))
       if (cancelado) return
       if (ra.error || rm.error || rf.error || rp.error) {
         setErro('Não consegui carregar os dados do painel. Atualize a página; se continuar, avise o suporte.')
@@ -184,6 +187,7 @@ export default function PainelGerencial() {
       setMats((rm.data ?? []) as unknown as LinhaMat[])
       setMovs((rf.data ?? []) as unknown as LinhaMov[])
       setPags((rp.data ?? []) as PagP[])
+      setReativacoes(rr.error ? [] : ((rr.data ?? []) as unknown as { aluno_id: string; data: string }[]))
       setSaidas(rh.error ? {} : Object.fromEntries(((rh.data ?? []) as unknown as { aluno_id: string; data: string }[]).map(x => [x.aluno_id, x.data])))
       setLoading(false)
     }
@@ -261,6 +265,13 @@ export default function PainelGerencial() {
     }
     return serieMensal(eventos, jAlu.janela, ['registrada', 'estimada'])
   }, [alunosP, dados.matsU, esporteAlu, saidas, jAlu.janela])
+  // Novos alunos do mês: cadastros novos (nunca existiram) e reativados (voltaram de inativo)
+  const novosMes = useMemo(() => {
+    const doEsporte = esporteAlu ? new Set(dados.matsU.filter(m => m.esporte_id === esporteAlu).map(m => m.aluno_id)) : null
+    const ids = new Set(alunosP.map(a => a.id))
+    const reativ = serieMensal(reativacoes.filter(r => ids.has(r.aluno_id) && (!doEsporte || doEsporte.has(r.aluno_id))).map<Evento>(r => ({ data: r.data })), jAlu.janela)
+    return serieAlunosAtivos(alunosDoGrafico, mesesAlu, hoje).map((l, i) => ({ rotulo: l.rotulo, novos: l.novos, reativados: Number(reativ[i]?.total ?? 0) }))
+  }, [alunosP, alunosDoGrafico, dados.matsU, esporteAlu, reativacoes, jAlu.janela, mesesAlu, hoje])
   const serieA = useMemo(() => serieAlunosAtivos(alunosDoGrafico, mesesAlu, hoje), [alunosDoGrafico, mesesAlu, hoje])
   const status = useMemo(() => statusDosPagamentos(itens, pPag.periodo, hoje), [itens, pPag.periodo, hoje])
   const faixas = useMemo(() => faixasDeAtraso(itens, hoje), [itens, hoje])
@@ -299,7 +310,6 @@ export default function PainelGerencial() {
 
   const modalidadesDisponiveis = useMemo(() => Array.from(new Set(dados.matsU.map(m => m.tipo))).sort(), [dados.matsU])
   const inativosSemData = useMemo(() => alunosDoGrafico.filter(a => a.status === 'Inativo' && !a.data_inativacao).length, [alunosDoGrafico])
-  const inativosEstimados = useMemo(() => alunosDoGrafico.filter(a => a.status === 'Inativo' && !!saidas[a.id]).length, [alunosDoGrafico, saidas])
 
   const atencao = useMemo(() => pontosDeAtencao({
     kpis, itens, alunos: alunosP, mats: matsP, saidas: movsDaUnidade, hoje, rastreiaInativacao,
@@ -489,17 +499,17 @@ export default function PainelGerencial() {
             </LineChart>
           </ResponsiveContainer>
         </Grafico>
-        <Grafico titulo="Novos alunos × inativações" nota={inativosEstimados > 0 ? `${inativosEstimados} inativação(ões) com data estimada pelo último pagamento (vieram inativos da planilha antiga)` : undefined}
-          carregando={loading} vazio={!loading && serieA.every(l => l.novos === 0 && l.inativacoes === 0)} mensagemVazio="Nenhum cadastro nem inativação neste período">
+        <Grafico titulo="Novos alunos" nota="Novo = cadastro novo, que nunca existiu. Reativado = voltou de inativo para ativo (o sistema só registra reativações a partir de 27/10/2026)."
+          carregando={loading} vazio={!loading && novosMes.every(l => l.novos === 0 && l.reativados === 0)} mensagemVazio="Nenhum aluno novo ou reativado neste período">
           <ResponsiveContainer width="100%" height={ALTURA}>
-            <BarChart data={serieA} margin={MARGEM}>
+            <BarChart data={novosMes} margin={MARGEM}>
               <Grade />
               <XAxis dataKey="rotulo" {...eixoX} />
               <YAxis {...eixoY} allowDecimals={false} />
               <Tooltip />
               <Legend {...legenda} />
-              <Bar dataKey="novos" name="Novos" fill={COR.recebido} radius={[4, 4, 0, 0]} />
-              <Bar dataKey="inativacoes" name="Inativações" fill={COR.vencido} radius={[4, 4, 0, 0]} />
+              <Bar dataKey="novos" stackId="n" name="Novos (nunca existiram)" fill={COR.recebido} />
+              <Bar dataKey="reativados" stackId="n" name="Reativados" fill={COR.base} radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </Grafico>
