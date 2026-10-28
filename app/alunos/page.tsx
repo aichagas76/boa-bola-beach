@@ -91,7 +91,7 @@ export default function Alunos() {
   const { unidadeId } = useUnidade()
   const [alunos, setAlunos] = useState<Aluno[]>([])
   const [busca, setBusca] = useState('')
-  const [filtro, setFiltro] = useState('Todos')
+  const [filtro, setFiltro] = useState('Ativo')
   const [loading, setLoading] = useState(true)
   const [ordem, setOrdem] = useState<{ coluna: ColunaId; direcao: Direcao }>({ coluna: 'nome', direcao: 'asc' })
 
