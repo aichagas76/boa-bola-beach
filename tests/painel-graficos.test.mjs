@@ -27,3 +27,16 @@ test('série mensal separa em grupos e conta 1 por evento sem valor', () => {
   ], { inicio: '2026-09-01', fim: '2026-09-30' }, ['registrado', 'estimado'])
   assert.deepEqual([r[0].total, r[0].registrado, r[0].estimado], [3, 1, 2])
 })
+
+test('despesas por categoria: só saída paga no período, maiores primeiro, resto em Outras', async () => {
+  const { despesasPorCategoria } = await import('../lib/painel-graficos.ts')
+  const s = (valor, data, categoria, extra = {}) => ({ tipo: 'Saída', status: 'Pago', valor, data, data_pagamento: data, categoria, ...extra })
+  const movs = [
+    s(100, '2026-10-02', 'Aluguel'), s(50, '2026-10-05', 'Aluguel'), s(30, '2026-10-06', 'Luz'), s(20, '2026-10-07', null),
+    s(999, '2026-09-30', 'Aluguel'), s(10, '2026-10-08', 'Água', { status: 'Pendente' }),
+    { tipo: 'Entrada', status: 'Recebido', valor: 500, data: '2026-10-03', data_pagamento: '2026-10-03', categoria: 'Mensalidade' },
+  ]
+  const r = despesasPorCategoria(movs, { inicio: '2026-10-01', fim: '2026-10-31' }, 2)
+  assert.deepEqual(r.map(x => [x.name, x.value]), [['Aluguel', 150], ['Luz', 30], ['Outras', 20]])
+  assert.equal(Math.round(r[0].pct), 75)
+})

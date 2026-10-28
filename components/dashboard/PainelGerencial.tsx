@@ -12,8 +12,8 @@ import { buscarTudo } from '@/lib/buscar-tudo'
 import { useUnidade } from '@/components/layout/UnidadeProvider'
 import FluxoDeCaixa from '@/components/dashboard/FluxoDeCaixa'
 import { VendasDeProdutos } from '@/components/dashboard/GraficosProdutosAlunos'
-import { mesesEntre, serieMensal, type Evento } from '@/lib/painel-graficos'
-import { FiltroMeses, FiltroPeriodo, PRESETS, TemaRecolhivel, useJanela, usePeriodo } from '@/components/dashboard/FiltroPeriodo'
+import { despesasPorCategoria, mesesEntre, serieMensal, type Evento } from '@/lib/painel-graficos'
+import { FiltroMeses, FiltroPeriodo, PRESETS, TemaRecolhivel, rotuloDoPeriodo, useJanela, usePeriodo } from '@/components/dashboard/FiltroPeriodo'
 import type { MovFluxo } from '@/lib/fluxo-caixa'
 import {
   alunosDaModalidade, aparaMesesVazios, calcularKpis, faixasDeAtraso, gastosDoPeriodo, itensFinanceiros, mesesDaJanela,
@@ -45,6 +45,7 @@ const COR_ESPORTE: Record<string, string> = {
   'Beach Tênis': '#F97316', 'Tênis': '#84A60F', Padel: '#2563EB', Pickleball: '#EAB308', 'Sem esporte': '#9CA3AF',
 }
 const corEsporte = (n: string) => COR_ESPORTE[n] ?? '#6B7280'
+const PALETA_CATEGORIAS = ['#2563EB', '#F97316', '#16A34A', '#EAB308', '#9333EA', '#0891B2', '#DB2777', '#84A60F']
 const COR_STATUS: Record<string, string> = { Pagos: COR.recebido, 'A vencer': COR.aVencer, Vencidos: COR.vencido, Cancelados: COR.cancelado }
 
 /* ---------- padrão dos gráficos ---------- */
@@ -119,6 +120,7 @@ type LinhaMov = {
   tipo: string; status: string | null; valor: number; data: string; data_pagamento: string | null; data_vencimento: string | null
   aluno_ref_id: string | null; professor_id: string | null; professores: { nome: string } | null; esportes: { nome: string } | null
   conta_bancaria_id: string | null; contas_bancarias: { nome: string } | null
+  categorias_financeiro: { categoria: string | null } | null
 }
 
 export default function PainelGerencial() {
@@ -167,7 +169,7 @@ export default function PainelGerencial() {
         buscarTudo((de, ate) => supabase.from('matriculas').select('aluno_id, tipo, valor, unidade_id, acesso_duas_unidades, esporte_id, esportes(nome)').order('id').range(de, ate)),
         buscarTudo((de, ate) => supabase
           .from('movimentacoes')
-          .select('tipo, status, valor, data, data_pagamento, data_vencimento, aluno_ref_id, professor_id, conta_bancaria_id, professores(nome), esportes(nome), contas_bancarias(nome)')
+          .select('tipo, status, valor, data, data_pagamento, data_vencimento, aluno_ref_id, professor_id, conta_bancaria_id, professores(nome), esportes(nome), contas_bancarias(nome), categorias_financeiro(categoria)')
           .eq('unidade_id', unidadeId)
           .or(`data.gte.${corte},data_pagamento.gte.${corte},status.neq.Recebido`)
           .order('id').range(de, ate)),
@@ -295,6 +297,11 @@ export default function PainelGerencial() {
     const ativos = new Set(dados.alunosU.filter(a => a.status === 'Ativo').map(a => a.id))
     return Math.round(dados.matsU.filter(m => ativos.has(m.aluno_id)).reduce((t, m) => t + (Number(m.valor) || 0), 0) * 100) / 100
   }, [dados.alunosU, dados.matsU])
+  // Despesas pagas por categoria, no período escolhido no Financeiro (a unidade toda: despesa não é de modalidade)
+  const despesasCat = useMemo(() => despesasPorCategoria(movs.map(m => ({
+    tipo: m.tipo, status: m.status, valor: Number(m.valor), data: m.data, data_pagamento: m.data_pagamento, categoria: m.categorias_financeiro?.categoria ?? null,
+  })), { inicio: pFin.periodo.inicio, fim: pFin.periodo.fim }), [movs, pFin.periodo])
+  const totalDespesasCat = despesasCat.reduce((t, d) => t + d.value, 0)
   const lucro = useMemo(
     () => aparaMesesVazios(resumoPorMes(movsRelUnidade, mesesFin), l => l.bruto > 0 || l.despesas > 0),
     [movsRelUnidade, mesesFin]
@@ -453,20 +460,41 @@ export default function PainelGerencial() {
           </ResponsiveContainer>
         </Grafico>
         <Grafico titulo="Lucro líquido por mês" nota={`No período: recebido ${brl(totaisPeriodo.bruto)} − despesas pagas ${brl(totaisPeriodo.despesas)} = ${brl(totaisPeriodo.lucro)}${modalidade ? " (unidade toda: despesas não se dividem por modalidade)" : ""}`}
-          carregando={loading} vazio={!loading && lucro.every(l => l.bruto === 0 && l.despesas === 0)} mensagemVazio="Sem receitas nem despesas pagas neste período" largo>
+          carregando={loading} vazio={!loading && lucro.every(l => l.bruto === 0 && l.despesas === 0)} mensagemVazio="Sem receitas nem despesas pagas neste período">
           <ResponsiveContainer width="100%" height={ALTURA}>
             <BarChart data={lucro} margin={MARGEM}>
               <Grade />
               <XAxis dataKey="rotulo" {...eixoX} />
               <YAxis {...eixoY} tickFormatter={brlCurto} />
               <Tooltip formatter={tip} />
-              <Legend {...legenda} />
-              <Bar dataKey="despesas" name="Despesas pagas" fill={COR.vencido} radius={[4, 4, 0, 0]} />
               <Bar dataKey="lucro" name="Lucro líquido" fill={COR.recebido} radius={[4, 4, 0, 0]}>
                 {lucro.map(l => <Cell key={l.mes} fill={l.lucro < 0 ? COR.vencido : COR.recebido} />)}
               </Bar>
             </BarChart>
           </ResponsiveContainer>
+        </Grafico>
+        <Grafico titulo="Despesas por categoria" nota={`Despesas pagas de ${rotuloDoPeriodo(pFin.periodo.inicio, pFin.periodo.fim)}: ${brl(totalDespesasCat)}`}
+          carregando={loading} vazio={!loading && despesasCat.length === 0} mensagemVazio="Nenhuma despesa paga neste período">
+          <div className="flex flex-col sm:flex-row items-center gap-4">
+            <div className="w-full sm:w-1/2">
+              <ResponsiveContainer width="100%" height={ALTURA}>
+                <PieChart>
+                  <Pie data={despesasCat} dataKey="value" nameKey="name" innerRadius={50} outerRadius={90} paddingAngle={2}>
+                    {despesasCat.map((d, i) => <Cell key={d.name} fill={d.name === 'Outras' ? COR.cancelado : PALETA_CATEGORIAS[i % PALETA_CATEGORIAS.length]} />)}
+                  </Pie>
+                  <Tooltip formatter={tip} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+            <ul className="w-full sm:w-1/2 space-y-1.5 text-sm">
+              {despesasCat.map((d, i) => (
+                <li key={d.name} className="flex items-center justify-between gap-2">
+                  <span className="inline-flex items-center gap-2 min-w-0"><span className="h-3 w-3 shrink-0 rounded-full" style={{ background: d.name === 'Outras' ? COR.cancelado : PALETA_CATEGORIAS[i % PALETA_CATEGORIAS.length] }} /><span className="truncate">{d.name}</span></span>
+                  <span className="shrink-0 text-gray-700">{pct(d.pct)} · {brl(d.value)}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
         </Grafico>
       </div>
       </TemaRecolhivel>

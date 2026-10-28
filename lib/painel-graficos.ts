@@ -47,3 +47,27 @@ export function serieMensal(eventos: Evento[], janela: Janela, grupos: string[] 
   }
   return pontos
 }
+
+export type DespesaCat = { name: string; value: number; pct: number }
+
+/** Despesas pagas no período, somadas por categoria (maiores primeiro; o que passar de `maximo` fatias vai para "Outras"). */
+export function despesasPorCategoria(
+  movs: { tipo: string; status: string | null; valor: number; data: string; data_pagamento: string | null; categoria: string | null }[],
+  janela: Janela,
+  maximo = 8,
+): DespesaCat[] {
+  const por = new Map<string, number>()
+  for (const m of movs) {
+    if (m.tipo !== 'Saída' || m.status !== 'Pago') continue
+    const d = m.data_pagamento ?? m.data
+    if (d < janela.inicio || d > janela.fim) continue
+    const nome = m.categoria?.trim() || 'Sem categoria'
+    por.set(nome, (por.get(nome) ?? 0) + centavos(Number(m.valor)))
+  }
+  const ordenado = [...por.entries()].sort((a, b) => b[1] - a[1])
+  const topo = ordenado.slice(0, maximo)
+  const resto = ordenado.slice(maximo).reduce((s, [, v]) => s + v, 0)
+  if (resto > 0) topo.push(['Outras', resto])
+  const total = topo.reduce((s, [, v]) => s + v, 0)
+  return topo.map(([name, v]) => ({ name, value: v / 100, pct: total ? (v / total) * 100 : 0 }))
+}
