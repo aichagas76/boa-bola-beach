@@ -83,6 +83,7 @@ export default function Relatorios() {
   const [de, setDe] = useState('')
   const [ate, setAte] = useState('')
   const [ratear, setRatear] = useState(false)
+  const [esporteSel, setEsporteSel] = useState('')
 
   useEffect(() => {
     if (!unidadeId) return
@@ -162,11 +163,25 @@ export default function Relatorios() {
     tipo: m.tipo, status: m.status, valor: Number(m.valor), data: m.data, data_pagamento: m.data_pagamento, esporte_nome: m.esportes?.nome ?? null,
   })), [movs])
   const porEsporte = useMemo(() => faturamentoPorEsporte({ movs: movsEsporte, inicio: periodo.inicio, fim: periodo.fim, ratear }), [movsEsporte, periodo, ratear])
+  // Esporte escolhido: só a linha dele, com as despesas dele (e a parte do rateio, se ligado); despesas gerais ficam de fora
+  const visao = useMemo(() => {
+    if (!esporteSel) return { linhas: porEsporte.linhas, totais: porEsporte.totais, despesasGerais: porEsporte.despesasGerais, filtrado: false }
+    const linhas = porEsporte.linhas.filter(l => l.esporte === esporteSel)
+    const l = linhas[0]
+    const centavos = (n: number) => Math.round(n * 100) / 100
+    return {
+      linhas,
+      totais: { faturamento: l?.faturamento ?? 0, despesas: l ? centavos(l.despesas + l.rateio) : 0, lucro: l ? (ratear ? l.lucro : l.resultado) : 0 },
+      despesasGerais: 0,
+      filtrado: true,
+    }
+  }, [porEsporte, esporteSel, ratear])
+  const esportesDoRelatorio = useMemo(() => porEsporte.linhas.map(l => l.esporte), [porEsporte])
 
   function exportarEsporte() {
     const linhas: (string | number)[][] = [['Esporte', 'Faturamento', 'Despesas do esporte', 'Resultado', ...(ratear ? ['Despesas gerais rateadas', 'Lucro líquido'] : [])]]
-    for (const l of porEsporte.linhas) linhas.push([l.esporte, l.faturamento, l.despesas, l.resultado, ...(ratear ? [l.rateio, l.lucro] : [])])
-    linhas.push([], ['Despesas gerais (sem esporte)', '', porEsporte.despesasGerais], ['TOTAL', porEsporte.totais.faturamento, porEsporte.totais.despesas, '', '', porEsporte.totais.lucro])
+    for (const l of visao.linhas) linhas.push([l.esporte, l.faturamento, l.despesas, l.resultado, ...(ratear ? [l.rateio, l.lucro] : [])])
+    linhas.push([], ['Despesas gerais (sem esporte)', '', visao.despesasGerais], ['TOTAL', visao.totais.faturamento, visao.totais.despesas, '', '', visao.totais.lucro])
     baixar(`faturamento-por-esporte-${periodo.inicio}-a-${periodo.fim}.csv`, linhas)
   }
 
@@ -394,7 +409,7 @@ export default function Relatorios() {
 
       {aba === 'esporte' && (
         <section>
-          <CabecalhoImpressao titulo="Faturamento e lucro por esporte" unidade={unidade?.nome} linhas={[`Período: ${periodo.inicio.split('-').reverse().join('/')} a ${periodo.fim.split('-').reverse().join('/')}`, ratear ? 'Despesas gerais rateadas entre os esportes' : 'Despesas gerais sem rateio']} />
+          <CabecalhoImpressao titulo="Faturamento e lucro por esporte" unidade={unidade?.nome} linhas={[`Período: ${periodo.inicio.split('-').reverse().join('/')} a ${periodo.fim.split('-').reverse().join('/')}`, ...(esporteSel ? [`Esporte: ${esporteSel}`] : []), ratear ? 'Despesas gerais rateadas entre os esportes' : 'Despesas gerais sem rateio']} />
           <div className="flex flex-wrap items-end gap-3 mb-4 print:hidden">
             <div className="inline-flex max-w-[calc(100vw-2rem)] overflow-x-auto rounded-lg border border-gray-200 bg-white">
               {PRESETS.map(p => (
@@ -411,40 +426,46 @@ export default function Relatorios() {
                 <input type="date" value={ate} max={hoje} onChange={e => setAte(e.target.value)} className={selectCls} aria-label="Até" />
               </div>
             )}
+            <div className="inline-flex max-w-[calc(100vw-2rem)] overflow-x-auto rounded-lg border border-gray-200 bg-white" role="group" aria-label="Esporte">
+              {['', ...esportesDoRelatorio].map(e => (
+                <button key={e || 'todos'} type="button" aria-pressed={esporteSel === e} onClick={() => setEsporteSel(e)}
+                  className={`px-3 h-9 text-sm font-medium whitespace-nowrap transition-colors ${esporteSel === e ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-50'}`}>{e || 'Todos os esportes'}</button>
+              ))}
+            </div>
             <label className="inline-flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
               <input type="checkbox" className="h-[18px] w-[18px] accent-blue-600" checked={ratear} onChange={e => setRatear(e.target.checked)} />
               Ratear despesas gerais entre os esportes
             </label>
-            <button type="button" onClick={exportarEsporte} disabled={porEsporte.linhas.length === 0}
+            <button type="button" onClick={exportarEsporte} disabled={visao.linhas.length === 0}
               className="ml-auto inline-flex items-center gap-2 h-9 px-3 text-sm border border-gray-200 rounded-lg text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50">
               <Download size={15} /> Exportar planilha
             </button>
-            <BotaoImprimir desabilitado={porEsporte.linhas.length === 0} />
+            <BotaoImprimir desabilitado={visao.linhas.length === 0} />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
             <div className="bg-white border border-gray-200 rounded-xl p-4">
               <div className="text-sm text-gray-600">Faturamento</div>
-              <div className="text-kpi text-gray-900">{loading ? '...' : brl(porEsporte.totais.faturamento)}</div>
+              <div className="text-kpi text-gray-900">{loading ? '...' : brl(visao.totais.faturamento)}</div>
               <div className="text-xs text-gray-500">entradas recebidas no período</div>
             </div>
             <div className="bg-white border border-gray-200 rounded-xl p-4">
               <div className="text-sm text-gray-600">Despesas pagas</div>
-              <div className="text-kpi text-red-600">{loading ? '...' : brl(porEsporte.totais.despesas)}</div>
-              <div className="text-xs text-gray-500">{brl(porEsporte.despesasGerais)} são gerais (sem esporte)</div>
+              <div className="text-kpi text-red-600">{loading ? '...' : brl(visao.totais.despesas)}</div>
+              <div className="text-xs text-gray-500">{visao.filtrado ? (ratear ? "inclui a parte rateada das despesas gerais" : "despesas gerais não entram (escolha Todos os esportes)") : `${brl(visao.despesasGerais)} são gerais (sem esporte)`}</div>
             </div>
             <div className="bg-white border border-gray-200 rounded-xl p-4">
               <div className="text-sm text-gray-600">Lucro líquido</div>
-              <div className={`text-kpi ${porEsporte.totais.lucro < 0 ? 'text-red-600' : 'text-green-700'}`}>{loading ? '...' : brl(porEsporte.totais.lucro)}</div>
+              <div className={`text-kpi ${visao.totais.lucro < 0 ? 'text-red-600' : 'text-green-700'}`}>{loading ? '...' : brl(visao.totais.lucro)}</div>
               <div className="text-xs text-gray-500">faturamento − despesas</div>
             </div>
           </div>
 
-          {porEsporte.linhas.length > 0 && (
+          {visao.linhas.length > 0 && (
             <div className="bg-white border border-gray-200 rounded-xl p-4 mb-4">
               <div className="text-sm font-semibold text-gray-900 mb-2">{ratear ? 'Faturamento e lucro (com rateio) por esporte' : 'Faturamento e resultado por esporte'}</div>
               <ResponsiveContainer width="100%" height={240}>
-                <BarChart data={porEsporte.linhas} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                <BarChart data={visao.linhas} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#eee" vertical={false} />
                   <XAxis dataKey="esporte" tick={{ fontSize: 12 }} tickLine={false} />
                   <YAxis width={52} tick={{ fontSize: 12 }} tickLine={false} axisLine={false} tickFormatter={brlCurto} />
@@ -471,8 +492,8 @@ export default function Relatorios() {
               </thead>
               <tbody>
                 {loading && <tr><td colSpan={ratear ? 6 : 4} className="text-center py-8 text-gray-400">Carregando...</td></tr>}
-                {!loading && porEsporte.linhas.length === 0 && <tr><td colSpan={ratear ? 6 : 4} className="text-center py-8 text-gray-400">Sem lançamentos neste período.</td></tr>}
-                {porEsporte.linhas.map(l => (
+                {!loading && visao.linhas.length === 0 && <tr><td colSpan={ratear ? 6 : 4} className="text-center py-8 text-gray-400">Sem lançamentos neste período.</td></tr>}
+                {visao.linhas.map(l => (
                   <tr key={l.esporte} className="border-b border-gray-100">
                     <td className="px-3 py-3 font-medium text-gray-900">{l.esporte}</td>
                     <td className="px-3 py-3 text-right text-gray-900">{brl(l.faturamento)}</td>
@@ -482,24 +503,24 @@ export default function Relatorios() {
                     {ratear && <td className={`px-3 py-3 text-right font-semibold ${l.lucro < 0 ? 'text-red-600' : 'text-green-700'}`}>{brl(l.lucro)}</td>}
                   </tr>
                 ))}
-                {!ratear && porEsporte.despesasGerais > 0 && (
+                {!ratear && visao.despesasGerais > 0 && (
                   <tr className="border-b border-gray-100 text-gray-600">
                     <td className="px-3 py-3">Despesas gerais (sem esporte)</td>
                     <td className="px-3 py-3" />
-                    <td className="px-3 py-3 text-right text-red-600">− {brl(porEsporte.despesasGerais)}</td>
-                    <td className="px-3 py-3 text-right text-red-600">− {brl(porEsporte.despesasGerais)}</td>
+                    <td className="px-3 py-3 text-right text-red-600">− {brl(visao.despesasGerais)}</td>
+                    <td className="px-3 py-3 text-right text-red-600">− {brl(visao.despesasGerais)}</td>
                   </tr>
                 )}
               </tbody>
-              {porEsporte.linhas.length > 0 && (
+              {visao.linhas.length > 0 && (
                 <tfoot>
                   <tr className="bg-gray-50 font-semibold text-gray-900">
                     <td className="px-3 py-3">Total</td>
-                    <td className="px-3 py-3 text-right">{brl(porEsporte.totais.faturamento)}</td>
-                    <td className="px-3 py-3 text-right text-red-600">− {brl(porEsporte.totais.despesas)}</td>
-                    <td className={`px-3 py-3 text-right ${porEsporte.totais.lucro < 0 ? 'text-red-600' : 'text-green-700'}`}>{brl(porEsporte.totais.lucro)}</td>
+                    <td className="px-3 py-3 text-right">{brl(visao.totais.faturamento)}</td>
+                    <td className="px-3 py-3 text-right text-red-600">− {brl(visao.totais.despesas)}</td>
+                    <td className={`px-3 py-3 text-right ${visao.totais.lucro < 0 ? 'text-red-600' : 'text-green-700'}`}>{brl(visao.totais.lucro)}</td>
                     {ratear && <td className="px-3 py-3" />}
-                    {ratear && <td className={`px-3 py-3 text-right ${porEsporte.totais.lucro < 0 ? 'text-red-600' : 'text-green-700'}`}>{brl(porEsporte.totais.lucro)}</td>}
+                    {ratear && <td className={`px-3 py-3 text-right ${visao.totais.lucro < 0 ? 'text-red-600' : 'text-green-700'}`}>{brl(visao.totais.lucro)}</td>}
                   </tr>
                 </tfoot>
               )}
