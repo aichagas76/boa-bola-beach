@@ -119,7 +119,7 @@ export default function Professores() {
   const pagination = usePagination(professores, 15)
 
   return (
-    <div>
+    <div className="max-w-4xl">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-page-title text-gray-900">Professores</h1>
         {!mostraForm && (
@@ -137,7 +137,7 @@ export default function Professores() {
           <div className="text-sm font-medium text-gray-700 mb-4">
             {editandoId ? 'Editar professor' : 'Novo professor'}
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
             <div>
               <label className="text-label text-gray-500 block mb-1">Nome <span className="text-red-500">*</span></label>
               <input
