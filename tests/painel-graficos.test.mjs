@@ -40,3 +40,10 @@ test('despesas por categoria: só saída paga no período, maiores primeiro, res
   assert.deepEqual(r.map(x => [x.name, x.value]), [['Aluguel', 150], ['Luz', 30], ['Outras', 20]])
   assert.equal(Math.round(r[0].pct), 75)
 })
+
+test('despesas por categoria: categoria excluída sai do cálculo e do percentual', async () => {
+  const { despesasPorCategoria } = await import('../lib/painel-graficos.ts')
+  const s = (valor, categoria) => ({ tipo: 'Saída', status: 'Pago', valor, data: '2026-10-02', data_pagamento: '2026-10-02', categoria })
+  const r = despesasPorCategoria([s(300, 'Mão de Obra'), s(100, 'Aluguel'), s(100, 'Luz')], { inicio: '2026-10-01', fim: '2026-10-31' }, 8, ['Mão de Obra'])
+  assert.deepEqual(r.map(x => [x.name, x.value, Math.round(x.pct)]), [['Aluguel', 100, 50], ['Luz', 100, 50]])
+})

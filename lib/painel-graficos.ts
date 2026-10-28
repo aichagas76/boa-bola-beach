@@ -50,11 +50,12 @@ export function serieMensal(eventos: Evento[], janela: Janela, grupos: string[] 
 
 export type DespesaCat = { name: string; value: number; pct: number }
 
-/** Despesas pagas no período, somadas por categoria (maiores primeiro; o que passar de `maximo` fatias vai para "Outras"). */
+/** Despesas pagas no período, somadas por categoria (maiores primeiro; o que passar de `maximo` fatias vai para "Outras"). `excluir` tira categorias do cálculo. */
 export function despesasPorCategoria(
   movs: { tipo: string; status: string | null; valor: number; data: string; data_pagamento: string | null; categoria: string | null }[],
   janela: Janela,
   maximo = 8,
+  excluir: string[] = [],
 ): DespesaCat[] {
   const por = new Map<string, number>()
   for (const m of movs) {
@@ -62,6 +63,7 @@ export function despesasPorCategoria(
     const d = m.data_pagamento ?? m.data
     if (d < janela.inicio || d > janela.fim) continue
     const nome = m.categoria?.trim() || 'Sem categoria'
+    if (excluir.includes(nome)) continue
     por.set(nome, (por.get(nome) ?? 0) + centavos(Number(m.valor)))
   }
   const ordenado = [...por.entries()].sort((a, b) => b[1] - a[1])

@@ -298,9 +298,14 @@ export default function PainelGerencial() {
     return Math.round(dados.matsU.filter(m => ativos.has(m.aluno_id)).reduce((t, m) => t + (Number(m.valor) || 0), 0) * 100) / 100
   }, [dados.alunosU, dados.matsU])
   // Despesas pagas por categoria, no período escolhido no Financeiro (a unidade toda: despesa não é de modalidade)
-  const despesasCat = useMemo(() => despesasPorCategoria(movs.map(m => ({
+  // Clicar numa categoria (na lista ou na fatia) tira ela do cálculo; clicar de novo traz de volta
+  const [categoriasOcultas, setCategoriasOcultas] = useState<string[]>([])
+  const movsDespesa = useMemo(() => movs.map(m => ({
     tipo: m.tipo, status: m.status, valor: Number(m.valor), data: m.data, data_pagamento: m.data_pagamento, categoria: m.categorias_financeiro?.categoria ?? null,
-  })), { inicio: pFin.periodo.inicio, fim: pFin.periodo.fim }), [movs, pFin.periodo])
+  })), [movs])
+  const despesasCat = useMemo(() => despesasPorCategoria(movsDespesa, { inicio: pFin.periodo.inicio, fim: pFin.periodo.fim }, 8, categoriasOcultas), [movsDespesa, pFin.periodo, categoriasOcultas])
+  const despesasOcultas = useMemo(() => despesasPorCategoria(movsDespesa, { inicio: pFin.periodo.inicio, fim: pFin.periodo.fim }, 99).filter(d => categoriasOcultas.includes(d.name)), [movsDespesa, pFin.periodo, categoriasOcultas])
+  const alternarCategoria = (nome: string) => { if (nome !== 'Outras') setCategoriasOcultas(l => (l.includes(nome) ? l.filter(x => x !== nome) : [...l, nome])) }
   const totalDespesasCat = despesasCat.reduce((t, d) => t + d.value, 0)
   const lucro = useMemo(
     () => aparaMesesVazios(resumoPorMes(movsRelUnidade, mesesFin), l => l.bruto > 0 || l.despesas > 0),
@@ -473,13 +478,13 @@ export default function PainelGerencial() {
             </BarChart>
           </ResponsiveContainer>
         </Grafico>
-        <Grafico titulo="Despesas por categoria" nota={`Despesas pagas de ${rotuloDoPeriodo(pFin.periodo.inicio, pFin.periodo.fim)}: ${brl(totalDespesasCat)}`}
-          carregando={loading} vazio={!loading && despesasCat.length === 0} mensagemVazio="Nenhuma despesa paga neste período">
+        <Grafico titulo="Despesas por categoria" nota={`Despesas pagas de ${rotuloDoPeriodo(pFin.periodo.inicio, pFin.periodo.fim)}: ${brl(totalDespesasCat)}. Clique numa categoria para tirá-la do cálculo.`}
+          carregando={loading} vazio={!loading && despesasCat.length === 0 && despesasOcultas.length === 0} mensagemVazio="Nenhuma despesa paga neste período">
           <div className="flex flex-col sm:flex-row items-center gap-4">
             <div className="w-full sm:w-1/2">
               <ResponsiveContainer width="100%" height={ALTURA}>
                 <PieChart>
-                  <Pie data={despesasCat} dataKey="value" nameKey="name" innerRadius={50} outerRadius={90} paddingAngle={2}>
+                  <Pie data={despesasCat} dataKey="value" nameKey="name" innerRadius={50} outerRadius={90} paddingAngle={2} onClick={(d: { name?: string }) => d.name && alternarCategoria(d.name)} style={{ cursor: 'pointer' }}>
                     {despesasCat.map((d, i) => <Cell key={d.name} fill={d.name === 'Outras' ? COR.cancelado : PALETA_CATEGORIAS[i % PALETA_CATEGORIAS.length]} />)}
                   </Pie>
                   <Tooltip formatter={tip} />
@@ -488,9 +493,21 @@ export default function PainelGerencial() {
             </div>
             <ul className="w-full sm:w-1/2 space-y-1.5 text-sm">
               {despesasCat.map((d, i) => (
-                <li key={d.name} className="flex items-center justify-between gap-2">
-                  <span className="inline-flex items-center gap-2 min-w-0"><span className="h-3 w-3 shrink-0 rounded-full" style={{ background: d.name === 'Outras' ? COR.cancelado : PALETA_CATEGORIAS[i % PALETA_CATEGORIAS.length] }} /><span className="truncate">{d.name}</span></span>
-                  <span className="shrink-0 text-gray-700">{pct(d.pct)} · {brl(d.value)}</span>
+                <li key={d.name}>
+                  <button type="button" disabled={d.name === 'Outras'} onClick={() => alternarCategoria(d.name)} title={d.name === 'Outras' ? undefined : 'Tirar do cálculo'}
+                    className="flex w-full items-center justify-between gap-2 rounded px-1 py-0.5 text-left enabled:hover:bg-gray-50">
+                    <span className="inline-flex items-center gap-2 min-w-0"><span className="h-3 w-3 shrink-0 rounded-full" style={{ background: d.name === 'Outras' ? COR.cancelado : PALETA_CATEGORIAS[i % PALETA_CATEGORIAS.length] }} /><span className="truncate">{d.name}</span></span>
+                    <span className="shrink-0 text-gray-700">{pct(d.pct)} · {brl(d.value)}</span>
+                  </button>
+                </li>
+              ))}
+              {despesasOcultas.map(d => (
+                <li key={d.name}>
+                  <button type="button" onClick={() => alternarCategoria(d.name)} title="Trazer de volta ao cálculo"
+                    className="flex w-full items-center justify-between gap-2 rounded px-1 py-0.5 text-left text-gray-400 hover:bg-gray-50">
+                    <span className="inline-flex items-center gap-2 min-w-0"><span className="h-3 w-3 shrink-0 rounded-full border border-gray-300" /><span className="truncate line-through">{d.name}</span></span>
+                    <span className="shrink-0 line-through">{brl(d.value)}</span>
+                  </button>
                 </li>
               ))}
             </ul>
