@@ -1,5 +1,5 @@
 // Relatórios gerenciais (sem banco, para poderem ser testados).
-//  1) Comissão dos professores no mês de competência.
+//  1) Pagamento dos professores no mês de competência (comissão das aulas pagas, comissão extra e descontos).
 //  2) Faturamento e lucro líquido por esporte.
 //
 // Competência: o mês a que a mensalidade se refere (o mês do vencimento), não o mês em que foi paga.
@@ -14,7 +14,7 @@ export type MatriculaR = {
   professor_id: string | null; professor_nome: string | null; esporte_nome: string | null
   unidade_id: string | null; acesso_duas_unidades: boolean | null
 }
-export type EntradaRecebida = { aluno_ref_id: string | null; valor: number; competencia: string }
+export type EntradaRecebida = { aluno_ref_id: string | null; valor: number; competencia: string; data_pagamento?: string | null }
 
 export const normaliza = (s: string | null | undefined) =>
   (s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim()
@@ -32,30 +32,89 @@ export type Situacao = 'Pago' | 'Inadimplente' | 'A vencer'
 
 export type DetalheAluno = {
   alunoId: string; nome: string; esporte: string
+  competencia: string // mês a que a mensalidade se refere
+  dataPagamento: string | null // quando o aluno pagou (a mais recente da competência)
   valorProfessor: number // mensalidade da aula com este professor
   totalAluno: number // tudo que o aluno paga na unidade
   recebido: number // recebido na competência
   situacao: Situacao
-  comissao: number
-  descontado: number
-  devido: number
+  comissao: number // comissão se a mensalidade estivesse toda paga
+  paga: number // comissão sobre o que foi pago: entra no pagamento
+  foraDoPagamento: number // comissão do que ainda não foi pago: aparece, mas não é paga
 }
+
+/** Lançamento do Financeiro ligado ao professor que muda o que ele recebe no mês. */
+export type MovProfessor = {
+  professor_id: string | null
+  tipo: string // 'Entrada' | 'Saída'
+  status: string | null
+  valor: number
+  data: string
+  data_pagamento: string | null
+  data_vencimento: string | null
+  descricao: string | null
+  categoria: string | null
+  subcategoria: string | null
+  aluno_ref_id: string | null
+  esporte_nome: string | null
+}
+export type Ajuste = { data: string; descricao: string; tipoAjuste: string; status: string; valor: number; contaNoTotal: number }
+
 export type LinhaComissao = {
   professor: string
   percentual: number | null
   semPercentual: boolean
   alunos: number
-  base: number // mensalidades que geram comissão
-  comissaoTotal: number
-  descontado: number // comissão dos alunos inadimplentes
-  devido: number // comissaoTotal − descontado
+  base: number // mensalidades com o professor no mês
+  comissaoTotal: number // comissão se tudo estivesse pago
+  paga: number // comissão das aulas já pagas pelos alunos (entra no pagamento)
+  foraDoPagamento: number // comissão do que não foi pago
+  extras: Ajuste[] // comissão de venda de produto, encordoamento e ranking
+  totalExtras: number
+  descontos: Ajuste[] // vales, adiantamentos, outras despesas e retiradas de produtos
+  totalDescontos: number
+  aPagar: number // paga + extras − descontos
   detalhe: DetalheAluno[]
 }
 
+const EXTRAS = ['comissao de venda', 'comissao de encordoamento', 'comissao ranking']
+const ROTULO_EXTRA: Record<string, string> = { 'comissao de venda': 'Comissão de venda de produto', 'comissao de encordoamento': 'Comissão de encordoamento', 'comissao ranking': 'Comissão de ranking' }
+
+/** Mês em que o lançamento conta: o do pagamento, se já foi pago; senão o do vencimento. */
+const mesDoAjuste = (m: MovProfessor) => {
+  const pago = (m.tipo === 'Saída' && m.status === 'Pago') || (m.tipo === 'Entrada' && m.status === 'Recebido')
+  return (pago ? (m.data_pagamento ?? m.data) : (m.data_vencimento ?? m.data)).slice(0, 7)
+}
+
+/** Separa um lançamento do professor em comissão extra, desconto ou nada (não é do relatório). */
+export function classificarAjuste(m: MovProfessor): { grupo: 'extra' | 'desconto'; ajuste: Ajuste } | null {
+  if (m.status === 'Cancelado' || m.status === 'Estornado') return null
+  const sub = normaliza(m.subcategoria)
+  const cat = normaliza(m.categoria)
+  const data = m.data_pagamento ?? m.data
+  const status = m.status ?? ''
+  if (m.tipo === 'Saída') {
+    if (EXTRAS.includes(sub)) {
+      return { grupo: 'extra', ajuste: { data, descricao: m.descricao ?? ROTULO_EXTRA[sub], tipoAjuste: ROTULO_EXTRA[sub], status, valor: m.valor, contaNoTotal: m.valor } }
+    }
+    const nome = [m.categoria, m.subcategoria].filter(Boolean).join(' · ') || 'Despesa'
+    return { grupo: 'desconto', ajuste: { data, descricao: m.descricao ?? nome, tipoAjuste: nome, status, valor: m.valor, contaNoTotal: m.valor } }
+  }
+  // Retirada de produto pelo próprio professor: desconta enquanto não foi paga na hora
+  if (m.tipo === 'Entrada' && !m.aluno_ref_id && cat.includes('produto')) {
+    const pago = m.status === 'Recebido'
+    return { grupo: 'desconto', ajuste: { data: m.data, descricao: m.descricao ?? 'Retirada de produto', tipoAjuste: 'Retirada de produto', status: pago ? 'Já pago' : status, valor: m.valor, contaNoTotal: pago ? 0 : m.valor } }
+  }
+  return null
+}
+
 /**
- * Comissão = mensalidade do aluno com o professor × % do professor.
- * "Descontado" = a parte da comissão ligada ao que o aluno ainda não pagou, só quando ele está inadimplente
- * (vencimento do mês já passou). Aluno com vencimento ainda por chegar não é descontado.
+ * Pagamento do professor no mês de competência:
+ *  - Comissão das aulas = mensalidade do aluno com o professor × % do professor, SÓ sobre o que o aluno pagou.
+ *    Quem não pagou aparece na lista, mas a comissão dele fica fora do pagamento.
+ *  - Comissão extra = comissão de venda de produto, de encordoamento e de ranking lançadas no Financeiro.
+ *  - Descontos = vales, adiantamentos e demais despesas lançadas para o professor, e retiradas de produto ainda não pagas.
+ *  - A pagar = comissão das aulas pagas + comissão extra − descontos.
  */
 export function comissaoPorProfessor(args: {
   mes: string
@@ -64,6 +123,7 @@ export function comissaoPorProfessor(args: {
   alunos: AlunoR[]
   matriculas: MatriculaR[]
   entradas: EntradaRecebida[]
+  movimentos?: MovProfessor[]
   unidadeId: string | null
   filtroProfessorId?: string | null
   filtroEsporte?: string | null
@@ -86,9 +146,11 @@ export function comissaoPorProfessor(args: {
   for (const m of args.matriculas) totalAluno.set(m.aluno_id, arredonda((totalAluno.get(m.aluno_id) ?? 0) + valorNaUnidade(m)))
 
   const recebidoNoMes = new Map<string, number>()
+  const pagoEm = new Map<string, string>()
   for (const e of args.entradas) {
     if (!e.aluno_ref_id || e.competencia !== mes) continue
     recebidoNoMes.set(e.aluno_ref_id, arredonda((recebidoNoMes.get(e.aluno_ref_id) ?? 0) + e.valor))
+    if (e.data_pagamento && e.data_pagamento > (pagoEm.get(e.aluno_ref_id) ?? '')) pagoEm.set(e.aluno_ref_id, e.data_pagamento)
   }
 
   const situacaoDe = (a: AlunoR, total: number, recebido: number): Situacao => {
@@ -101,6 +163,11 @@ export function comissaoPorProfessor(args: {
   const porNome = new Map(args.professores.map(p => [normaliza(p.nome), p]))
   const porId = new Map(args.professores.map(p => [p.id, p]))
   const linhas = new Map<string, LinhaComissao>()
+  const novaLinha = (nome: string, percentual: number | null): LinhaComissao => ({
+    professor: nome, percentual, semPercentual: percentual === null,
+    alunos: 0, base: 0, comissaoTotal: 0, paga: 0, foraDoPagamento: 0,
+    extras: [], totalExtras: 0, descontos: [], totalDescontos: 0, aPagar: 0, detalhe: [],
+  })
 
   for (const m of args.matriculas) {
     const aluno = alunosPorId.get(m.aluno_id)
@@ -116,32 +183,54 @@ export function comissaoPorProfessor(args: {
     const total = totalAluno.get(aluno.id) ?? 0
     const recebido = recebidoNoMes.get(aluno.id) ?? 0
     const situacao = situacaoDe(aluno, total, recebido)
-    const pendente = total > 0 ? Math.max(0, 1 - recebido / total) : 0
+    const fracaoPaga = total > 0 ? Math.min(1, recebido / total) : 0
     const percentual = prof?.comissao_percentual ?? null
     const comissao = arredonda(valorProf * ((percentual ?? 0) / 100))
-    const descontado = situacao === 'Inadimplente' ? arredonda(comissao * pendente) : 0
+    const paga = arredonda(comissao * fracaoPaga)
 
-    const linha = linhas.get(chave) ?? {
-      professor: prof?.nome ?? m.professor_nome ?? 'Professor', percentual, semPercentual: percentual === null,
-      alunos: 0, base: 0, comissaoTotal: 0, descontado: 0, devido: 0, detalhe: [],
-    }
+    const linha = linhas.get(chave) ?? novaLinha(prof?.nome ?? m.professor_nome ?? 'Professor', percentual)
     linha.detalhe.push({
-      alunoId: aluno.id, nome: aluno.nome, esporte: m.esporte_nome ?? 'Sem esporte', valorProfessor: valorProf,
-      totalAluno: total, recebido, situacao, comissao, descontado, devido: arredonda(comissao - descontado),
+      alunoId: aluno.id, nome: aluno.nome, esporte: m.esporte_nome ?? 'Sem esporte', competencia: mes, dataPagamento: pagoEm.get(aluno.id) ?? null,
+      valorProfessor: valorProf, totalAluno: total, recebido, situacao, comissao, paga, foraDoPagamento: arredonda(comissao - paga),
     })
     linha.base = arredonda(linha.base + valorProf)
     linha.comissaoTotal = arredonda(linha.comissaoTotal + comissao)
-    linha.descontado = arredonda(linha.descontado + descontado)
-    linha.devido = arredonda(linha.comissaoTotal - linha.descontado)
+    linha.paga = arredonda(linha.paga + paga)
     linhas.set(chave, linha)
   }
 
-  const lista = Array.from(linhas.values()).map(l => ({ ...l, alunos: new Set(l.detalhe.map(d => d.alunoId)).size }))
-    .sort((a, b) => a.professor.localeCompare(b.professor, 'pt-BR'))
+  // Comissão extra e descontos lançados no Financeiro (o professor aparece mesmo sem aluno no mês)
+  for (const mov of args.movimentos ?? []) {
+    if (!mov.professor_id || mesDoAjuste(mov) !== mes) continue
+    if (args.filtroProfessorId && mov.professor_id !== args.filtroProfessorId) continue
+    if (args.filtroEsporte && mov.esporte_nome && mov.esporte_nome !== args.filtroEsporte) continue
+    const classe = classificarAjuste(mov)
+    if (!classe) continue
+    const prof = porId.get(mov.professor_id)
+    if (!prof) continue
+    const linha = linhas.get(prof.id) ?? novaLinha(prof.nome, prof.comissao_percentual)
+    if (classe.grupo === 'extra') { linha.extras.push(classe.ajuste); linha.totalExtras = arredonda(linha.totalExtras + classe.ajuste.contaNoTotal) }
+    else { linha.descontos.push(classe.ajuste); linha.totalDescontos = arredonda(linha.totalDescontos + classe.ajuste.contaNoTotal) }
+    linhas.set(prof.id, linha)
+  }
+
+  const ordemData = (a: Ajuste, b: Ajuste) => a.data.localeCompare(b.data)
+  const lista = Array.from(linhas.values()).map(l => {
+    const detalhe = [...l.detalhe].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR') || a.esporte.localeCompare(b.esporte, 'pt-BR'))
+    const foraDoPagamento = arredonda(l.comissaoTotal - l.paga)
+    return {
+      ...l, detalhe, foraDoPagamento, alunos: new Set(l.detalhe.map(d => d.alunoId)).size,
+      extras: [...l.extras].sort(ordemData), descontos: [...l.descontos].sort(ordemData),
+      aPagar: arredonda(l.paga + l.totalExtras - l.totalDescontos),
+    }
+  }).sort((a, b) => a.professor.localeCompare(b.professor, 'pt-BR'))
   const soma = (f: (l: LinhaComissao) => number) => arredonda(lista.reduce((s, l) => s + f(l), 0))
   return {
     linhas: lista,
-    totais: { base: soma(l => l.base), comissaoTotal: soma(l => l.comissaoTotal), descontado: soma(l => l.descontado), devido: soma(l => l.devido) },
+    totais: {
+      base: soma(l => l.base), comissaoTotal: soma(l => l.comissaoTotal), paga: soma(l => l.paga), foraDoPagamento: soma(l => l.foraDoPagamento),
+      extras: soma(l => l.totalExtras), descontos: soma(l => l.totalDescontos), aPagar: soma(l => l.aPagar),
+    },
   }
 }
 

@@ -10,12 +10,13 @@ import { BotaoImprimir, CabecalhoImpressao } from '@/components/relatorios/Cabec
 import { mesesDaJanela, periodoDe, rotuloMes, type Preset } from '@/lib/painel'
 import {
   comissaoPorProfessor, competenciaDe, faturamentoPorEsporte, paraCsv,
-  type AlunoR, type EntradaRecebida, type MatriculaR, type MovEsporte, type ProfessorR,
+  type AlunoR, type EntradaRecebida, type MatriculaR, type MovEsporte, type MovProfessor, type ProfessorR,
 } from '@/lib/relatorios-gerenciais'
 
 const brl = (v: number) => `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 const brlCurto = (v: number) => (Math.abs(v) >= 1000 ? `${(v / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} mil` : String(v))
 const tip = (v: unknown) => brl(Number(v ?? 0))
+const dataBr = (iso: string) => iso.slice(0, 10).split('-').reverse().join('/')
 
 const COR_SITUACAO: Record<string, string> = {
   Pago: 'bg-green-50 text-green-700',
@@ -48,6 +49,7 @@ type LinhaMat = Omit<MatriculaR, 'esporte_nome'> & { esportes: { nome: string } 
 type LinhaMov = {
   tipo: string; status: string | null; valor: number; data: string; data_pagamento: string | null
   data_vencimento: string | null; aluno_ref_id: string | null; esportes: { nome: string } | null
+  professor_id: string | null; descricao: string | null; categorias_financeiro: { categoria: string | null; subcategoria: string | null } | null
 }
 
 export default function Relatorios() {
@@ -96,7 +98,7 @@ export default function Relatorios() {
         buscarTudo((de, ate) => supabase.from('matriculas').select('aluno_id, tipo, valor, professor_id, professor_nome, unidade_id, acesso_duas_unidades, esportes(nome)').order('id').range(de, ate)),
         buscarTudo((de, ate) => supabase
           .from('movimentacoes')
-          .select('tipo, status, valor, data, data_pagamento, data_vencimento, aluno_ref_id, esportes(nome)')
+          .select('tipo, status, valor, data, data_pagamento, data_vencimento, aluno_ref_id, professor_id, descricao, esportes(nome), categorias_financeiro(categoria, subcategoria)')
           .eq('unidade_id', unidadeId)
           .or(`data.gte.${corte},data_pagamento.gte.${corte}`)
           .order('id').range(de, ate)),
@@ -122,7 +124,13 @@ export default function Relatorios() {
   const matsR: MatriculaR[] = useMemo(() => mats.map(m => ({ ...m, esporte_nome: m.esportes?.nome ?? null })), [mats])
   const entradas: EntradaRecebida[] = useMemo(() => movs
     .filter(m => m.tipo === 'Entrada' && m.status === 'Recebido')
-    .map(m => ({ aluno_ref_id: m.aluno_ref_id, valor: Number(m.valor), competencia: competenciaDe(m) })), [movs])
+    .map(m => ({ aluno_ref_id: m.aluno_ref_id, valor: Number(m.valor), competencia: competenciaDe(m), data_pagamento: m.data_pagamento ?? m.data })), [movs])
+  // Comissão extra, vales e demais lançamentos ligados a um professor
+  const movimentos: MovProfessor[] = useMemo(() => movs.filter(m => m.professor_id).map(m => ({
+    professor_id: m.professor_id, tipo: m.tipo, status: m.status, valor: Number(m.valor), data: m.data, data_pagamento: m.data_pagamento, data_vencimento: m.data_vencimento,
+    descricao: m.descricao, categoria: m.categorias_financeiro?.categoria ?? null, subcategoria: m.categorias_financeiro?.subcategoria ?? null,
+    aluno_ref_id: m.aluno_ref_id, esporte_nome: m.esportes?.nome ?? null,
+  })), [movs])
   const esportesOpcoes = useMemo(() => Array.from(new Set(matsR.map(m => m.esporte_nome ?? 'Sem esporte'))).sort(), [matsR])
   const professoresComAula = useMemo(() => {
     const nomes = new Set(matsR.filter(m => m.professor_nome || m.professor_id).map(m => (m.professor_nome ?? '').trim().toLowerCase()))
@@ -130,19 +138,22 @@ export default function Relatorios() {
   }, [professores, matsR])
 
   const comissao = useMemo(() => comissaoPorProfessor({
-    mes, hoje, professores, alunos, matriculas: matsR, entradas, unidadeId,
+    mes, hoje, professores, alunos, matriculas: matsR, entradas, movimentos, unidadeId,
     filtroProfessorId: filtroProfessor || null, filtroEsporte: filtroEsporte || null,
-  }), [mes, hoje, professores, alunos, matsR, entradas, unidadeId, filtroProfessor, filtroEsporte])
+  }), [mes, hoje, professores, alunos, matsR, entradas, movimentos, unidadeId, filtroProfessor, filtroEsporte])
 
   function exportarComissao() {
     const linhas: (string | number)[][] = [
-      ['Professor', '% comissão', 'Aluno', 'Esporte', 'Mensalidade com o professor', 'Situação', 'Comissão', 'Descontado (inadimplência)', 'Valor devido'],
+      ['Professor', 'Seção', 'Aluno / lançamento', 'Esporte / tipo', 'Competência', 'Data de pagamento / data', 'Situação', 'Mensalidade com o professor', 'Valor'],
     ]
-    for (const l of comissao.linhas) for (const d of l.detalhe) {
-      linhas.push([l.professor, l.percentual ?? '', d.nome, d.esporte, d.valorProfessor, d.situacao, d.comissao, d.descontado, d.devido])
+    for (const l of comissao.linhas) {
+      for (const d of l.detalhe) linhas.push([l.professor, 'Comissão das aulas', d.nome, d.esporte, d.competencia, d.dataPagamento ? dataBr(d.dataPagamento) : '', d.situacao, d.valorProfessor, d.paga])
+      for (const x of l.extras) linhas.push([l.professor, 'Comissão extra', x.descricao, x.tipoAjuste, mes, dataBr(x.data), x.status, '', x.contaNoTotal])
+      for (const x of l.descontos) linhas.push([l.professor, 'Descontos', x.descricao, x.tipoAjuste, mes, dataBr(x.data), x.status, '', -x.contaNoTotal])
+      linhas.push([l.professor, 'A PAGAR', '', '', mes, '', '', '', l.aPagar])
     }
-    linhas.push([], ['TOTAL', '', '', '', comissao.totais.base, '', comissao.totais.comissaoTotal, comissao.totais.descontado, comissao.totais.devido])
-    baixar(`comissao-professores-${mes}.csv`, linhas)
+    linhas.push([], ['TOTAL A PAGAR', '', '', '', mes, '', '', comissao.totais.base, comissao.totais.aPagar])
+    baixar(`pagamento-professores-${mes}.csv`, linhas)
   }
 
   /* ---------- faturamento por esporte ---------- */
@@ -169,7 +180,7 @@ export default function Relatorios() {
       </div>
 
       <div className="inline-flex rounded-lg border border-gray-200 bg-white overflow-hidden mb-5 print:hidden">
-        {([['comissao', 'Comissão dos professores'], ['esporte', 'Faturamento e lucro por esporte']] as const).map(([id, nome]) => (
+        {([['comissao', 'Pagamento dos professores'], ['esporte', 'Faturamento e lucro por esporte']] as const).map(([id, nome]) => (
           <button key={id} type="button" onClick={() => setAba(id)}
             className={`px-4 h-10 text-sm font-medium transition-colors ${aba === id ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-50'}`}>
             {nome}
@@ -181,7 +192,7 @@ export default function Relatorios() {
 
       {aba === 'comissao' && (
         <section>
-          <CabecalhoImpressao titulo="Comissão dos professores" unidade={unidade?.nome} linhas={[`Competência: ${nomeMes(mes)}`, ...(filtroProfessor ? [`Professor: ${professores.find(p => p.id === filtroProfessor)?.nome ?? ''}`] : []), ...(filtroEsporte ? [`Esporte: ${filtroEsporte}`] : [])]} />
+          <CabecalhoImpressao titulo="Pagamento dos professores" unidade={unidade?.nome} linhas={[`Competência: ${nomeMes(mes)}`, ...(filtroProfessor ? [`Professor: ${professores.find(p => p.id === filtroProfessor)?.nome ?? ''}`] : []), ...(filtroEsporte ? [`Esporte: ${filtroEsporte}`] : [])]} />
           <div className="flex flex-wrap items-end gap-3 mb-4 print:hidden">
             <label className="text-sm text-gray-700">Mês de competência
               <select value={mes} onChange={e => setMes(e.target.value)} className={`${selectCls} block mt-1`}>
@@ -207,21 +218,31 @@ export default function Relatorios() {
             <BotaoImprimir desabilitado={comissao.linhas.length === 0} />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-4 break-inside-avoid">
             <div className="bg-white border border-gray-200 rounded-xl p-4">
-              <div className="text-sm text-gray-600">Comissão total</div>
-              <div className="text-kpi text-gray-900">{loading ? '...' : brl(comissao.totais.comissaoTotal)}</div>
-              <div className="text-xs text-gray-500">sobre {brl(comissao.totais.base)} de mensalidades</div>
+              <div className="text-sm text-gray-600">Comissão das aulas</div>
+              <div className="text-kpi text-gray-900">{loading ? '...' : brl(comissao.totais.paga)}</div>
+              <div className="text-xs text-gray-500">só mensalidades pagas</div>
             </div>
             <div className="bg-white border border-gray-200 rounded-xl p-4">
-              <div className="text-sm text-gray-600">Descontado (inadimplentes)</div>
-              <div className={`text-kpi ${comissao.totais.descontado > 0 ? 'text-red-600' : 'text-gray-900'}`}>{loading ? '...' : brl(comissao.totais.descontado)}</div>
-              <div className="text-xs text-gray-500">parte da comissão ligada ao que não foi pago</div>
+              <div className="text-sm text-gray-600">Comissão extra</div>
+              <div className="text-kpi text-gray-900">{loading ? '...' : brl(comissao.totais.extras)}</div>
+              <div className="text-xs text-gray-500">produtos e encordoamento</div>
             </div>
             <div className="bg-white border border-gray-200 rounded-xl p-4">
-              <div className="text-sm text-gray-600">Valor devido</div>
-              <div className="text-kpi text-green-700">{loading ? '...' : brl(comissao.totais.devido)}</div>
-              <div className="text-xs text-gray-500">comissão total − descontado</div>
+              <div className="text-sm text-gray-600">Descontos</div>
+              <div className={`text-kpi ${comissao.totais.descontos > 0 ? 'text-red-600' : 'text-gray-900'}`}>{loading ? '...' : brl(comissao.totais.descontos)}</div>
+              <div className="text-xs text-gray-500">vales, despesas e retiradas</div>
+            </div>
+            <div className="bg-white border border-gray-200 rounded-xl p-4">
+              <div className="text-sm text-gray-600">Fora do pagamento</div>
+              <div className="text-kpi text-gray-500">{loading ? '...' : brl(comissao.totais.foraDoPagamento)}</div>
+              <div className="text-xs text-gray-500">comissão de quem não pagou</div>
+            </div>
+            <div className="bg-white border border-gray-200 rounded-xl p-4 col-span-2 lg:col-span-1">
+              <div className="text-sm text-gray-600">Total a pagar</div>
+              <div className="text-kpi text-green-700">{loading ? '...' : brl(comissao.totais.aPagar)}</div>
+              <div className="text-xs text-gray-500">aulas + extra − descontos</div>
             </div>
           </div>
 
@@ -232,16 +253,16 @@ export default function Relatorios() {
                   <th className={th}>Professor</th>
                   <th className={`${th} text-right`}>%</th>
                   <th className={`${th} text-right`}>Alunos</th>
-                  <th className={`${th} text-right`}>Mensalidades</th>
-                  <th className={`${th} text-right`}>Comissão total</th>
-                  <th className={`${th} text-right`}>Descontado</th>
-                  <th className={`${th} text-right`}>Valor devido</th>
+                  <th className={`${th} text-right`}>Comissão das aulas</th>
+                  <th className={`${th} text-right`}>Extra</th>
+                  <th className={`${th} text-right`}>Descontos</th>
+                  <th className={`${th} text-right`}>A pagar</th>
                 </tr>
               </thead>
               <tbody>
                 {loading && <tr><td colSpan={7} className="text-center py-8 text-gray-400">Carregando...</td></tr>}
                 {!loading && comissao.linhas.length === 0 && (
-                  <tr><td colSpan={7} className="text-center py-8 text-gray-400">Nenhum aluno com professor nesta competência e filtros.</td></tr>
+                  <tr><td colSpan={7} className="text-center py-8 text-gray-400">Nenhum aluno nem lançamento de professor nesta competência e filtros.</td></tr>
                 )}
                 {comissao.linhas.map(l => {
                   const aberto = !!abertos[l.professor] || imprimindo
@@ -257,22 +278,89 @@ export default function Relatorios() {
                         </td>
                         <td className="px-3 py-3 text-right text-gray-600">{l.percentual === null ? '—' : `${l.percentual.toLocaleString('pt-BR')}%`}</td>
                         <td className="px-3 py-3 text-right text-gray-600">{l.alunos}</td>
-                        <td className="px-3 py-3 text-right text-gray-600">{brl(l.base)}</td>
-                        <td className="px-3 py-3 text-right text-gray-900">{brl(l.comissaoTotal)}</td>
-                        <td className={`px-3 py-3 text-right ${l.descontado > 0 ? 'text-red-600' : 'text-gray-500'}`}>{l.descontado > 0 ? `− ${brl(l.descontado)}` : brl(0)}</td>
-                        <td className="px-3 py-3 text-right font-semibold text-green-700">{brl(l.devido)}</td>
+                        <td className="px-3 py-3 text-right text-gray-900">{brl(l.paga)}</td>
+                        <td className="px-3 py-3 text-right text-gray-900">{l.totalExtras > 0 ? `+ ${brl(l.totalExtras)}` : brl(0)}</td>
+                        <td className={`px-3 py-3 text-right ${l.totalDescontos > 0 ? 'text-red-600' : 'text-gray-500'}`}>{l.totalDescontos > 0 ? `− ${brl(l.totalDescontos)}` : brl(0)}</td>
+                        <td className="px-3 py-3 text-right font-semibold text-green-700">{brl(l.aPagar)}</td>
                       </tr>
-                      {aberto && l.detalhe.map(d => (
-                        <tr key={`${l.professor}-${d.alunoId}-${d.esporte}-${d.valorProfessor}`} className="bg-gray-50/70 border-b border-gray-100 text-xs">
-                          <td className="pl-10 pr-3 py-2 text-gray-800">{d.nome} <span className="text-gray-400">· {d.esporte}</span></td>
-                          <td className="px-3 py-2 text-right"><span className={`inline-flex px-2 py-0.5 rounded-full font-medium ${COR_SITUACAO[d.situacao]}`}>{d.situacao}</span></td>
-                          <td className="px-3 py-2 text-right text-gray-500" title="Recebido na competência / total do aluno">{brl(d.recebido)} / {brl(d.totalAluno)}</td>
-                          <td className="px-3 py-2 text-right text-gray-600">{brl(d.valorProfessor)}</td>
-                          <td className="px-3 py-2 text-right text-gray-700">{brl(d.comissao)}</td>
-                          <td className={`px-3 py-2 text-right ${d.descontado > 0 ? 'text-red-600' : 'text-gray-400'}`}>{d.descontado > 0 ? `− ${brl(d.descontado)}` : brl(0)}</td>
-                          <td className="px-3 py-2 text-right text-gray-800">{brl(d.devido)}</td>
+                      {aberto && (
+                        <tr className="bg-gray-50/70 border-b border-gray-100">
+                          <td colSpan={7} className="px-3 py-3">
+                            <div className="space-y-4">
+                              <div>
+                                <div className="text-xs font-semibold uppercase tracking-wide text-gray-600 mb-1">Comissão das aulas · alunos em ordem alfabética</div>
+                                {l.detalhe.length === 0 ? <div className="text-xs text-gray-400">Nenhum aluno com este professor na competência.</div> : (
+                                  <table className="w-full text-xs">
+                                    <thead>
+                                      <tr className="text-left text-gray-500">
+                                        <th className="py-1 pr-2 font-medium">Aluno</th>
+                                        <th className="py-1 px-2 font-medium">Competência</th>
+                                        <th className="py-1 px-2 font-medium">Pagamento</th>
+                                        <th className="py-1 px-2 font-medium text-right">Mensalidade</th>
+                                        <th className="py-1 px-2 font-medium text-right">Situação</th>
+                                        <th className="py-1 pl-2 font-medium text-right">Comissão</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {l.detalhe.map(d => (
+                                        <tr key={`${d.alunoId}-${d.esporte}-${d.valorProfessor}`} className="border-t border-gray-100">
+                                          <td className="py-1.5 pr-2 text-gray-800">{d.nome} <span className="text-gray-400">· {d.esporte}</span></td>
+                                          <td className="py-1.5 px-2 text-gray-600">{rotuloMes(d.competencia)}</td>
+                                          <td className="py-1.5 px-2 text-gray-600">{d.dataPagamento ? dataBr(d.dataPagamento) : '—'}</td>
+                                          <td className="py-1.5 px-2 text-right text-gray-600">{brl(d.valorProfessor)}</td>
+                                          <td className="py-1.5 px-2 text-right"><span className={`inline-flex px-2 py-0.5 rounded-full font-medium ${COR_SITUACAO[d.situacao]}`}>{d.situacao}</span></td>
+                                          <td className={`py-1.5 pl-2 text-right ${d.paga > 0 ? 'text-gray-800' : 'text-gray-400'}`}>
+                                            {d.paga > 0 ? brl(d.paga) : 'fora do pagamento'}
+                                            {d.paga > 0 && d.foraDoPagamento > 0 && <span className="block text-gray-400">+ {brl(d.foraDoPagamento)} não pago</span>}
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                )}
+                              </div>
+
+                              <div>
+                                <div className="text-xs font-semibold uppercase tracking-wide text-gray-600 mb-1">Comissão extra · venda de produto e encordoamento</div>
+                                {l.extras.length === 0 ? <div className="text-xs text-gray-400">Nenhuma comissão extra lançada no mês.</div> : (
+                                  <table className="w-full text-xs">
+                                    <tbody>
+                                      {l.extras.map((x, i) => (
+                                        <tr key={`${x.data}-${i}`} className="border-t border-gray-100">
+                                          <td className="py-1.5 pr-2 text-gray-600 w-24">{dataBr(x.data)}</td>
+                                          <td className="py-1.5 px-2 text-gray-800">{x.descricao}</td>
+                                          <td className="py-1.5 px-2 text-gray-500">{x.tipoAjuste}</td>
+                                          <td className="py-1.5 px-2 text-gray-500">{x.status}</td>
+                                          <td className="py-1.5 pl-2 text-right text-gray-800">+ {brl(x.contaNoTotal)}</td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                )}
+                              </div>
+
+                              <div>
+                                <div className="text-xs font-semibold uppercase tracking-wide text-gray-600 mb-1">Descontos · lançamentos do Financeiro (vale, adiantamento, despesas, retiradas)</div>
+                                {l.descontos.length === 0 ? <div className="text-xs text-gray-400">Nenhum desconto lançado no mês.</div> : (
+                                  <table className="w-full text-xs">
+                                    <tbody>
+                                      {l.descontos.map((x, i) => (
+                                        <tr key={`${x.data}-${i}`} className="border-t border-gray-100">
+                                          <td className="py-1.5 pr-2 text-gray-600 w-24">{dataBr(x.data)}</td>
+                                          <td className="py-1.5 px-2 text-gray-800">{x.descricao}</td>
+                                          <td className="py-1.5 px-2 text-gray-500">{x.tipoAjuste}</td>
+                                          <td className="py-1.5 px-2 text-gray-500">{x.status}</td>
+                                          <td className={`py-1.5 pl-2 text-right ${x.contaNoTotal > 0 ? 'text-red-600' : 'text-gray-400'}`}>{x.contaNoTotal > 0 ? `− ${brl(x.contaNoTotal)}` : brl(0)}</td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                )}
+                              </div>
+                            </div>
+                          </td>
                         </tr>
-                      ))}
+                      )}
                     </Fragment>
                   )
                 })}
@@ -281,10 +369,10 @@ export default function Relatorios() {
                 <tfoot>
                   <tr className="bg-gray-50 font-semibold text-gray-900">
                     <td className="px-3 py-3" colSpan={3}>Total</td>
-                    <td className="px-3 py-3 text-right">{brl(comissao.totais.base)}</td>
-                    <td className="px-3 py-3 text-right">{brl(comissao.totais.comissaoTotal)}</td>
-                    <td className="px-3 py-3 text-right text-red-600">{comissao.totais.descontado > 0 ? `− ${brl(comissao.totais.descontado)}` : brl(0)}</td>
-                    <td className="px-3 py-3 text-right text-green-700">{brl(comissao.totais.devido)}</td>
+                    <td className="px-3 py-3 text-right">{brl(comissao.totais.paga)}</td>
+                    <td className="px-3 py-3 text-right">+ {brl(comissao.totais.extras)}</td>
+                    <td className="px-3 py-3 text-right text-red-600">{comissao.totais.descontos > 0 ? `− ${brl(comissao.totais.descontos)}` : brl(0)}</td>
+                    <td className="px-3 py-3 text-right text-green-700">{brl(comissao.totais.aPagar)}</td>
                   </tr>
                 </tfoot>
               )}
@@ -294,9 +382,11 @@ export default function Relatorios() {
           <div className="mt-3 flex gap-2 text-xs text-gray-500">
             <Info size={14} className="shrink-0 mt-0.5" />
             <p>
-              Competência = mês do vencimento da mensalidade. Comissão = mensalidade do aluno com o professor × % do professor (clique no professor para ver aluno a aluno).
-              Aluno é <strong>inadimplente</strong> quando o vencimento do mês já passou e ele ainda não pagou tudo que deve na unidade; o desconto é a parte da comissão ligada ao que falta.
-              Quem ainda não venceu não é descontado. A conta usa as matrículas de hoje; mudanças de professor ou de valor em meses passados não ficam guardadas.
+              Competência = mês do vencimento da mensalidade (escolha acima). Comissão das aulas = mensalidade do aluno com o professor × % do professor, <strong>só sobre o que o aluno pagou</strong>:
+              quem não pagou aparece na lista, mas a comissão dele fica fora do pagamento (pagamento parcial entra na proporção do que foi pago).
+              Comissão extra = comissão de venda de produto, de encordoamento e de ranking lançadas no Financeiro para o professor.
+              Descontos = vales, adiantamentos e demais despesas lançadas para o professor no mês, e retiradas de produto que ele ainda não pagou.
+              A conta usa as matrículas de hoje; mudanças de professor ou de valor em meses passados não ficam guardadas.
             </p>
           </div>
         </section>
