@@ -12,7 +12,7 @@ export function MobileSidebar() {
   const links = [
     { href: '/', label: 'Painel', icon: '📊' },
     { href: '/alunos', label: 'Alunos', icon: '👥' },
-    { href: '/pagamentos', label: 'Pagamentos', icon: '💰' },
+    { href: '/pagamentos', label: 'Pagamentos Aluno', icon: '💰' },
     { href: '/atraso', label: 'Em atraso', icon: '⚠️' },
     { href: '/financeiro', label: 'Financeiro', icon: '📈' },
     { href: '/logs', label: 'Logs', icon: '📋' },
