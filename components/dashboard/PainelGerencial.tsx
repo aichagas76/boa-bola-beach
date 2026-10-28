@@ -12,6 +12,7 @@ import { buscarTudo } from '@/lib/buscar-tudo'
 import { useUnidade } from '@/components/layout/UnidadeProvider'
 import FluxoDeCaixa from '@/components/dashboard/FluxoDeCaixa'
 import { VendasDeProdutos } from '@/components/dashboard/GraficosProdutosAlunos'
+import { serieMensal, type Evento } from '@/lib/painel-graficos'
 import { FiltroPeriodo, PRESETS, TemaRecolhivel, usePeriodo } from '@/components/dashboard/FiltroPeriodo'
 import type { MovFluxo } from '@/lib/fluxo-caixa'
 import {
@@ -249,6 +250,16 @@ export default function PainelGerencial() {
       .filter(a => !doEsporte || doEsporte.has(a.id))
       .map(a => (a.status === 'Inativo' && !a.data_inativacao && saidas[a.id] ? { ...a, data_inativacao: saidas[a.id] } : a))
   }, [alunosP, dados.matsU, esporteAlu, saidas])
+  const inativacoesMes = useMemo(() => {
+    const doEsporte = esporteAlu ? new Set(dados.matsU.filter(m => m.esporte_id === esporteAlu).map(m => m.aluno_id)) : null
+    const eventos: Evento[] = []
+    for (const a of alunosP) {
+      if (doEsporte && !doEsporte.has(a.id)) continue
+      if (a.data_inativacao) eventos.push({ data: a.data_inativacao, grupo: 'registrada' })
+      else if (a.status === 'Inativo' && saidas[a.id]) eventos.push({ data: saidas[a.id], grupo: 'estimada' })
+    }
+    return serieMensal(eventos, { inicio: mesesAlu[0] + '-01', fim: hoje }, ['registrada', 'estimada'])
+  }, [alunosP, dados.matsU, esporteAlu, saidas, mesesAlu, hoje])
   const serieA = useMemo(() => serieAlunosAtivos(alunosDoGrafico, mesesAlu, hoje), [alunosDoGrafico, mesesAlu, hoje])
   const status = useMemo(() => statusDosPagamentos(itens, pPag.periodo, hoje), [itens, pPag.periodo, hoje])
   const faixas = useMemo(() => faixasDeAtraso(itens, hoje), [itens, hoje])
@@ -456,10 +467,12 @@ export default function PainelGerencial() {
       <TemaRecolhivel titulo="Alunos" subtitulo="Base = alunos ativos no fim de cada mês. Novos cadastros e inativações do mês." filtro={
         <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
           <FiltroPeriodo p={pAlu} nome="Alunos" />
-          <select value={esporteAlu} onChange={e => setEsporteAlu(e.target.value)} aria-label="Esporte" className="h-9 shrink-0 border border-gray-200 rounded-lg px-2 text-sm bg-white">
-            <option value="">Todos os esportes</option>
-            {esportesAlu.map(e => <option key={e.id} value={e.id}>{e.nome}</option>)}
-          </select>
+          <div className="inline-flex shrink-0 max-w-[calc(100vw-2rem)] overflow-x-auto rounded-lg border border-gray-200 bg-white" role="group" aria-label="Esporte">
+            {[{ id: '', nome: 'Todos' }, ...esportesAlu].map(e => (
+              <button key={e.id || 'todos'} type="button" aria-pressed={esporteAlu === e.id} onClick={() => setEsporteAlu(e.id)}
+                className={`px-3 h-9 text-sm font-medium whitespace-nowrap transition-colors ${esporteAlu === e.id ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-50'}`}>{e.nome}</button>
+            ))}
+          </div>
         </div>
       }>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -486,6 +499,20 @@ export default function PainelGerencial() {
               <Legend {...legenda} />
               <Bar dataKey="novos" name="Novos" fill={COR.recebido} radius={[4, 4, 0, 0]} />
               <Bar dataKey="inativacoes" name="Inativações" fill={COR.vencido} radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </Grafico>
+        <Grafico titulo="Inativações por mês" nota="Barra clara = data estimada pelo último pagamento (alunos que vieram inativos da planilha antiga)" largo
+          carregando={loading} vazio={!loading && inativacoesMes.every(l => l.total === 0)} mensagemVazio="Nenhuma inativação neste período">
+          <ResponsiveContainer width="100%" height={ALTURA}>
+            <BarChart data={inativacoesMes} margin={MARGEM}>
+              <Grade />
+              <XAxis dataKey="rotulo" {...eixoX} />
+              <YAxis {...eixoY} allowDecimals={false} />
+              <Tooltip />
+              <Legend {...legenda} />
+              <Bar dataKey="registrada" stackId="i" name="Data registrada" fill={COR.vencido} />
+              <Bar dataKey="estimada" stackId="i" name="Data estimada" fill="#FCA5A5" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </Grafico>
