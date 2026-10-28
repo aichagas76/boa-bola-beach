@@ -6,6 +6,7 @@ import { ChevronDown, ChevronRight, Download, Info } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { buscarTudo } from '@/lib/buscar-tudo'
 import { useUnidade } from '@/components/layout/UnidadeProvider'
+import { BotaoImprimir, CabecalhoImpressao } from '@/components/relatorios/CabecalhoImpressao'
 import { mesesDaJanela, periodoDe, rotuloMes, type Preset } from '@/lib/painel'
 import {
   comissaoPorProfessor, competenciaDe, faturamentoPorEsporte, paraCsv,
@@ -67,6 +68,14 @@ export default function Relatorios() {
   const [filtroProfessor, setFiltroProfessor] = useState('')
   const [filtroEsporte, setFiltroEsporte] = useState('')
   const [abertos, setAbertos] = useState<Record<string, boolean>>({})
+  const [imprimindo, setImprimindo] = useState(false)
+  useEffect(() => {
+    const antes = () => setImprimindo(true)
+    const depois = () => setImprimindo(false)
+    window.addEventListener('beforeprint', antes)
+    window.addEventListener('afterprint', depois)
+    return () => { window.removeEventListener('beforeprint', antes); window.removeEventListener('afterprint', depois) }
+  }, [])
   // filtros: esporte
   const [preset, setPreset] = useState<Preset>('mes_atual')
   const [de, setDe] = useState('')
@@ -154,12 +163,12 @@ export default function Relatorios() {
 
   return (
     <div className="max-w-6xl">
-      <div className="mb-5 pl-12 md:pl-0">
+      <div className="mb-5 pl-12 md:pl-0 print:hidden">
         <h1 className="text-page-title text-gray-900">Relatórios</h1>
         <p className="text-sm text-gray-500">{unidade?.nome ?? ''}</p>
       </div>
 
-      <div className="inline-flex rounded-lg border border-gray-200 bg-white overflow-hidden mb-5">
+      <div className="inline-flex rounded-lg border border-gray-200 bg-white overflow-hidden mb-5 print:hidden">
         {([['comissao', 'Comissão dos professores'], ['esporte', 'Faturamento e lucro por esporte']] as const).map(([id, nome]) => (
           <button key={id} type="button" onClick={() => setAba(id)}
             className={`px-4 h-10 text-sm font-medium transition-colors ${aba === id ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-50'}`}>
@@ -172,7 +181,8 @@ export default function Relatorios() {
 
       {aba === 'comissao' && (
         <section>
-          <div className="flex flex-wrap items-end gap-3 mb-4">
+          <CabecalhoImpressao titulo="Comissão dos professores" unidade={unidade?.nome} linhas={[`Competência: ${nomeMes(mes)}`, ...(filtroProfessor ? [`Professor: ${professores.find(p => p.id === filtroProfessor)?.nome ?? ''}`] : []), ...(filtroEsporte ? [`Esporte: ${filtroEsporte}`] : [])]} />
+          <div className="flex flex-wrap items-end gap-3 mb-4 print:hidden">
             <label className="text-sm text-gray-700">Mês de competência
               <select value={mes} onChange={e => setMes(e.target.value)} className={`${selectCls} block mt-1`}>
                 {mesesOpcoes.map(m => <option key={m} value={m}>{nomeMes(m)}{m === mesAtual ? ' (atual)' : ''}</option>)}
@@ -194,6 +204,7 @@ export default function Relatorios() {
               className="ml-auto inline-flex items-center gap-2 h-9 px-3 text-sm border border-gray-200 rounded-lg text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50">
               <Download size={15} /> Exportar planilha
             </button>
+            <BotaoImprimir desabilitado={comissao.linhas.length === 0} />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
@@ -233,7 +244,7 @@ export default function Relatorios() {
                   <tr><td colSpan={7} className="text-center py-8 text-gray-400">Nenhum aluno com professor nesta competência e filtros.</td></tr>
                 )}
                 {comissao.linhas.map(l => {
-                  const aberto = !!abertos[l.professor]
+                  const aberto = !!abertos[l.professor] || imprimindo
                   return (
                     <Fragment key={l.professor}>
                       <tr className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer" onClick={() => setAbertos(a => ({ ...a, [l.professor]: !aberto }))}>
@@ -293,7 +304,8 @@ export default function Relatorios() {
 
       {aba === 'esporte' && (
         <section>
-          <div className="flex flex-wrap items-end gap-3 mb-4">
+          <CabecalhoImpressao titulo="Faturamento e lucro por esporte" unidade={unidade?.nome} linhas={[`Período: ${periodo.inicio.split('-').reverse().join('/')} a ${periodo.fim.split('-').reverse().join('/')}`, ratear ? 'Despesas gerais rateadas entre os esportes' : 'Despesas gerais sem rateio']} />
+          <div className="flex flex-wrap items-end gap-3 mb-4 print:hidden">
             <div className="inline-flex max-w-[calc(100vw-2rem)] overflow-x-auto rounded-lg border border-gray-200 bg-white">
               {PRESETS.map(p => (
                 <button key={p.id} type="button" onClick={() => setPreset(p.id)}
@@ -317,6 +329,7 @@ export default function Relatorios() {
               className="ml-auto inline-flex items-center gap-2 h-9 px-3 text-sm border border-gray-200 rounded-lg text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50">
               <Download size={15} /> Exportar planilha
             </button>
+            <BotaoImprimir desabilitado={porEsporte.linhas.length === 0} />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">

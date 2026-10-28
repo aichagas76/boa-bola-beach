@@ -203,3 +203,19 @@ td, th { font-variant-numeric: tabular-nums; }
 .ampliar-15 .text-xs { font-size: 0.8625rem; line-height: 1.25rem; }
 .ampliar-15 .text-th { font-size: 0.9375rem; line-height: 1.375rem; }
 .ampliar-15 .text-label { font-size: 0.9375rem; line-height: 1.375rem; }
+
+/* Impressão e PDF dos relatórios: página A4 limpa, sem menu nem botões, com as cores preservadas */
+@page { size: A4; margin: 14mm 12mm; }
+@media print {
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  html, body { background: #fff !important; }
+  aside, .fixed { display: none !important; }
+  main { background: #fff !important; padding: 0 !important; min-height: 0 !important; width: 100% !important; }
+  main > div { max-width: none !important; }
+  .overflow-x-auto { overflow: visible !important; }
+  tr { break-inside: avoid; }
+  thead { display: table-header-group; }
+  tfoot { display: table-footer-group; }
+  h1, h2 { break-after: avoid; }
+  .shadow, .shadow-sm { box-shadow: none !important; }
+}
