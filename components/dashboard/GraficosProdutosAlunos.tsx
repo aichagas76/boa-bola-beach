@@ -92,7 +92,7 @@ export function VendasDeProdutos({ hoje }: { hoje: string }) {
   )
 }
 
-type Mudanca = { data: string; de_status: string | null; para_status: string; estimado: boolean; alunos: { unidade_id: string | null } | null }
+type Mudanca = { data: string; de_status: string | null; para_status: string; estimado: boolean; alunos: { unidade_id: string | null; matriculas: { esporte_id: string | null }[] | null } | null }
 
 /** Inativações (ativo -> inativo) e reativações (inativo -> ativo) por mês. */
 export function MovimentoDeAlunos({ hoje }: { hoje: string }) {
@@ -102,6 +102,12 @@ export function MovimentoDeAlunos({ hoje }: { hoje: string }) {
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState(false)
   const [linhas, setLinhas] = useState<Mudanca[]>([])
+  const [esporte, setEsporte] = useState('')
+  const [esportes, setEsportes] = useState<{ id: string; nome: string }[]>([])
+
+  useEffect(() => {
+    supabase.from('esportes').select('id, nome').eq('ativo', true).order('nome').then(({ data }) => setEsportes(data ?? []))
+  }, [])
 
   useEffect(() => {
     if (!unidadeId) return
@@ -109,7 +115,7 @@ export function MovimentoDeAlunos({ hoje }: { hoje: string }) {
     async function carregar() {
       setCarregando(true)
       setErro(false)
-      const r = await buscarTudo((de, ate) => supabase.from('alunos_status_historico').select('data, de_status, para_status, estimado, alunos(unidade_id)')
+      const r = await buscarTudo((de, ate) => supabase.from('alunos_status_historico').select('data, de_status, para_status, estimado, alunos(unidade_id, matriculas(esporte_id))')
         .gte('data', inicio).lte('data', fim).order('data').order('id').range(de, ate))
       if (cancelado) return
       if (r.error) setErro(true)
@@ -120,17 +126,25 @@ export function MovimentoDeAlunos({ hoje }: { hoje: string }) {
     return () => { cancelado = true }
   }, [unidadeId, inicio, fim])
 
+  // Esporte escolhido: só os alunos que têm matrícula nele
+  const doEsporte = useMemo(() => (esporte ? linhas.filter(l => (l.alunos?.matriculas ?? []).some(m => m.esporte_id === esporte)) : linhas), [linhas, esporte])
   const inativacoes = useMemo(() => serieMensal(
-    linhas.filter(l => l.para_status === 'Inativo').map<Evento>(l => ({ data: l.data, grupo: l.estimado ? 'estimado' : 'registrado' })), j.janela, ['registrado', 'estimado']), [linhas, j.janela])
+    doEsporte.filter(l => l.para_status === 'Inativo').map<Evento>(l => ({ data: l.data, grupo: l.estimado ? 'estimado' : 'registrado' })), j.janela, ['registrado', 'estimado']), [doEsporte, j.janela])
   const reativacoes = useMemo(() => serieMensal(
-    linhas.filter(l => l.de_status === 'Inativo' && l.para_status === 'Ativo').map<Evento>(l => ({ data: l.data, grupo: 'registrado' })), j.janela, ['registrado']), [linhas, j.janela])
+    doEsporte.filter(l => l.de_status === 'Inativo' && l.para_status === 'Ativo').map<Evento>(l => ({ data: l.data, grupo: 'registrado' })), j.janela, ['registrado']), [doEsporte, j.janela])
   const totalIn = inativacoes.reduce((s, p) => s + p.total, 0)
   const totalRe = reativacoes.reduce((s, p) => s + p.total, 0)
   const estimadas = inativacoes.reduce((s, p) => s + Number(p.estimado), 0)
 
   return (
     <div>
-      <div className="mb-3"><FiltroMeses j={j} nome="Inativações e reativações" /></div>
+      <div className="mb-3 flex flex-wrap items-center gap-2 sm:flex-nowrap">
+        <FiltroMeses j={j} nome="Inativações e reativações" />
+        <select value={esporte} onChange={e => setEsporte(e.target.value)} aria-label="Esporte" className="h-9 shrink-0 border border-gray-200 rounded-lg px-2 text-sm bg-white">
+          <option value="">Todos os esportes</option>
+          {esportes.map(e => <option key={e.id} value={e.id}>{e.nome}</option>)}
+        </select>
+      </div>
       <div className="grid gap-3 mb-3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))' }}>
         <Kpi rotulo="Inativações" valor={carregando ? '...' : String(totalIn)} nota="alunos que passaram de ativo a inativo" />
         <Kpi rotulo="Reativações" valor={carregando ? '...' : String(totalRe)} nota="alunos que voltaram de inativo a ativo" />
