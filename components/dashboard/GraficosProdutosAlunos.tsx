@@ -42,7 +42,7 @@ export function VendasDeProdutos({ hoje }: { hoje: string }) {
   const { inicio, fim } = j.janela
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState(false)
-  const [linhas, setLinhas] = useState<{ data: string; quantidade: number; preco_unitario: number }[]>([])
+  const [linhas, setLinhas] = useState<{ data: string; valor: number }[]>([])
 
   useEffect(() => {
     if (!unidadeId) return
@@ -50,22 +50,23 @@ export function VendasDeProdutos({ hoje }: { hoje: string }) {
     async function carregar() {
       setCarregando(true)
       setErro(false)
-      const r = await buscarTudo((de, ate) => supabase.from('estoque_retiradas').select('data, quantidade, preco_unitario')
-        .eq('unidade_id', unidadeId).gte('data', inicio).lte('data', fim).order('data').order('id').range(de, ate))
+      // As vendas (as antigas da planilha e as novas do Estoque) ficam no Financeiro como entrada "Venda Produto Loja"
+      const r = await buscarTudo((de, ate) => supabase.from('movimentacoes').select('data, valor, categorias_financeiro!inner(categoria)')
+        .eq('unidade_id', unidadeId).eq('tipo', 'Entrada').not('status', 'in', '(Cancelado,Estornado)')
+        .ilike('categorias_financeiro.categoria', '%Venda%Produto%')
+        .gte('data', inicio).lte('data', fim).order('data').order('id').range(de, ate))
       if (cancelado) return
       if (r.error) setErro(true)
-      else setLinhas((r.data ?? []) as { data: string; quantidade: number; preco_unitario: number }[])
+      else setLinhas((r.data ?? []) as unknown as { data: string; valor: number }[])
       setCarregando(false)
     }
     carregar()
     return () => { cancelado = true }
   }, [unidadeId, inicio, fim])
 
-  const valores = useMemo(() => serieMensal(linhas.map<Evento>(l => ({ data: l.data, valor: Number(l.quantidade) * Number(l.preco_unitario) })), j.janela), [linhas, j.janela])
-  const itens = useMemo(() => serieMensal(linhas.map<Evento>(l => ({ data: l.data, valor: Number(l.quantidade) })), j.janela), [linhas, j.janela])
+  const valores = useMemo(() => serieMensal(linhas.map<Evento>(l => ({ data: l.data, valor: Number(l.valor) })), j.janela), [linhas, j.janela])
   const total = valores.reduce((s, p) => s + p.total, 0)
-  const qtd = itens.reduce((s, p) => s + p.total, 0)
-  const dados = valores.map((p, i) => ({ ...p, itens: itens[i].total }))
+  const qtd = valores.reduce((s, p) => s + p.qtd, 0)
 
   return (
     <div>
@@ -73,16 +74,16 @@ export function VendasDeProdutos({ hoje }: { hoje: string }) {
       <div className="grid gap-3 mb-3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))' }}>
         <Kpi rotulo="Total vendido" valor={carregando ? '...' : brl(total)} nota="no período escolhido" />
         <Kpi rotulo="Média por mês" valor={carregando ? '...' : brl(valores.length ? total / valores.length : 0)} nota={`${valores.length} ${valores.length === 1 ? 'mês' : 'meses'}`} />
-        <Kpi rotulo="Itens vendidos" valor={carregando ? '...' : String(qtd)} />
+        <Kpi rotulo="Vendas lançadas" valor={carregando ? '...' : String(qtd)} nota="quantidade de lançamentos de venda" />
       </div>
-      <Cartao titulo="Vendas de produtos por mês" nota="Valor de cada venda (preço × quantidade), pela data da venda, na unidade escolhida">
+      <Cartao titulo="Vendas de produtos por mês" nota="Entradas de venda de produtos da loja lançadas no Financeiro (inclui as antigas da planilha), pela data da venda, na unidade escolhida">
         {carregando ? <Mensagem texto="Carregando..." /> : erro ? <Mensagem texto="Não consegui carregar as vendas. Atualize a página." /> : total === 0 ? <Mensagem texto="Nenhuma venda neste período" /> : (
           <ResponsiveContainer width="100%" height={ALTURA}>
-            <BarChart data={dados} margin={MARGEM}>
+            <BarChart data={valores} margin={MARGEM}>
               <CartesianGrid strokeDasharray="3 3" stroke="#eee" vertical={false} />
               <XAxis dataKey="rotulo" tick={{ fontSize: 12 }} tickLine={false} />
               <YAxis width={52} tick={{ fontSize: 12 }} tickLine={false} axisLine={false} tickFormatter={brlCurto} />
-              <Tooltip formatter={(v: unknown, nome: unknown) => (nome === 'Itens' ? String(v) : brl(Number(v ?? 0)))} />
+              <Tooltip formatter={(v: unknown) => brl(Number(v ?? 0))} />
               <Bar dataKey="total" name="Vendido" fill={COR.marca} radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
