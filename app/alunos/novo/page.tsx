@@ -12,6 +12,7 @@ import EsportesForm from '@/components/alunos/EsportesForm'
 import { useUnidade } from '@/components/layout/UnidadeProvider'
 import { carregarCatalogo, estadosIniciais, salvarMatriculas } from '@/lib/esportes-db'
 import type { EstadoEsporte } from '@/lib/esportes'
+import { carregarProfessoresAtivos, type ProfessorOpcao } from '@/lib/professores'
 
 const dadosParaValidar = (f: FormAluno) => ({ ...f, temResponsavel: f.tem_responsavel })
 
@@ -21,7 +22,7 @@ export default function NovoAluno() {
   const [loading, setLoading] = useState(false)
   const [tentou, setTentou] = useState(false)
   const [nomeDuplicado, setNomeDuplicado] = useState(false)
-  const [professores, setProfessores] = useState<{ id: string; nome: string }[]>([])
+  const [professores, setProfessores] = useState<ProfessorOpcao[]>([])
   const [estados, setEstados] = useState<EstadoEsporte[]>([])
   const [modalidadesPorEsporte, setModalidadesPorEsporte] = useState<Record<string, string[]>>({})
 
@@ -42,8 +43,7 @@ export default function NovoAluno() {
   })
 
   useEffect(() => {
-    supabase.from('professores').select('id, nome').eq('ativo', true).order('nome')
-      .then(({ data }) => setProfessores(data ?? []))
+    carregarProfessoresAtivos(supabase).then(setProfessores)
     carregarCatalogo(supabase).then(({ esportes, modalidades, modalidadesPorEsporte }) => {
       setModalidadesPorEsporte(modalidadesPorEsporte)
       setEstados(estadosIniciais(esportes, '', modalidades))

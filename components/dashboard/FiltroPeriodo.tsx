@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { periodoDe, type Preset } from '@/lib/painel'
+import { janelaDeMeses } from '@/lib/painel-graficos'
 
 export const PRESETS: { id: Preset; nome: string }[] = [
   { id: 'mes_atual', nome: 'Mês atual' },
@@ -73,5 +74,46 @@ export function TemaRecolhivel({ titulo, subtitulo, filtro, children }: {
         </div>
       )}
     </section>
+  )
+}
+
+/* ---------- filtro por meses (1, 3, 6, 12 meses ou datas escolhidas), para os gráficos mensais ---------- */
+export const OPCOES_MESES = [1, 3, 6, 12]
+
+export function useJanela(hoje: string, inicial = 6) {
+  const [escolha, setEscolha] = useState<number | 'custom'>(inicial)
+  const [de, setDe] = useState('')
+  const [ate, setAte] = useState('')
+  const janela = useMemo(() => {
+    if (escolha !== 'custom') return janelaDeMeses(escolha, hoje)
+    return de && ate && de <= ate ? { inicio: de, fim: ate } : janelaDeMeses(1, hoje)
+  }, [escolha, de, ate, hoje])
+  return { escolha, setEscolha, de, setDe, ate, setAte, janela, hoje }
+}
+export type EstadoJanela = ReturnType<typeof useJanela>
+
+export function FiltroMeses({ j, nome }: { j: EstadoJanela; nome: string }) {
+  return (
+    <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
+      <div className="inline-flex shrink-0 max-w-[calc(100vw-2rem)] overflow-x-auto rounded-lg border border-gray-200 bg-white" role="group" aria-label={`Período de ${nome}`}>
+        {OPCOES_MESES.map(n => (
+          <button key={n} type="button" aria-pressed={j.escolha === n} onClick={() => j.setEscolha(n)}
+            className={`px-3 h-9 text-sm font-medium whitespace-nowrap transition-colors ${j.escolha === n ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-50'}`}>
+            {n === 1 ? '1 mês' : `${n} meses`}
+          </button>
+        ))}
+        <button type="button" aria-pressed={j.escolha === 'custom'} onClick={() => j.setEscolha('custom')}
+          className={`px-3 h-9 text-sm font-medium whitespace-nowrap transition-colors ${j.escolha === 'custom' ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-50'}`}>
+          Personalizado
+        </button>
+      </div>
+      {j.escolha === 'custom' && (
+        <div className="inline-flex shrink-0 items-center gap-2 text-sm text-gray-600">
+          <input type="date" value={j.de} max={j.hoje} onChange={e => j.setDe(e.target.value)} className="h-9 w-[8.25rem] border border-gray-200 rounded-lg px-2 text-sm bg-white" aria-label={`De (${nome})`} />
+          até
+          <input type="date" value={j.ate} max={j.hoje} onChange={e => j.setAte(e.target.value)} className="h-9 w-[8.25rem] border border-gray-200 rounded-lg px-2 text-sm bg-white" aria-label={`Até (${nome})`} />
+        </div>
+      )}
+    </div>
   )
 }

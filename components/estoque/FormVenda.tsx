@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { useUnidade } from '@/components/layout/UnidadeProvider'
 import { registrarLog } from '@/lib/log'
 import { X } from 'lucide-react'
-import { comissaoIndicacao, precoUnitario, totalVenda, validarVenda, vencimentoNaMensalidade, vencimentoProfessor, type Comprador, type Situacao } from '@/lib/estoque'
+import { comissaoIndicacao, padroesEncordoamento, precoUnitario, totalVenda, validarVenda, vencimentoNaMensalidade, vencimentoProfessor, type Comprador, type Situacao } from '@/lib/estoque'
 
 export type Produto = {
   id: string; nome: string; categoria: string | null; fornecedor_id: string | null
@@ -82,6 +82,9 @@ export function FormVenda({ produtos, saldos, inicial, alunos, professores, banc
 
   const produto = produtos.find(p => p.id === produtoId)
   const precoPadrao = produto ? precoUnitario(produto, comprador) : 0
+  // Encordoamento: 10% de indicação e R$ 10,00 por unidade, salvos como estão se a pessoa não mudar
+  const padrao = produto ? padroesEncordoamento(produto) : null
+  const pctPadrao = padrao?.indicacaoPct ?? Number(produto?.comissao_indicacao ?? 0)
   // O valor pode ser alterado na venda; ao trocar de produto ou de comprador volta ao preço do cadastro
   const chavePreco = `${produtoId}|${comprador}`
   const [manual, setManual] = useState<{ chave: string; texto: string } | null>(null)
@@ -102,9 +105,9 @@ export function FormVenda({ produtos, saldos, inicial, alunos, professores, banc
       p_aluno: comprador === 'aluno' ? alunoId : null, p_professor: comprador === 'professor' ? professorId : null,
       p_pago: pago, p_forma: forma, p_banco: pago ? banco || null : null, p_vencimento: pago ? null : vencimento, p_data: data,
       p_comissao_professor: produto.encordoamento ? comissaoProf || null : null,
-      p_comissao_valor: produto.encordoamento && comissaoValor.trim() !== '' ? numero(comissaoValor) : null,
+      p_comissao_valor: produto.encordoamento ? (comissaoValor.trim() !== '' ? numero(comissaoValor) : padrao!.valorPorUnidade) : null,
       ...(editou ? { p_preco: preco } : {}),
-      ...(indicacaoProf ? { p_indicacao_professor: indicacaoProf, ...(indicacaoPct !== null && Number.isFinite(numero(indicacaoPct)) ? { p_indicacao_percentual: numero(indicacaoPct) } : {}) } : {}),
+      ...(indicacaoProf ? { p_indicacao_professor: indicacaoProf, ...(indicacaoPct !== null && Number.isFinite(numero(indicacaoPct)) ? { p_indicacao_percentual: numero(indicacaoPct) } : padrao ? { p_indicacao_percentual: padrao.indicacaoPct } : {}) } : {}),
     })
     setSalvando(false)
     if (error) return alert('Erro: ' + error.message)
@@ -163,11 +166,11 @@ export function FormVenda({ produtos, saldos, inicial, alunos, professores, banc
           </select>
         </Rotulo>
         {indicacaoProf ? (() => {
-          const pct = indicacaoPct !== null && Number.isFinite(numero(indicacaoPct)) ? numero(indicacaoPct) : Number(produto?.comissao_indicacao ?? 0)
+          const pct = indicacaoPct !== null && Number.isFinite(numero(indicacaoPct)) ? numero(indicacaoPct) : pctPadrao
           return (
             <Rotulo texto="Comissão da indicação (%)">
               <div className="flex items-center gap-2">
-                <input className={campo} inputMode="decimal" value={indicacaoPct ?? String(produto?.comissao_indicacao ?? 0).replace('.', ',')} onChange={e => setIndicacaoPct(e.target.value)} />
+                <input className={campo} inputMode="decimal" value={indicacaoPct ?? String(pctPadrao).replace('.', ',')} onChange={e => setIndicacaoPct(e.target.value)} />
                 <span className="text-sm text-gray-600 whitespace-nowrap">= <b>{moeda(comissaoIndicacao(totalVenda(preco, q), pct))}</b></span>
               </div>
             </Rotulo>
@@ -179,7 +182,7 @@ export function FormVenda({ produtos, saldos, inicial, alunos, professores, banc
               <select className={campo} value={comissaoProf || produto.comissao_professor_id || ''} onChange={e => setComissaoProf(e.target.value)}>
                 <option value="">Escolher</option>{professores.map(x => <option key={x.id} value={x.id}>{x.nome}</option>)}
               </select></Rotulo>
-            <Rotulo texto="Valor por unidade (R$)"><input className={campo} inputMode="decimal" value={comissaoValor} onChange={e => setComissaoValor(e.target.value)} placeholder={String(produto.comissao_valor)} /></Rotulo>
+            <Rotulo texto="Valor por unidade (R$)"><input className={campo} inputMode="decimal" value={comissaoValor !== '' ? comissaoValor : String(padrao?.valorPorUnidade ?? produto.comissao_valor).replace('.', ',')} onChange={e => setComissaoValor(e.target.value)} placeholder={String(produto.comissao_valor)} /></Rotulo>
           </>
         )}
       </div>

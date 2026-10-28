@@ -11,15 +11,17 @@ type Professor = {
   nome: string
   celular: string | null
   comissao_percentual: number | null
+  professor_esportes?: { esporte_id: string }[] | null
 }
 
 type FormState = {
   nome: string
   celular: string
   comissao_percentual: string
+  esportes: string[]
 }
 
-const formVazio: FormState = { nome: '', celular: '', comissao_percentual: '' }
+const formVazio: FormState = { nome: '', celular: '', comissao_percentual: '', esportes: [] }
 
 function mascaraCelular(v: string) {
   v = v.replace(/\D/g, '').slice(0, 11)
@@ -30,6 +32,7 @@ function mascaraCelular(v: string) {
 
 export default function Professores() {
   const [professores, setProfessores] = useState<Professor[]>([])
+  const [esportes, setEsportes] = useState<{ id: string; nome: string }[]>([])
   const [loading, setLoading] = useState(true)
   const [form, setForm] = useState<FormState>(formVazio)
   const [editandoId, setEditandoId] = useState<string | null>(null)
@@ -38,8 +41,12 @@ export default function Professores() {
 
   async function carregar() {
     setLoading(true)
-    const { data } = await supabase.from('professores').select('*').order('nome')
-    setProfessores(data ?? [])
+    // Se a tabela de esportes do professor ainda não existir no banco, a lista abre sem eles
+    let r = await supabase.from('professores').select('*, professor_esportes(esporte_id)').order('nome')
+    if (r.error) r = await supabase.from('professores').select('*').order('nome')
+    setProfessores((r.data ?? []) as Professor[])
+    const e = await supabase.from('esportes').select('id, nome').eq('ativo', true).order('nome')
+    setEsportes(e.data ?? [])
     setLoading(false)
   }
 
@@ -56,6 +63,7 @@ export default function Professores() {
       nome: p.nome,
       celular: p.celular ?? '',
       comissao_percentual: p.comissao_percentual?.toString() ?? '',
+      esportes: (p.professor_esportes ?? []).map(x => x.esporte_id),
     })
     setEditandoId(p.id)
     setMostraForm(true)
@@ -79,12 +87,21 @@ export default function Professores() {
       comissao_percentual: comissao,
     }
 
+    let professorId = editandoId
     if (editandoId) {
       const { error } = await supabase.from('professores').update(payload).eq('id', editandoId)
       if (error) { alert('Erro ao salvar: ' + error.message); setSalvando(false); return }
     } else {
-      const { error } = await supabase.from('professores').insert(payload)
-      if (error) { alert('Erro ao salvar: ' + error.message); setSalvando(false); return }
+      const { data, error } = await supabase.from('professores').insert(payload).select('id').single()
+      if (error || !data) { alert('Erro ao salvar: ' + (error?.message ?? '')); setSalvando(false); return }
+      professorId = data.id
+    }
+    // Esportes do professor: troca a lista inteira pelo que está marcado
+    const apaga = await supabase.from('professor_esportes').delete().eq('professor_id', professorId)
+    if (apaga.error) { alert('Professor salvo, mas não consegui salvar os esportes: ' + apaga.error.message); setSalvando(false); cancelar(); carregar(); return }
+    if (form.esportes.length > 0) {
+      const { error } = await supabase.from('professor_esportes').insert(form.esportes.map(esporte_id => ({ professor_id: professorId, esporte_id })))
+      if (error) { alert('Professor salvo, mas não consegui salvar os esportes: ' + error.message); setSalvando(false); cancelar(); carregar(); return }
     }
 
     setSalvando(false)
@@ -153,6 +170,20 @@ export default function Professores() {
               />
             </div>
           </div>
+          <div className="mt-4">
+            <label className="text-label text-gray-500 block mb-1">Esportes em que dá aula</label>
+            <div className="flex flex-wrap gap-2">
+              {esportes.map(e => {
+                const marcado = form.esportes.includes(e.id)
+                return (
+                  <button key={e.id} type="button" aria-pressed={marcado}
+                    onClick={() => setForm({ ...form, esportes: marcado ? form.esportes.filter(x => x !== e.id) : [...form.esportes, e.id] })}
+                    className={`h-9 px-3 rounded-full border text-sm transition-colors ${marcado ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'}`}>{e.nome}</button>
+                )
+              })}
+            </div>
+            <p className="mt-1 text-xs text-gray-500">No cadastro do aluno, o professor só aparece nos esportes marcados aqui. Sem nenhum marcado, ele aparece em todos.</p>
+          </div>
           <div className="flex justify-end gap-3 mt-4">
             <button onClick={cancelar} className="px-4 py-2 text-sm border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50">
               Cancelar
@@ -175,21 +206,25 @@ export default function Professores() {
               <tr className="bg-gray-50 border-b border-gray-200">
                 <th className="text-left px-4 py-3 text-th text-gray-500">Nome</th>
                 <th className="text-left px-4 py-3 text-th text-gray-500">Celular</th>
+                <th className="text-left px-4 py-3 text-th text-gray-500">Esportes</th>
                 <th className="text-left px-4 py-3 text-th text-gray-500">Comissão %</th>
                 <th className="px-4 py-3"></th>
               </tr>
             </thead>
             <tbody>
               {loading && (
-                <tr><td colSpan={4} className="text-center py-8 text-gray-400">Carregando...</td></tr>
+                <tr><td colSpan={5} className="text-center py-8 text-gray-400">Carregando...</td></tr>
               )}
               {!loading && professores.length === 0 && (
-                <tr><td colSpan={4} className="text-center py-8 text-gray-400">Nenhum professor cadastrado.</td></tr>
+                <tr><td colSpan={5} className="text-center py-8 text-gray-400">Nenhum professor cadastrado.</td></tr>
               )}
               {pagination.paginatedItems.map((p, i) => (
                 <tr key={p.id} className={`border-b border-gray-100 hover:bg-gray-50 ${i === pagination.paginatedItems.length - 1 && pagination.currentPage === pagination.totalPages ? 'border-0' : ''}`}>
                 <td className="px-4 py-3 font-medium text-gray-900">{p.nome}</td>
                 <td className="px-4 py-3 text-gray-600">{p.celular ? mascaraCelular(p.celular) : '-'}</td>
+                <td className="px-4 py-3 text-gray-600">
+                  {(p.professor_esportes ?? []).length > 0 ? (p.professor_esportes ?? []).map(x => esportes.find(e => e.id === x.esporte_id)?.nome).filter(Boolean).join(', ') : '-'}
+                </td>
                 <td className="px-4 py-3 text-gray-600">
                   {p.comissao_percentual != null ? `${p.comissao_percentual}%` : '-'}
                 </td>

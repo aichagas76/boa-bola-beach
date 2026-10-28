@@ -76,3 +76,13 @@ export function lucroTotal(vendas: { preco_unitario: number; custo_unitario: num
 
 /** Comissão de indicação: porcentagem do valor da venda (arredondada em centavos). */
 export const comissaoIndicacao = (totalVenda: number, percentual: number) => arredonda((totalVenda * percentual) / 100)
+
+/** Encordoamento: comissão da indicação e valor por unidade começam em 10% e R$ 10,00 quando o produto não tem outro valor cadastrado. */
+export const PADRAO_ENCORDOAMENTO = { indicacaoPct: 10, valorPorUnidade: 10 }
+export function padroesEncordoamento(p: { encordoamento: boolean; comissao_indicacao?: number | null; comissao_valor?: number | null }) {
+  if (!p.encordoamento) return null
+  return {
+    indicacaoPct: Number(p.comissao_indicacao) > 0 ? Number(p.comissao_indicacao) : PADRAO_ENCORDOAMENTO.indicacaoPct,
+    valorPorUnidade: Number(p.comissao_valor) > 0 ? Number(p.comissao_valor) : PADRAO_ENCORDOAMENTO.valorPorUnidade,
+  }
+}

@@ -5,6 +5,7 @@ import { Check, ChevronUp, Trophy } from 'lucide-react'
 import { mascaraValor, ESPORTE_COM_COMBO, MAX_AULAS_POR_ESPORTE, type EstadoEsporte } from '@/lib/esportes'
 import IconeEsporte from '@/components/alunos/IconeEsporte'
 import IconeModalidade from '@/components/alunos/IconeModalidade'
+import { professoresDoEsporte, type ProfessorOpcao } from '@/lib/professores'
 
 const entrada = 'w-full h-10 border border-gray-200 rounded-lg px-3 text-sm bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-400'
 
@@ -39,7 +40,7 @@ const LINHA = 'grid grid-cols-1 md:grid-cols-[10rem_12rem_1fr] gap-x-4 gap-y-2 i
 type Props = {
   estados: EstadoEsporte[]
   onChange: (estados: EstadoEsporte[]) => void
-  professores: { id: string; nome: string }[]
+  professores: ProfessorOpcao[]
   modalidadesPorEsporte: Record<string, string[]> // para cada esporte, as modalidades ativas que valem nele
 }
 
@@ -145,7 +146,7 @@ export default function EsportesForm({ estados, onChange, professores, modalidad
                       <select className={entrada} disabled={!e.aulas.ativo} value={aula.professor}
                         onChange={ev => mudar(e.esporteId, x => ({ ...x, aulas: { ...x.aulas, lista: x.aulas.lista.map((a, idx) => idx === k ? { ...a, professor: ev.target.value } : a) } }))}>
                         <option value="">Professor</option>
-                        {professores.map(p => <option key={p.id} value={p.nome}>{p.nome}</option>)}
+                        {professoresDoEsporte(professores, e.esporteId, aula.professor).map(p => <option key={p.id} value={p.nome}>{p.nome}</option>)}
                       </select>
                       {k > 0 && (
                         <button type="button" title="Remover aula" className="text-red-400 hover:text-red-600 text-sm px-1"

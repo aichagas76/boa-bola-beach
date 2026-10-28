@@ -11,6 +11,7 @@ import DadosPessoais, { ChaveStatus, nomeJaCadastrado, type FormAluno } from '@/
 import EsportesForm from '@/components/alunos/EsportesForm'
 import { carregarCatalogo, estadosDoAluno, salvarMatriculas } from '@/lib/esportes-db'
 import { idsEditaveisPorEsporte, type EstadoEsporte, type MatriculaBanco } from '@/lib/esportes'
+import { carregarProfessoresAtivos, type ProfessorOpcao } from '@/lib/professores'
 
 const dadosParaValidar = (f: FormAluno) => ({ ...f, temResponsavel: f.tem_responsavel })
 
@@ -40,7 +41,7 @@ export default function EditarAluno() {
     responsavel_cpf: '',
     responsavel_celular: '',
   })
-  const [professores, setProfessores] = useState<{ id: string; nome: string }[]>([])
+  const [professores, setProfessores] = useState<ProfessorOpcao[]>([])
   const [estados, setEstados] = useState<EstadoEsporte[]>([])
   const [modalidadesPorEsporte, setModalidadesPorEsporte] = useState<Record<string, string[]>>({})
   const [idsExistentes, setIdsExistentes] = useState<string[]>([])
@@ -68,8 +69,7 @@ export default function EditarAluno() {
         })
       }
 
-      const { data: profs } = await supabase.from('professores').select('id, nome').eq('ativo', true).order('nome')
-      setProfessores(profs ?? [])
+      setProfessores(await carregarProfessoresAtivos(supabase))
 
       const { esportes, unidades, modalidades: ativas, modalidadesPorEsporte: porEsporte } = await carregarCatalogo(supabase)
       setModalidadesPorEsporte(porEsporte)

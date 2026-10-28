@@ -11,6 +11,7 @@ import { supabase } from '@/lib/supabase'
 import { buscarTudo } from '@/lib/buscar-tudo'
 import { useUnidade } from '@/components/layout/UnidadeProvider'
 import FluxoDeCaixa from '@/components/dashboard/FluxoDeCaixa'
+import { MovimentoDeAlunos, VendasDeProdutos } from '@/components/dashboard/GraficosProdutosAlunos'
 import { FiltroPeriodo, PRESETS, TemaRecolhivel, usePeriodo } from '@/components/dashboard/FiltroPeriodo'
 import type { MovFluxo } from '@/lib/fluxo-caixa'
 import {
@@ -462,6 +463,14 @@ export default function PainelGerencial() {
           </ResponsiveContainer>
         </Grafico>
       </div>
+      </TemaRecolhivel>
+
+      <TemaRecolhivel titulo="Inativações e reativações" subtitulo="Alunos que saem e voltam, mês a mês.">
+        <MovimentoDeAlunos hoje={hoje} />
+      </TemaRecolhivel>
+
+      <TemaRecolhivel titulo="Vendas de produtos" subtitulo="Estoque: quanto foi vendido por mês.">
+        <VendasDeProdutos hoje={hoje} />
       </TemaRecolhivel>
 
       <TemaRecolhivel titulo="Modalidades" subtitulo="Alunos ativos de hoje. O aluno em combo conta nas duas unidades; quem tem mais de uma modalidade entra em cada uma." filtro={<FiltroPeriodo p={pMod} nome="Modalidades" />}>

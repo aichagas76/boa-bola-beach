@@ -58,3 +58,11 @@ test('comissão de indicação é % do valor da venda, em centavos', () => {
   assert.equal(comissaoIndicacao(19.9, 7), 1.39)
   assert.equal(comissaoIndicacao(100, 0), 0)
 })
+
+test('encordoamento começa com 10% de indicação e R$ 10 por unidade, se o produto não tiver outro valor', async () => {
+  const { padroesEncordoamento } = await import('../lib/estoque.ts')
+  assert.equal(padroesEncordoamento({ encordoamento: false, comissao_indicacao: 0, comissao_valor: 0 }), null)
+  assert.deepEqual(padroesEncordoamento({ encordoamento: true, comissao_indicacao: 0, comissao_valor: 0 }), { indicacaoPct: 10, valorPorUnidade: 10 })
+  assert.deepEqual(padroesEncordoamento({ encordoamento: true }), { indicacaoPct: 10, valorPorUnidade: 10 })
+  assert.deepEqual(padroesEncordoamento({ encordoamento: true, comissao_indicacao: 15, comissao_valor: 12.5 }), { indicacaoPct: 15, valorPorUnidade: 12.5 })
+})
