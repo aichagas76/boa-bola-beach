@@ -47,3 +47,21 @@ test('despesas por categoria: categoria excluída sai do cálculo e do percentua
   const r = despesasPorCategoria([s(300, 'Mão de Obra'), s(100, 'Aluguel'), s(100, 'Luz')], { inicio: '2026-10-01', fim: '2026-10-31' }, 8, ['Mão de Obra'])
   assert.deepEqual(r.map(x => [x.name, x.value, Math.round(x.pct)]), [['Aluguel', 100, 50], ['Luz', 100, 50]])
 })
+
+test('faturamento dos professores: ranking, por mês e alunos que pagaram', async () => {
+  const { faturamentoProfessores } = await import('../lib/painel-graficos.ts')
+  const e = (prof, nome, valor, dia, aluno, extra = {}) => ({ tipo: 'Entrada', status: 'Recebido', valor, data: dia, data_pagamento: dia, professor_id: prof, professor_nome: nome, esporte_nome: 'Tênis', aluno_ref_id: aluno, ...extra })
+  const movs = [
+    e('p1', 'Ana', 100, '2026-09-10', 'a1'), e('p1', 'Ana', 100, '2026-09-12', 'a1'), e('p1', 'Ana', 50, '2026-10-02', 'a2', { esporte_nome: 'Padel' }),
+    e('p2', 'Bia', 400, '2026-10-05', 'a3'),
+    e('p1', 'Ana', 999, '2026-07-01', 'a9'), e('p1', 'Ana', 10, '2026-10-03', 'a4', { status: 'Não recebido' }),
+    e(null, null, 5, '2026-10-04', 'a5'),
+  ]
+  const j = { inicio: '2026-08-01', fim: '2026-10-27' }
+  const todos = faturamentoProfessores(movs, j)
+  assert.deepEqual(todos.ranking.map(r => [r.professor, r.total, r.qtd]), [['Bia', 400, 1], ['Ana', 250, 3]])
+  assert.deepEqual(todos.ranking[1].porEsporte, { 'Tênis': 200, Padel: 50 })
+  assert.deepEqual(todos.porMes.map(p => [p.rotulo, p.total, p.alunos]), [['ago/26', 0, 0], ['set/26', 200, 1], ['out/26', 450, 2]])
+  const ana = faturamentoProfessores(movs, j, 'p1')
+  assert.deepEqual(ana.porMes.map(p => [p.total, p.alunos]), [[0, 0], [200, 1], [50, 1]])
+})

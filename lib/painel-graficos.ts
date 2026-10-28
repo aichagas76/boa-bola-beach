@@ -73,3 +73,56 @@ export function despesasPorCategoria(
   const total = topo.reduce((s, [, v]) => s + v, 0)
   return topo.map(([name, v]) => ({ name, value: v / 100, pct: total ? (v / total) * 100 : 0 }))
 }
+
+export type MovProfessorGrafico = {
+  tipo: string
+  status: string | null
+  valor: number
+  data: string
+  data_pagamento: string | null
+  professor_id: string | null
+  professor_nome: string | null
+  esporte_nome: string | null
+  aluno_ref_id: string | null
+}
+export type FaturamentoProfessor = { id: string; professor: string; total: number; qtd: number; porEsporte: Record<string, number> }
+export type PontoProfessorMes = { mes: string; rotulo: string; total: number; alunos: number }
+
+/**
+ * Faturamento dos professores no período: entradas recebidas (pela data do pagamento) ligadas a um professor.
+ *  - `ranking`: total de cada professor, do maior para o menor, com o detalhe por esporte;
+ *  - `porMes`: valor recebido por mês e quantos alunos diferentes pagaram, só do professor escolhido (ou de todos).
+ */
+export function faturamentoProfessores(movs: MovProfessorGrafico[], janela: Janela, professorId = '') {
+  const doPeriodo = movs.filter(m => {
+    if (m.tipo !== 'Entrada' || m.status !== 'Recebido' || !m.professor_id) return false
+    const d = m.data_pagamento ?? m.data
+    return d >= janela.inicio && d <= janela.fim
+  })
+
+  const por = new Map<string, { id: string; professor: string; centavos: number; qtd: number; esportes: Map<string, number> }>()
+  for (const m of doPeriodo) {
+    const l = por.get(m.professor_id!) ?? { id: m.professor_id!, professor: m.professor_nome ?? 'Professor sem nome', centavos: 0, qtd: 0, esportes: new Map<string, number>() }
+    const c = centavos(Number(m.valor))
+    l.centavos += c
+    l.qtd += 1
+    const e = m.esporte_nome ?? 'Sem esporte'
+    l.esportes.set(e, (l.esportes.get(e) ?? 0) + c)
+    por.set(m.professor_id!, l)
+  }
+  const ranking: FaturamentoProfessor[] = [...por.values()]
+    .sort((a, b) => b.centavos - a.centavos || a.professor.localeCompare(b.professor, 'pt-BR'))
+    .map(l => ({ id: l.id, professor: l.professor, total: l.centavos / 100, qtd: l.qtd, porEsporte: Object.fromEntries([...l.esportes].map(([e, v]) => [e, v / 100])) }))
+
+  const escolhidos = professorId ? doPeriodo.filter(m => m.professor_id === professorId) : doPeriodo
+  const meses = mesesEntre(janela.inicio, janela.fim)
+  const totalMes = new Map<string, number>()
+  const alunosMes = new Map<string, Set<string>>()
+  for (const m of escolhidos) {
+    const mes = mesDe(m.data_pagamento ?? m.data)
+    totalMes.set(mes, (totalMes.get(mes) ?? 0) + centavos(Number(m.valor)))
+    if (m.aluno_ref_id) { const s = alunosMes.get(mes) ?? new Set<string>(); s.add(m.aluno_ref_id); alunosMes.set(mes, s) }
+  }
+  const porMes: PontoProfessorMes[] = meses.map(mes => ({ mes, rotulo: rotuloMes(mes), total: (totalMes.get(mes) ?? 0) / 100, alunos: alunosMes.get(mes)?.size ?? 0 }))
+  return { ranking, porMes }
+}

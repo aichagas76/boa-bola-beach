@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import {
-  Bar, BarChart, CartesianGrid, Cell, ComposedChart, Legend, Line, LineChart, Pie, PieChart,
+  Bar, BarChart, CartesianGrid, Cell, ComposedChart, Legend, LabelList, Line, LineChart, Pie, PieChart,
   ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts'
 import { AlertTriangle, ArrowDownRight, ArrowUpRight, CheckCircle2, ChevronRight, Info, Minus } from 'lucide-react'
@@ -12,7 +12,7 @@ import { buscarTudo } from '@/lib/buscar-tudo'
 import { useUnidade } from '@/components/layout/UnidadeProvider'
 import FluxoDeCaixa from '@/components/dashboard/FluxoDeCaixa'
 import { VendasDeProdutos } from '@/components/dashboard/GraficosProdutosAlunos'
-import { despesasPorCategoria, mesesEntre, serieMensal, type Evento } from '@/lib/painel-graficos'
+import { despesasPorCategoria, faturamentoProfessores, mesesEntre, serieMensal, type Evento } from '@/lib/painel-graficos'
 import { FiltroMeses, FiltroPeriodo, PRESETS, TemaRecolhivel, rotuloDoPeriodo, useJanela, usePeriodo } from '@/components/dashboard/FiltroPeriodo'
 import type { MovFluxo } from '@/lib/fluxo-caixa'
 import {
@@ -21,7 +21,7 @@ import {
   type AlunoP, type MatP, type MovP, type PagP, type Preset,
 } from '@/lib/painel'
 import {
-  alunosPorModalidade, faturamentoPorProfessor, resumoPorMes, totaisDoPeriodo,
+  alunosPorModalidade, resumoPorMes, totaisDoPeriodo,
   type Mov,
 } from '@/lib/relatorios'
 
@@ -134,7 +134,8 @@ export default function PainelGerencial() {
   // Cada tema tem o seu próprio período; o do topo vale só para os indicadores principais
   const pFin = usePeriodo(hoje)
   const jAlu = useJanela(hoje, 6)
-  const pMod = usePeriodo(hoje)
+  const jMod = useJanela(hoje, 6)
+  const [profSel, setProfSel] = useState('')
   const pPag = usePeriodo(hoje)
 
   const [loading, setLoading] = useState(true)
@@ -278,12 +279,7 @@ export default function PainelGerencial() {
   const status = useMemo(() => statusDosPagamentos(itens, pPag.periodo, hoje), [itens, pPag.periodo, hoje])
   const faixas = useMemo(() => faixasDeAtraso(itens, hoje), [itens, hoje])
 
-  const movsRel: Mov[] = useMemo(() => dados.movsF.map(m => ({
-    tipo: m.tipo, status: m.status, valor: Number(m.valor), data: m.data, data_pagamento: m.data_pagamento,
-    professor_id: m.professor_id, professor_nome: m.professores?.nome ?? null, esporte_nome: m.esportes?.nome ?? null,
-  })), [dados.movsF])
   const mesesPeriodoFin = useMemo(() => mesesDaJanela(pFin.periodo.inicio, pFin.periodo.fim, 1), [pFin.periodo])
-  const mesesPeriodoMod = useMemo(() => mesesDaJanela(pMod.periodo.inicio, pMod.periodo.fim, 1), [pMod.periodo])
   // O lucro usa todas as movimentações da unidade (despesas não pertencem a uma modalidade)
   const movsRelUnidade: Mov[] = useMemo(() => movs.map(m => ({
     tipo: m.tipo, status: m.status, valor: Number(m.valor), data: m.data, data_pagamento: m.data_pagamento,
@@ -312,7 +308,18 @@ export default function PainelGerencial() {
     [movsRelUnidade, mesesFin]
   )
   const totaisPeriodo = useMemo(() => totaisDoPeriodo(resumoPorMes(movsRelUnidade, mesesPeriodoFin)), [movsRelUnidade, mesesPeriodoFin])
-  const porProfessor = useMemo(() => faturamentoPorProfessor(movsRel, mesesPeriodoMod), [movsRel, mesesPeriodoMod])
+  // Faturamento dos professores: ranking do período e, mês a mês, o valor e os alunos que pagaram
+  const movsProf = useMemo(() => dados.movsF.map(m => ({
+    tipo: m.tipo, status: m.status, valor: Number(m.valor), data: m.data, data_pagamento: m.data_pagamento,
+    professor_id: m.professor_id, professor_nome: m.professores?.nome ?? null, esporte_nome: m.esportes?.nome ?? null, aluno_ref_id: m.aluno_ref_id,
+  })), [dados.movsF])
+  const fatProf = useMemo(() => faturamentoProfessores(movsProf, jMod.janela, profSel), [movsProf, jMod.janela, profSel])
+  const professoresFat = useMemo(() => {
+    const por = new Map<string, string>()
+    for (const m of movsProf) if (m.professor_id && m.professor_nome && m.tipo === 'Entrada' && m.status === 'Recebido') por.set(m.professor_id, m.professor_nome)
+    return [...por.entries()].map(([id, nome]) => ({ id, nome })).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+  }, [movsProf])
+  const nomeProfSel = professoresFat.find(x => x.id === profSel)?.nome
 
   const matsRel = useMemo(() => dados.matsF.map(m => ({
     aluno_id: m.aluno_id, tipo: m.tipo, unidade_id: m.unidade_id, acesso_duas_unidades: m.acesso_duas_unidades, esporte_nome: m.esportes?.nome ?? null,
@@ -579,45 +586,78 @@ export default function PainelGerencial() {
         <VendasDeProdutos hoje={hoje} />
       </TemaRecolhivel>
 
-      <TemaRecolhivel titulo="Modalidades" subtitulo="Alunos ativos de hoje. O aluno em combo conta nas duas unidades; quem tem mais de uma modalidade entra em cada uma." filtro={<FiltroPeriodo p={pMod} nome="Modalidades" />}>
+      <TemaRecolhivel titulo="Modalidades" subtitulo="Alunos ativos de hoje (aluno em combo conta nas duas unidades) e o faturamento dos professores no período."
+        filtro={<FiltroMeses j={jMod} nome="Modalidades" opcoes={[{ n: 1, nome: 'Mês atual' }, { n: 3, nome: '3 meses' }, { n: 6, nome: '6 meses' }, { n: 12, nome: '1 ano' }]} />}>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Grafico titulo="Alunos por modalidade e esporte" largo
-          carregando={loading} vazio={!loading && porModalidade.dados.length === 0} mensagemVazio="Nenhuma matrícula ativa neste recorte">
-          <div className="flex flex-col md:flex-row md:items-center gap-4">
-            <div className="w-full md:w-2/3">
-              <ResponsiveContainer width="100%" height={ALTURA}>
-                <BarChart data={porModalidade.dados} margin={MARGEM}>
-                  <Grade />
-                  <XAxis dataKey="modalidade" {...eixoX} />
-                  <YAxis {...eixoY} allowDecimals={false} />
-                  <Tooltip />
-                  <Legend {...legenda} />
-                  {porModalidade.esportes.map(e => <Bar key={e} dataKey={e} stackId="m" fill={corEsporte(e)} name={e} />)}
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-            <ul className="w-full md:w-1/3 space-y-2 text-sm">
-              {fatiasModalidade.map(f => (
-                <li key={f.modalidade} className="flex items-center justify-between gap-2 border-b border-gray-100 pb-2 last:border-0">
-                  <span className="text-gray-800">{f.modalidade}</span>
-                  <span className="text-gray-600"><strong className="text-gray-900">{f.total}</strong> · {pct(f.pct)}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </Grafico>
-        <Grafico titulo="Faturamento por professor (por esporte)" nota="Entradas recebidas no período, vinculadas ao professor"
-          carregando={loading} vazio={!loading && porProfessor.dados.length === 0} mensagemVazio="Nenhuma entrada vinculada a professor neste período"
-          altura={Math.max(ALTURA - 20, porProfessor.dados.length * 44 + 70)} largo>
-          <ResponsiveContainer width="100%" height={Math.max(ALTURA - 20, porProfessor.dados.length * 44 + 70)}>
-            <BarChart data={porProfessor.dados} layout="vertical" margin={{ ...MARGEM, left: 16 }}>
+        <Grafico titulo="Alunos por modalidade e esporte" nota="Alunos ativos hoje; quem tem mais de uma modalidade entra em cada uma"
+          carregando={loading} vazio={!loading && porModalidade.dados.length === 0} mensagemVazio="Nenhuma matrícula ativa neste recorte" altura={Math.max(160, porModalidade.dados.length * 54 + 70)}>
+          <ResponsiveContainer width="100%" height={Math.max(160, porModalidade.dados.length * 54 + 70)}>
+            <BarChart data={porModalidade.dados} layout="vertical" margin={{ top: 4, right: 24, left: 0, bottom: 0 }} barSize={26}>
               <CartesianGrid strokeDasharray="3 3" stroke="#eee" horizontal={false} />
-              <XAxis type="number" tickFormatter={brlCurto} tick={{ fontSize: 12 }} tickLine={false} />
-              <YAxis type="category" dataKey="professor" width={90} tick={{ fontSize: 12 }} tickLine={false} axisLine={false} />
-              <Tooltip formatter={tip} />
+              <XAxis type="number" allowDecimals={false} tick={{ fontSize: 12 }} tickLine={false} />
+              <YAxis type="category" dataKey="modalidade" width={84} tick={{ fontSize: 13 }} tickLine={false} axisLine={false} />
+              <Tooltip cursor={{ fill: 'rgba(0,0,0,0.04)' }} />
               <Legend {...legenda} />
-              {porProfessor.esportes.map(e => <Bar key={e} dataKey={e} stackId="p" fill={corEsporte(e)} name={e} />)}
+              {porModalidade.esportes.map(e => <Bar key={e} dataKey={e} stackId="m" fill={corEsporte(e)} name={e} />)}
             </BarChart>
+          </ResponsiveContainer>
+          <ul className="mt-3 divide-y divide-gray-100 text-sm">
+            {fatiasModalidade.map(f => (
+              <li key={f.modalidade} className="flex items-center justify-between gap-2 py-1.5">
+                <span className="text-gray-800">{f.modalidade}</span>
+                <span className="text-gray-600"><strong className="text-gray-900">{f.total}</strong> alunos · {pct(f.pct)}</span>
+              </li>
+            ))}
+          </ul>
+        </Grafico>
+
+        <Grafico titulo="Faturamento por professor" nota="Entradas recebidas no período. Clique numa barra para ver o professor mês a mês."
+          carregando={loading} vazio={!loading && fatProf.ranking.length === 0} mensagemVazio="Nenhuma entrada vinculada a professor neste período"
+          altura={Math.max(160, fatProf.ranking.length * 34 + 30)}>
+          <ResponsiveContainer width="100%" height={Math.max(160, fatProf.ranking.length * 34 + 30)}>
+            <BarChart data={fatProf.ranking} layout="vertical" margin={{ top: 4, right: 70, left: 0, bottom: 0 }} barSize={18}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#eee" horizontal={false} />
+              <XAxis type="number" hide />
+              <YAxis type="category" dataKey="professor" width={96} tick={{ fontSize: 12 }} tickLine={false} axisLine={false} interval={0} />
+              <Tooltip cursor={{ fill: 'rgba(0,0,0,0.04)' }}
+                content={({ active, payload }) => {
+                  if (!active || !payload?.length) return null
+                  const d = payload[0].payload as { professor: string; total: number; qtd: number; porEsporte: Record<string, number> }
+                  return (
+                    <div className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs shadow">
+                      <div className="font-semibold text-gray-900">{d.professor}</div>
+                      <div className="text-gray-700">{brl(d.total)} · {d.qtd} {d.qtd === 1 ? 'pagamento' : 'pagamentos'}</div>
+                      {Object.entries(d.porEsporte).map(([e, v]) => <div key={e} className="text-gray-500">{e}: {brl(v)}</div>)}
+                    </div>
+                  )
+                }} />
+              <Bar dataKey="total" name="Faturamento" radius={[0, 4, 4, 0]} cursor="pointer" onClick={(d: { id?: string }) => d.id && setProfSel(d.id)}>
+                {fatProf.ranking.map(r => <Cell key={r.id} fill={profSel && r.id !== profSel ? '#BBD98A' : COR.marca} />)}
+                <LabelList dataKey="total" position="right" formatter={(v: unknown) => `R$ ${brlCurto(Number(v ?? 0))}`} style={{ fontSize: 12, fill: '#374151' }} />
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </Grafico>
+
+        <Grafico titulo={`Faturamento por mês · ${nomeProfSel ?? 'todos os professores'}`} nota="Colunas: valor recebido no mês. Linha: alunos diferentes que pagaram." largo
+          carregando={loading} vazio={!loading && fatProf.porMes.every(p => p.total === 0)} mensagemVazio="Nenhuma entrada deste professor neste período">
+          <div className="mb-2">
+            <select value={profSel} onChange={e => setProfSel(e.target.value)} aria-label="Professor" className="h-9 border border-gray-200 rounded-lg px-2 text-sm bg-white">
+              <option value="">Todos os professores</option>
+              {professoresFat.map(x => <option key={x.id} value={x.id}>{x.nome}</option>)}
+            </select>
+          </div>
+          <ResponsiveContainer width="100%" height={ALTURA}>
+            <ComposedChart data={fatProf.porMes} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+              <Grade />
+              <XAxis dataKey="rotulo" {...eixoX} />
+              <YAxis yAxisId="valor" {...eixoY} tickFormatter={brlCurto} />
+              <YAxis yAxisId="alunos" orientation="right" width={36} tick={{ fontSize: 12 }} tickLine={false} axisLine={false} allowDecimals={false} />
+              <Tooltip formatter={(v: unknown, nome: unknown) => (nome === 'Alunos que pagaram' ? String(v) : tip(v))} />
+              <Legend {...legenda} />
+              <Bar yAxisId="valor" dataKey="total" name="Faturamento" fill={COR.marca} radius={[4, 4, 0, 0]} maxBarSize={48} />
+              <Line yAxisId="alunos" type="monotone" dataKey="alunos" name="Alunos que pagaram" stroke="#F97316" strokeWidth={2.5} dot={{ r: 3 }} />
+            </ComposedChart>
           </ResponsiveContainer>
         </Grafico>
       </div>
