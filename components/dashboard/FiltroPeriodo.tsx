@@ -92,14 +92,15 @@ export function useJanela(hoje: string, inicial = 6) {
 }
 export type EstadoJanela = ReturnType<typeof useJanela>
 
-export function FiltroMeses({ j, nome }: { j: EstadoJanela; nome: string }) {
+export function FiltroMeses({ j, nome, opcoes }: { j: EstadoJanela; nome: string; opcoes?: { n: number; nome: string }[] }) {
+  const lista = opcoes ?? OPCOES_MESES.map(n => ({ n, nome: n === 1 ? '1 mês' : `${n} meses` }))
   return (
     <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
       <div className="inline-flex shrink-0 max-w-[calc(100vw-2rem)] overflow-x-auto rounded-lg border border-gray-200 bg-white" role="group" aria-label={`Período de ${nome}`}>
-        {OPCOES_MESES.map(n => (
+        {lista.map(({ n, nome: rotulo }) => (
           <button key={n} type="button" aria-pressed={j.escolha === n} onClick={() => j.setEscolha(n)}
             className={`px-3 h-9 text-sm font-medium whitespace-nowrap transition-colors ${j.escolha === n ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-50'}`}>
-            {n === 1 ? '1 mês' : `${n} meses`}
+            {rotulo}
           </button>
         ))}
         <button type="button" aria-pressed={j.escolha === 'custom'} onClick={() => j.setEscolha('custom')}

@@ -12,8 +12,8 @@ import { buscarTudo } from '@/lib/buscar-tudo'
 import { useUnidade } from '@/components/layout/UnidadeProvider'
 import FluxoDeCaixa from '@/components/dashboard/FluxoDeCaixa'
 import { VendasDeProdutos } from '@/components/dashboard/GraficosProdutosAlunos'
-import { serieMensal, type Evento } from '@/lib/painel-graficos'
-import { FiltroPeriodo, PRESETS, TemaRecolhivel, usePeriodo } from '@/components/dashboard/FiltroPeriodo'
+import { mesesEntre, serieMensal, type Evento } from '@/lib/painel-graficos'
+import { FiltroMeses, FiltroPeriodo, PRESETS, TemaRecolhivel, useJanela, usePeriodo } from '@/components/dashboard/FiltroPeriodo'
 import type { MovFluxo } from '@/lib/fluxo-caixa'
 import {
   alunosDaModalidade, aparaMesesVazios, calcularKpis, faixasDeAtraso, gastosDoPeriodo, itensFinanceiros, mesesDaJanela,
@@ -131,7 +131,7 @@ export default function PainelGerencial() {
   const [modalidade, setModalidade] = useState('')
   // Cada tema tem o seu próprio período; o do topo vale só para os indicadores principais
   const pFin = usePeriodo(hoje)
-  const pAlu = usePeriodo(hoje)
+  const jAlu = useJanela(hoje, 6)
   const pMod = usePeriodo(hoje)
   const pPag = usePeriodo(hoje)
 
@@ -211,7 +211,8 @@ export default function PainelGerencial() {
 
   const periodo = useMemo(() => periodoDe(preset, hoje, de, ate), [preset, hoje, de, ate])
   const mesesFin = useMemo(() => mesesDaJanela(pFin.periodo.inicio, pFin.periodo.fim, 6), [pFin.periodo])
-  const mesesAlu = useMemo(() => mesesDaJanela(pAlu.periodo.inicio, pAlu.periodo.fim, 6), [pAlu.periodo])
+  // Tema Alunos: o gráfico mostra exatamente os meses escolhidos (6 meses, 1 ano ou datas)
+  const mesesAlu = useMemo(() => mesesEntre(jAlu.janela.inicio, jAlu.janela.fim), [jAlu.janela])
 
   const alunosP: AlunoP[] = useMemo(() => dados.alunosF.map(a => ({
     id: a.id, status: a.status, data_cadastro: a.data_cadastro, data_inativacao: a.data_inativacao ?? null, data_vencimento: a.data_vencimento,
@@ -258,8 +259,8 @@ export default function PainelGerencial() {
       if (a.data_inativacao) eventos.push({ data: a.data_inativacao, grupo: 'registrada' })
       else if (a.status === 'Inativo' && saidas[a.id]) eventos.push({ data: saidas[a.id], grupo: 'estimada' })
     }
-    return serieMensal(eventos, { inicio: mesesAlu[0] + '-01', fim: hoje }, ['registrada', 'estimada'])
-  }, [alunosP, dados.matsU, esporteAlu, saidas, mesesAlu, hoje])
+    return serieMensal(eventos, jAlu.janela, ['registrada', 'estimada'])
+  }, [alunosP, dados.matsU, esporteAlu, saidas, jAlu.janela])
   const serieA = useMemo(() => serieAlunosAtivos(alunosDoGrafico, mesesAlu, hoje), [alunosDoGrafico, mesesAlu, hoje])
   const status = useMemo(() => statusDosPagamentos(itens, pPag.periodo, hoje), [itens, pPag.periodo, hoje])
   const faixas = useMemo(() => faixasDeAtraso(itens, hoje), [itens, hoje])
@@ -466,7 +467,7 @@ export default function PainelGerencial() {
 
       <TemaRecolhivel titulo="Alunos" subtitulo="Base = alunos ativos no fim de cada mês. Novos cadastros e inativações do mês." filtro={
         <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
-          <FiltroPeriodo p={pAlu} nome="Alunos" />
+          <FiltroMeses j={jAlu} nome="Alunos" opcoes={[{ n: 6, nome: '6 meses' }, { n: 12, nome: '1 ano' }]} />
           <div className="inline-flex shrink-0 max-w-[calc(100vw-2rem)] overflow-x-auto rounded-lg border border-gray-200 bg-white" role="group" aria-label="Esporte">
             {[{ id: '', nome: 'Todos' }, ...esportesAlu].map(e => (
               <button key={e.id || 'todos'} type="button" aria-pressed={esporteAlu === e.id} onClick={() => setEsporteAlu(e.id)}
