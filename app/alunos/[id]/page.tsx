@@ -4,6 +4,7 @@ import IconeModalidade from '@/components/alunos/IconeModalidade'
 import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { avisar, confirmar } from '@/lib/avisos-ui'
 
 type Aluno = {
   id: string
@@ -83,7 +84,7 @@ export default function DetalheAluno() {
       const txt = window.prompt('Valor da cobrança (R$):', sugerido ? String(sugerido) : '')
       if (!txt) return
       const valor = Number(txt.replace(',', '.'))
-      if (!valor || valor <= 0) return alert('Valor inválido')
+      if (!valor || valor <= 0) return avisar('Valor inválido')
       const hoje = new Date().toLocaleDateString('en-CA')
       const venc = aluno?.data_vencimento && aluno.data_vencimento >= hoje ? aluno.data_vencimento : hoje
       payload = { alunoId: id, valor, dataVencimento: venc }
@@ -99,7 +100,7 @@ export default function DetalheAluno() {
       if (!res.ok) throw new Error(data.error || 'Erro ao gerar cobrança')
       window.location.reload()
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Erro ao gerar cobrança')
+      avisar(err instanceof Error ? err.message : 'Erro ao gerar cobrança')
     } finally {
       setGerando(null)
     }
@@ -280,7 +281,7 @@ export default function DetalheAluno() {
       <div className="flex justify-end gap-3">
         <button
           onClick={async () => {
-            if (!confirm('Tem certeza que deseja excluir este aluno?')) return
+            if (!await confirmar('Tem certeza que deseja excluir este aluno?')) return
             await supabase.from('matriculas').delete().eq('aluno_id', aluno.id)
             await supabase.from('alunos').delete().eq('id', aluno.id)
             router.push('/alunos')

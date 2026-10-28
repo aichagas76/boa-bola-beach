@@ -6,6 +6,7 @@ import { useUnidade } from '@/components/layout/UnidadeProvider'
 import { registrarLog } from '@/lib/log'
 import { X } from 'lucide-react'
 import { comissaoIndicacao, padroesEncordoamento, precoUnitario, totalVenda, validarVenda, vencimentoNaMensalidade, vencimentoProfessor, type Comprador, type Situacao } from '@/lib/estoque'
+import { avisar } from '@/lib/avisos-ui'
 
 export type Produto = {
   id: string; nome: string; categoria: string | null; fornecedor_id: string | null
@@ -96,9 +97,9 @@ export function FormVenda({ produtos, saldos, inicial, alunos, professores, banc
   const vencimento = comprador === 'aluno' ? vencimentoNaMensalidade(hojeIso(), aluno?.data_vencimento) : vencimentoProfessor(hojeIso())
 
   async function salvar() {
-    if (!produto) return alert('Escolha o produto.')
+    if (!produto) return avisar('Escolha o produto.')
     const erros = validarVenda({ quantidade: q, saldo: saldos[produto.id] ?? 0, comprador, aluno_id: alunoId, professor_id: professorId, preco })
-    if (erros.length) return alert(erros.join('\n'))
+    if (erros.length) return avisar(erros.join('\n'))
     setSalvando(true)
     const { error } = await supabase.rpc('estoque_vender', {
       p_produto: produto.id, p_quantidade: q, p_comprador: comprador,
@@ -110,7 +111,7 @@ export function FormVenda({ produtos, saldos, inicial, alunos, professores, banc
       ...(indicacaoProf ? { p_indicacao_professor: indicacaoProf, ...(indicacaoPct !== null && Number.isFinite(numero(indicacaoPct)) ? { p_indicacao_percentual: numero(indicacaoPct) } : padrao ? { p_indicacao_percentual: padrao.indicacaoPct } : {}) } : {}),
     })
     setSalvando(false)
-    if (error) return alert('Erro: ' + error.message)
+    if (error) return avisar('Erro: ' + error.message)
     await registrarLog('Venda de estoque', 'estoque_retiradas', undefined, `${q} x ${produto.nome}`)
     onSalvo()
   }

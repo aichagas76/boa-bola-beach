@@ -6,6 +6,7 @@ import { mascaraValor, ESPORTE_COM_COMBO, MAX_AULAS_POR_ESPORTE, type EstadoEspo
 import IconeEsporte from '@/components/alunos/IconeEsporte'
 import IconeModalidade from '@/components/alunos/IconeModalidade'
 import { professoresDoEsporte, type ProfessorOpcao } from '@/lib/professores'
+import { confirmar } from '@/lib/avisos-ui'
 
 const entrada = 'w-full h-10 border border-gray-200 rounded-lg px-3 text-sm bg-white text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-400'
 
@@ -56,8 +57,8 @@ export default function EsportesForm({ estados, onChange, professores, modalidad
     onChange(estados.map(x => (x.esporteId === esporteId ? fn(x) : x)))
   }
 
-  function alternarEsporte(x: EstadoEsporte) {
-    if (x.ativo && temModalidade(x) && !window.confirm(`Tirar ${x.nome}? As modalidades e valores marcados nele serão removidos ao salvar.`)) return
+  async function alternarEsporte(x: EstadoEsporte) {
+    if (x.ativo && temModalidade(x) && !await confirmar(`Tirar ${x.nome}? As modalidades e valores marcados nele serão removidos ao salvar.`)) return
     setRecolhidos(r => ({ ...r, [x.esporteId]: false }))
     mudar(x.esporteId, e => ({ ...e, ativo: !e.ativo }))
   }

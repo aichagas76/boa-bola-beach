@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Trash2 } from 'lucide-react'
 import IconeEsporte from '@/components/alunos/IconeEsporte'
+import { avisar, confirmar } from '@/lib/avisos-ui'
 
 type Modalidade = { id: string; nome: string; ativo: boolean }
 type Esporte = { id: string; nome: string }
@@ -47,10 +48,10 @@ export default function Modalidades() {
   async function adicionar() {
     if (!novoNome.trim()) return
     const { data, error } = await supabase.from('modalidades').insert({ nome: novoNome.trim() }).select('id').single()
-    if (error || !data) return alert(mensagemDeErro(error ?? { message: 'não consegui criar' }))
+    if (error || !data) return avisar(mensagemDeErro(error ?? { message: 'não consegui criar' }))
     if (!semVinculos && escolhidosNovos.length > 0) {
       const { error: e2 } = await supabase.from('modalidade_esportes').insert(escolhidosNovos.map(esporte_id => ({ modalidade_id: data.id, esporte_id })))
-      if (e2) alert('Modalidade criada, mas não consegui ligar aos esportes: ' + e2.message)
+      if (e2) avisar('Modalidade criada, mas não consegui ligar aos esportes: ' + e2.message)
     }
     setNovoNome('')
     setNovosEsportes(null)
@@ -59,7 +60,7 @@ export default function Modalidades() {
 
   async function alternar(m: Modalidade) {
     const { error } = await supabase.from('modalidades').update({ ativo: !m.ativo }).eq('id', m.id)
-    if (error) return alert(mensagemDeErro(error))
+    if (error) return avisar(mensagemDeErro(error))
     carregar()
   }
 
@@ -69,7 +70,7 @@ export default function Modalidades() {
     const { error } = tem
       ? await supabase.from('modalidade_esportes').delete().eq('modalidade_id', m.id).eq('esporte_id', esporteId)
       : await supabase.from('modalidade_esportes').insert({ modalidade_id: m.id, esporte_id: esporteId })
-    if (error) return alert(mensagemDeErro(error))
+    if (error) return avisar(mensagemDeErro(error))
     setVinculos(v => {
       const novo = new Set(v)
       if (tem) novo.delete(chave)
@@ -81,11 +82,11 @@ export default function Modalidades() {
   async function deletar(m: Modalidade) {
     const { count } = await supabase.from('matriculas').select('id', { count: 'exact', head: true }).eq('tipo', m.nome)
     if ((count ?? 0) > 0) {
-      return alert(`Há ${count} matrícula(s) de alunos nesta modalidade. Para ela sumir do cadastro, deixe-a inativa em vez de excluir.`)
+      return avisar(`Há ${count} matrícula(s) de alunos nesta modalidade. Para ela sumir do cadastro, deixe-a inativa em vez de excluir.`)
     }
-    if (!confirm(`Excluir a modalidade ${m.nome}?`)) return
+    if (!await confirmar(`Excluir a modalidade ${m.nome}?`)) return
     const { error } = await supabase.from('modalidades').delete().eq('id', m.id)
-    if (error) return alert(mensagemDeErro(error))
+    if (error) return avisar(mensagemDeErro(error))
     carregar()
   }
 

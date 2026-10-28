@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Trash2, Edit2, Check, X } from 'lucide-react'
+import { avisar, confirmar } from '@/lib/avisos-ui'
 
 type Pessoa = {
   id: string
@@ -40,7 +41,7 @@ export default function Pessoas() {
     })
 
     if (error) {
-      alert('Erro: ' + error.message)
+      avisar('Erro: ' + error.message)
       return
     }
 
@@ -57,7 +58,7 @@ export default function Pessoas() {
     }).eq('id', id)
 
     if (error) {
-      alert('Erro: ' + error.message)
+      avisar('Erro: ' + error.message)
       return
     }
 
@@ -66,12 +67,12 @@ export default function Pessoas() {
   }
 
   async function deletar(id: string) {
-    if (!confirm('Excluir esta pessoa?')) return
+    if (!await confirmar('Excluir esta pessoa?')) return
 
     const { error } = await supabase.from('pessoas').delete().eq('id', id)
 
     if (error) {
-      alert('Erro: ' + error.message)
+      avisar('Erro: ' + error.message)
       return
     }
 

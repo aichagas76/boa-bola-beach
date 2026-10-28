@@ -11,6 +11,7 @@ import { usePagination } from '@/lib/hooks/usePagination'
 import { Pagination } from '@/components/ui/pagination'
 import MovimentoDialog, { type Catalogos, type MovimentoEditavel, type TipoMov } from '@/components/financeiro/MovimentoDialog'
 import { ArrowDown, ArrowUp, ArrowUpDown, Check, Pencil, Trash2, Undo2 } from 'lucide-react'
+import { avisar, confirmar } from '@/lib/avisos-ui'
 
 type Movimentacao = MovimentoEditavel & {
   origem: string | null
@@ -166,20 +167,20 @@ export default function Financeiro() {
 
   async function alternarBaixa(m: Movimentacao) {
     const concluido = feito(m)
-    if (!confirm(concluido ? 'Desfazer a baixa desta movimentação?' : 'Confirmar baixa desta movimentação?')) return
+    if (!await confirmar(concluido ? 'Desfazer a baixa desta movimentação?' : 'Confirmar baixa desta movimentação?')) return
     const { error } = await supabase.from('movimentacoes').update({
       status: concluido ? (m.tipo === 'Entrada' ? 'Não recebido' : 'Pendente') : (m.tipo === 'Entrada' ? 'Recebido' : 'Pago'),
       data_pagamento: concluido ? null : hoje,
     }).eq('id', m.id)
-    if (error) return alert('Erro ao dar baixa: ' + error.message)
+    if (error) return avisar('Erro ao dar baixa: ' + error.message)
     await registrarLog(concluido ? 'Baixa desfeita' : 'Baixa de movimentação', 'movimentacoes', m.id)
     carregar()
   }
 
   async function excluir(m: Movimentacao) {
-    if (!confirm('Excluir esta movimentação? Não dá para desfazer.')) return
+    if (!await confirmar('Excluir esta movimentação? Não dá para desfazer.')) return
     const { error } = await supabase.from('movimentacoes').delete().eq('id', m.id)
-    if (error) return alert('Erro ao excluir: ' + error.message)
+    if (error) return avisar('Erro ao excluir: ' + error.message)
     await registrarLog('Movimentação excluída', 'movimentacoes', m.id, m.descricao ?? undefined)
     carregar()
   }

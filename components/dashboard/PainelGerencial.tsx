@@ -166,19 +166,24 @@ export default function PainelGerencial() {
         rastreia = false
         ra = await buscarTudo((de, ate) => supabase.from('alunos').select('id, status, data_cadastro, data_vencimento, unidade_id').order('id').range(de, ate)) as typeof ra
       }
-      const [rm, rf, rp] = await Promise.all([
+      const [rm, rf, rp, rh, rr, dProf, dEsp, dConta, dCat] = await Promise.all([
         buscarTudo((de, ate) => supabase.from('matriculas').select('aluno_id, tipo, valor, unidade_id, acesso_duas_unidades, esporte_id, esportes(nome)').order('id').range(de, ate)),
         buscarTudo((de, ate) => supabase
           .from('movimentacoes')
-          .select('tipo, status, valor, data, data_pagamento, data_vencimento, aluno_ref_id, professor_id, conta_bancaria_id, professores(nome), esportes(nome), contas_bancarias(nome), categorias_financeiro(categoria)')
+          .select('tipo, status, valor, data, data_pagamento, data_vencimento, aluno_ref_id, professor_id, esporte_id, conta_bancaria_id, categoria_id')
           .eq('unidade_id', unidadeId)
           .or(`data.gte.${corte},data_pagamento.gte.${corte},status.neq.Recebido`)
           .order('id').range(de, ate)),
         buscarTudo((de, ate) => supabase.from('pagamentos').select('aluno_id, valor, status, data_vencimento').neq('status', 'Pago').order('id').range(de, ate)),
+        // Se a tabela do histórico ainda não existir no banco, o gráfico segue só com as datas registradas
+        buscarTudo((de, ate) => supabase.from('alunos_status_historico').select('aluno_id, data').eq('para_status', 'Inativo').order('data').order('id').range(de, ate)),
+        buscarTudo((de, ate) => supabase.from('alunos_status_historico').select('aluno_id, data').eq('de_status', 'Inativo').eq('para_status', 'Ativo').order('data').order('id').range(de, ate)),
+        // Nomes buscados uma vez só (em vez de repetidos em cada lançamento): a carga fica bem menor
+        supabase.from('professores').select('id, nome'),
+        supabase.from('esportes').select('id, nome'),
+        supabase.from('contas_bancarias').select('id, nome'),
+        supabase.from('categorias_financeiro').select('id, categoria'),
       ])
-      // Se a tabela do histórico ainda não existir no banco, o gráfico segue só com as datas registradas
-      const rh = await buscarTudo((de, ate) => supabase.from('alunos_status_historico').select('aluno_id, data').eq('para_status', 'Inativo').order('data').order('id').range(de, ate))
-      const rr = await buscarTudo((de, ate) => supabase.from('alunos_status_historico').select('aluno_id, data').eq('de_status', 'Inativo').eq('para_status', 'Ativo').order('data').order('id').range(de, ate))
       if (cancelado) return
       if (ra.error || rm.error || rf.error || rp.error) {
         setErro('Não consegui carregar os dados do painel. Atualize a página; se continuar, avise o suporte.')
@@ -188,7 +193,15 @@ export default function PainelGerencial() {
       setRastreiaInativacao(rastreia)
       setAlunos((ra.data ?? []) as unknown as LinhaAluno[])
       setMats((rm.data ?? []) as unknown as LinhaMat[])
-      setMovs((rf.data ?? []) as unknown as LinhaMov[])
+      const nomes = (r: { data: { id: string; nome?: string; categoria?: string }[] | null }, campo: 'nome' | 'categoria') => new Map((r.data ?? []).map(x => [x.id, x[campo] ?? null]))
+      const nProf = nomes(dProf, 'nome'), nEsp = nomes(dEsp, 'nome'), nConta = nomes(dConta, 'nome'), nCat = nomes(dCat, 'categoria')
+      setMovs(((rf.data ?? []) as unknown as (Omit<LinhaMov, 'professores' | 'esportes' | 'contas_bancarias' | 'categorias_financeiro'> & { esporte_id: string | null; categoria_id: string | null })[]).map(m => ({
+        ...m,
+        professores: m.professor_id && nProf.get(m.professor_id) ? { nome: nProf.get(m.professor_id)! } : null,
+        esportes: m.esporte_id && nEsp.get(m.esporte_id) ? { nome: nEsp.get(m.esporte_id)! } : null,
+        contas_bancarias: m.conta_bancaria_id && nConta.get(m.conta_bancaria_id) ? { nome: nConta.get(m.conta_bancaria_id)! } : null,
+        categorias_financeiro: m.categoria_id && nCat.get(m.categoria_id) ? { categoria: nCat.get(m.categoria_id)! } : null,
+      })) as LinhaMov[])
       setPags((rp.data ?? []) as PagP[])
       setReativacoes(rr.error ? [] : ((rr.data ?? []) as unknown as { aluno_id: string; data: string }[]))
       setSaidas(rh.error ? {} : Object.fromEntries(((rh.data ?? []) as unknown as { aluno_id: string; data: string }[]).map(x => [x.aluno_id, x.data])))

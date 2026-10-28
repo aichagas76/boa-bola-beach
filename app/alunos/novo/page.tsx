@@ -13,6 +13,7 @@ import { useUnidade } from '@/components/layout/UnidadeProvider'
 import { carregarCatalogo, estadosIniciais, salvarMatriculas } from '@/lib/esportes-db'
 import type { EstadoEsporte } from '@/lib/esportes'
 import { carregarProfessoresAtivos, type ProfessorOpcao } from '@/lib/professores'
+import { avisar } from '@/lib/avisos-ui'
 
 const dadosParaValidar = (f: FormAluno) => ({ ...f, temResponsavel: f.tem_responsavel })
 
@@ -54,7 +55,7 @@ export default function NovoAluno() {
 
   async function salvar() {
     setTentou(true)
-    if (!unidadeId) return alert('Seu login ainda não tem unidade liberada. Fale com quem administra o sistema.')
+    if (!unidadeId) return avisar('Seu login ainda não tem unidade liberada. Fale com quem administra o sistema.')
     // Confere o nome de novo na hora de salvar (outra pessoa pode ter cadastrado enquanto isso)
     const duplicado = await nomeJaCadastrado(form.nome)
     setNomeDuplicado(duplicado)
@@ -69,13 +70,13 @@ export default function NovoAluno() {
       .single()
 
     if (error || !aluno) {
-      alert(error?.code === '23505' ? 'Já existe um aluno com este nome.' : 'Erro ao salvar aluno: ' + error?.message)
+      avisar(error?.code === '23505' ? 'Já existe um aluno com este nome.' : 'Erro ao salvar aluno: ' + error?.message)
       setLoading(false)
       return
     }
 
     const erroMatriculas = await salvarMatriculas(supabase, aluno.id, estados.map(e => ({ ...e, unidadeId })), [])
-    if (erroMatriculas) alert('Aluno salvo, mas houve erro nas modalidades: ' + erroMatriculas)
+    if (erroMatriculas) avisar('Aluno salvo, mas houve erro nas modalidades: ' + erroMatriculas)
 
     try {
       const quemPaga = pagador({ nome: form.nome, cpf: form.cpf, celular: form.celular, responsavel_nome: form.tem_responsavel ? form.responsavel_nome : null, responsavel_cpf: form.responsavel_cpf, responsavel_celular: form.responsavel_celular })
@@ -90,11 +91,11 @@ export default function NovoAluno() {
         await supabase.from('alunos').update({ asaas_customer_id: asaasData.id, asaas_customer_doc: (quemPaga.cpf ?? '').replace(/\D/g, '') }).eq('id', aluno.id)
       } else if (asaasData.error) {
         console.error('Erro Asaas:', asaasData.error)
-        alert('Erro ao criar cliente Asaas: ' + asaasData.error)
+        avisar('Erro ao criar cliente Asaas: ' + asaasData.error)
       }
     } catch (e) {
       console.error('Erro na requisição Asaas:', e)
-      alert('Erro ao criar cliente Asaas')
+      avisar('Erro ao criar cliente Asaas')
     }
 
     await registrarLog('Cadastrou aluno', 'alunos', aluno.id, form.nome)

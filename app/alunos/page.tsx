@@ -15,6 +15,7 @@ import { BadgeCheck, Copy, CircleDollarSign, CreditCard, History, Link2, Package
 import { buscarTudo } from '@/lib/buscar-tudo'
 import { VendaDoAluno } from '@/components/estoque/FormVenda'
 import HistoricoAluno from '@/components/alunos/HistoricoAluno'
+import { avisar, confirmar } from '@/lib/avisos-ui'
 
 type Aluno = {
   id: string
@@ -136,7 +137,7 @@ export default function Alunos() {
     )
     if (!txt) return
     const valor = Number(txt.replace(',', '.'))
-    if (!valor || valor <= 0) return alert('Valor inválido')
+    if (!valor || valor <= 0) return avisar('Valor inválido')
     const hoje = new Date().toLocaleDateString('en-CA')
     const venc = aluno.data_vencimento && aluno.data_vencimento >= hoje ? aluno.data_vencimento : hoje
     setGerandoId(aluno.id)
@@ -150,7 +151,7 @@ export default function Alunos() {
       if (!res.ok) throw new Error(data.error || 'Erro ao gerar cobrança')
       await carregar()
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Erro ao gerar cobrança')
+      avisar(err instanceof Error ? err.message : 'Erro ao gerar cobrança')
     } finally {
       setGerandoId(null)
     }
@@ -289,8 +290,8 @@ export default function Alunos() {
   async function confirmarPagamento() {
     if (!alunoModal) return
     const idsProdutos = produtosModal.filter(x => marcados.has(x.id)).map(x => x.id)
-    if (receberMensalidade && matriculasModal.length === 0) return alert('Este aluno não tem matrículas cadastradas.')
-    if (!receberMensalidade && idsProdutos.length === 0) return alert('Marque a mensalidade ou algum produto para receber.')
+    if (receberMensalidade && matriculasModal.length === 0) return avisar('Este aluno não tem matrículas cadastradas.')
+    if (!receberMensalidade && idsProdutos.length === 0) return avisar('Marque a mensalidade ou algum produto para receber.')
     const valorPago = parseFloat(valorTexto.replace(',', '.') || '0')
     // O valor pago cobre primeiro a mensalidade; o que sobrar quita os produtos marcados (só os que ficam inteiros pagos)
     const paraMensalidade = receberMensalidade ? Math.min(valorPago, totalMens) : 0
@@ -299,7 +300,7 @@ export default function Alunos() {
     for (const x of produtosModal.filter(y => marcados.has(y.id))) {
       if (x.valor <= resto + 0.005) { idsAPagar.push(x.id); resto -= x.valor }
     }
-    if (receberMensalidade && paraMensalidade <= 0) return alert('Informe um valor maior que zero.')
+    if (receberMensalidade && paraMensalidade <= 0) return avisar('Informe um valor maior que zero.')
     setSalvandoPgto(true)
 
     // Mensalidade e produtos entram numa operação só no banco: ou entra tudo, ou nada
@@ -315,13 +316,13 @@ export default function Alunos() {
     })
     let { error } = await chamar(false)
     if (error?.message === 'JA_PAGOU_HOJE') {
-      if (!confirm('Este aluno já teve um pagamento lançado neste dia. Lançar outro adianta o vencimento mais um mês. Lançar mesmo assim?')) {
+      if (!await confirmar('Este aluno já teve um pagamento lançado neste dia. Lançar outro adianta o vencimento mais um mês. Lançar mesmo assim?')) {
         setSalvandoPgto(false)
         return
       }
       ;({ error } = await chamar(true))
     }
-    if (error) { setSalvandoPgto(false); alert(error.message); return }
+    if (error) { setSalvandoPgto(false); avisar(error.message); return }
     setSalvandoPgto(false)
 
     setModalAberto(false)
@@ -330,16 +331,16 @@ export default function Alunos() {
   }
 
   async function excluirAluno(id: string, nome: string) {
-    if (!confirm('Excluir ' + nome + '? Esta ação não pode ser desfeita.')) return
+    if (!await confirmar('Excluir ' + nome + '? Esta ação não pode ser desfeita.')) return
 
     const { error: errMat } = await supabase.from('matriculas').delete().eq('aluno_id', id)
-    if (errMat) { alert('Erro ao excluir matrículas: ' + errMat.message); return }
+    if (errMat) { avisar('Erro ao excluir matrículas: ' + errMat.message); return }
 
     const { error: errMov } = await supabase.from('movimentacoes').delete().eq('aluno_ref_id', id)
-    if (errMov) { alert('Erro ao excluir movimentações: ' + errMov.message); return }
+    if (errMov) { avisar('Erro ao excluir movimentações: ' + errMov.message); return }
 
     const { error: errAlu } = await supabase.from('alunos').delete().eq('id', id)
-    if (errAlu) { alert('Erro ao excluir aluno: ' + errAlu.message); return }
+    if (errAlu) { avisar('Erro ao excluir aluno: ' + errAlu.message); return }
 
     await registrarLog('Excluiu aluno', 'alunos', id, nome)
     carregar()

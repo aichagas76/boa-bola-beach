@@ -3,6 +3,7 @@ import { Geist } from 'next/font/google'
 import './globals.css'
 import Sidebar from '@/components/layout/Sidebar'
 import UnidadeProvider from '@/components/layout/UnidadeProvider'
+import { AvisosHost } from '@/lib/avisos-ui'
 
 const geist = Geist({ subsets: ['latin'] })
 
@@ -27,6 +28,7 @@ export default function RootLayout({
           </main>
         </div>
         </UnidadeProvider>
+        <AvisosHost />
       </body>
     </html>
   )

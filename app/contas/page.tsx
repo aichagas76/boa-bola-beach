@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useUnidade } from '@/components/layout/UnidadeProvider'
 import { Trash2, Edit2, Check, X } from 'lucide-react'
+import { avisar, confirmar } from '@/lib/avisos-ui'
 
 type ContaBancaria = {
   id: string
@@ -40,7 +41,7 @@ export default function Contas() {
     })
 
     if (error) {
-      alert('Erro: ' + error.message)
+      avisar('Erro: ' + error.message)
       return
     }
 
@@ -56,7 +57,7 @@ export default function Contas() {
     }).eq('id', id)
 
     if (error) {
-      alert('Erro: ' + error.message)
+      avisar('Erro: ' + error.message)
       return
     }
 
@@ -65,12 +66,12 @@ export default function Contas() {
   }
 
   async function deletar(id: string) {
-    if (!confirm('Excluir esta conta?')) return
+    if (!await confirmar('Excluir esta conta?')) return
 
     const { error } = await supabase.from('contas_bancarias').delete().eq('id', id)
 
     if (error) {
-      alert('Erro: ' + error.message)
+      avisar('Erro: ' + error.message)
       return
     }
 

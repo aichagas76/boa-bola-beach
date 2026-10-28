@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Trash2, Edit2, Check, X } from 'lucide-react'
+import { avisar, confirmar } from '@/lib/avisos-ui'
 
 type CategoriaFinanceiro = {
   id: string
@@ -64,7 +65,7 @@ export default function Categorias() {
       })
 
     if (error) {
-      alert('Erro: ' + error.message)
+      avisar('Erro: ' + error.message)
       return
     }
 
@@ -84,7 +85,7 @@ export default function Categorias() {
       })
 
     if (error) {
-      alert('Erro: ' + error.message)
+      avisar('Erro: ' + error.message)
       return
     }
 
@@ -108,7 +109,7 @@ export default function Categorias() {
       .eq('id', id)
 
     if (error) {
-      alert('Erro: ' + error.message)
+      avisar('Erro: ' + error.message)
       return
     }
 
@@ -118,7 +119,7 @@ export default function Categorias() {
   }
 
   async function deletarItem(id: string) {
-    if (!confirm('Excluir?')) return
+    if (!await confirmar('Excluir?')) return
 
     const { error } = await supabase
       .from('categorias_financeiro')
@@ -126,7 +127,7 @@ export default function Categorias() {
       .eq('id', id)
 
     if (error) {
-      alert('Erro: ' + error.message)
+      avisar('Erro: ' + error.message)
       return
     }
 

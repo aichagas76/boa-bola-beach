@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { Trash2, Edit2 } from 'lucide-react'
 import { usePagination } from '@/lib/hooks/usePagination'
 import { Pagination } from '@/components/ui/pagination'
+import { avisar, confirmar } from '@/lib/avisos-ui'
 
 type Professor = {
   id: string
@@ -76,9 +77,9 @@ export default function Professores() {
   }
 
   async function salvar() {
-    if (!form.nome.trim()) return alert('Informe o nome do professor')
+    if (!form.nome.trim()) return avisar('Informe o nome do professor')
     const comissao = form.comissao_percentual ? parseFloat(form.comissao_percentual) : null
-    if (comissao !== null && (comissao < 0 || comissao > 100)) return alert('Comissão deve ser entre 0 e 100')
+    if (comissao !== null && (comissao < 0 || comissao > 100)) return avisar('Comissão deve ser entre 0 e 100')
 
     setSalvando(true)
     const payload = {
@@ -90,18 +91,18 @@ export default function Professores() {
     let professorId = editandoId
     if (editandoId) {
       const { error } = await supabase.from('professores').update(payload).eq('id', editandoId)
-      if (error) { alert('Erro ao salvar: ' + error.message); setSalvando(false); return }
+      if (error) { avisar('Erro ao salvar: ' + error.message); setSalvando(false); return }
     } else {
       const { data, error } = await supabase.from('professores').insert(payload).select('id').single()
-      if (error || !data) { alert('Erro ao salvar: ' + (error?.message ?? '')); setSalvando(false); return }
+      if (error || !data) { avisar('Erro ao salvar: ' + (error?.message ?? '')); setSalvando(false); return }
       professorId = data.id
     }
     // Esportes do professor: troca a lista inteira pelo que está marcado
     const apaga = await supabase.from('professor_esportes').delete().eq('professor_id', professorId)
-    if (apaga.error) { alert('Professor salvo, mas não consegui salvar os esportes: ' + apaga.error.message); setSalvando(false); cancelar(); carregar(); return }
+    if (apaga.error) { avisar('Professor salvo, mas não consegui salvar os esportes: ' + apaga.error.message); setSalvando(false); cancelar(); carregar(); return }
     if (form.esportes.length > 0) {
       const { error } = await supabase.from('professor_esportes').insert(form.esportes.map(esporte_id => ({ professor_id: professorId, esporte_id })))
-      if (error) { alert('Professor salvo, mas não consegui salvar os esportes: ' + error.message); setSalvando(false); cancelar(); carregar(); return }
+      if (error) { avisar('Professor salvo, mas não consegui salvar os esportes: ' + error.message); setSalvando(false); cancelar(); carregar(); return }
     }
 
     setSalvando(false)
@@ -110,9 +111,9 @@ export default function Professores() {
   }
 
   async function excluir(id: string) {
-    if (!confirm('Excluir este professor?')) return
+    if (!await confirmar('Excluir este professor?')) return
     const { error } = await supabase.from('professores').delete().eq('id', id)
-    if (error) { alert('Erro ao excluir: ' + error.message); return }
+    if (error) { avisar('Erro ao excluir: ' + error.message); return }
     carregar()
   }
 

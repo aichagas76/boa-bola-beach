@@ -8,6 +8,7 @@ import { registrarLog } from '@/lib/log'
 import { usePagination } from '@/lib/hooks/usePagination'
 import { Pagination } from '@/components/ui/pagination'
 import { Modal } from '@/components/ui/modal'
+import { avisar } from '@/lib/avisos-ui'
 
 type Movimentacao = {
   id: string
@@ -64,7 +65,7 @@ export default function Pagamentos() {
       .from('movimentacoes')
       .update({ status: 'Recebido', data_pagamento: hoje })
       .eq('id', mov.id)
-    if (error) { alert('Erro: ' + error.message); setBaixandoId(null); return }
+    if (error) { avisar('Erro: ' + error.message); setBaixandoId(null); return }
     await registrarLog('Baixa pagamento', 'movimentacoes', mov.id, 'Pagamento')
     setTimeout(() => window.location.reload(), 800)
   }
@@ -81,7 +82,7 @@ export default function Pagamentos() {
       .delete()
       .eq('id', confirmDelete.id)
     if (error) {
-      alert('Erro: ' + error.message)
+      avisar('Erro: ' + error.message)
       setBaixandoId(null)
       setConfirmDelete({ isOpen: false, id: null })
       return

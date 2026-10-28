@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Trash2, Edit2, Check, X } from 'lucide-react'
+import { avisar, confirmar } from '@/lib/avisos-ui'
 
 type Banco = {
   id: string
@@ -37,7 +38,7 @@ export default function Bancos() {
 
     const { error } = await supabase.from('bancos').insert({ nome: novoNome.trim() })
     if (error) {
-      alert(mensagemDeErro(error))
+      avisar(mensagemDeErro(error))
       return
     }
 
@@ -50,7 +51,7 @@ export default function Bancos() {
 
     const { error } = await supabase.from('bancos').update({ nome: editandoNome.trim() }).eq('id', id)
     if (error) {
-      alert(mensagemDeErro(error))
+      avisar(mensagemDeErro(error))
       return
     }
 
@@ -59,11 +60,11 @@ export default function Bancos() {
   }
 
   async function deletar(id: string) {
-    if (!confirm('Excluir este banco? Os lançamentos que usam ele ficam sem banco.')) return
+    if (!await confirmar('Excluir este banco? Os lançamentos que usam ele ficam sem banco.')) return
 
     const { error } = await supabase.from('bancos').delete().eq('id', id)
     if (error) {
-      alert(mensagemDeErro(error))
+      avisar(mensagemDeErro(error))
       return
     }
 

@@ -12,6 +12,7 @@ import EsportesForm from '@/components/alunos/EsportesForm'
 import { carregarCatalogo, estadosDoAluno, salvarMatriculas } from '@/lib/esportes-db'
 import { idsEditaveisPorEsporte, type EstadoEsporte, type MatriculaBanco } from '@/lib/esportes'
 import { carregarProfessoresAtivos, type ProfessorOpcao } from '@/lib/professores'
+import { avisar } from '@/lib/avisos-ui'
 
 const dadosParaValidar = (f: FormAluno) => ({ ...f, temResponsavel: f.tem_responsavel })
 
@@ -96,14 +97,14 @@ export default function EditarAluno() {
 
     const { error } = await supabase.from('alunos').update(paraBanco(form)).eq('id', id)
     if (error) {
-      alert(error.code === '23505' ? 'Já existe um aluno com este nome.' : 'Erro ao salvar aluno: ' + error.message)
+      avisar(error.code === '23505' ? 'Já existe um aluno com este nome.' : 'Erro ao salvar aluno: ' + error.message)
       setSaving(false)
       return
     }
 
     const erroMatriculas = await salvarMatriculas(supabase, id, estados, idsExistentes)
     if (erroMatriculas) {
-      alert('Erro ao salvar as modalidades: ' + erroMatriculas)
+      avisar('Erro ao salvar as modalidades: ' + erroMatriculas)
       setSaving(false)
       return
     }

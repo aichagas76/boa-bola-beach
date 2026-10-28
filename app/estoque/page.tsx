@@ -13,6 +13,7 @@ import {
   COR, FORMAS, FormVenda, Janela, Rotulo, campo, dataBr, hojeIso, moeda, numero,
   type AlunoOpcao, type Compra, type Opcao, type Produto, type Retirada,
 } from '@/components/estoque/FormVenda'
+import { avisar, confirmar } from '@/lib/avisos-ui'
 
 export default function Estoque() {
   const { unidadeId } = useUnidade()
@@ -68,23 +69,23 @@ export default function Estoque() {
     const { data: ret } = await supabase.from('estoque_retiradas').select('movimentacao_id').eq('id', r.id).single()
     if (!ret?.movimentacao_id) return
     const { error } = await supabase.from('movimentacoes').update({ status: 'Recebido', data_pagamento: hojeIso() }).eq('id', ret.movimentacao_id)
-    if (error) return alert('Erro: ' + error.message)
+    if (error) return avisar('Erro: ' + error.message)
     await registrarLog('Baixa de venda de estoque', 'estoque_retiradas', r.id)
     carregar()
   }
 
   async function desfazerVenda(r: Retirada) {
-    if (!confirm('Desfazer esta venda? O produto volta ao estoque e o lançamento sai do financeiro.')) return
+    if (!await confirmar('Desfazer esta venda? O produto volta ao estoque e o lançamento sai do financeiro.')) return
     const { error } = await supabase.rpc('estoque_desfazer_venda', { p_retirada: r.id })
-    if (error) return alert('Erro: ' + error.message)
+    if (error) return avisar('Erro: ' + error.message)
     await registrarLog('Venda de estoque desfeita', 'estoque_retiradas', r.id)
     carregar()
   }
 
   async function desfazerCompra(c: Compra) {
-    if (!confirm('Desfazer esta compra? Ela sai do estoque e do financeiro.')) return
+    if (!await confirmar('Desfazer esta compra? Ela sai do estoque e do financeiro.')) return
     const { error } = await supabase.rpc('estoque_desfazer_compra', { p_compra: c.id })
-    if (error) return alert('Erro: ' + error.message)
+    if (error) return avisar('Erro: ' + error.message)
     await registrarLog('Compra de estoque desfeita', 'estoque_compras', c.id)
     carregar()
   }
@@ -238,9 +239,9 @@ function FormProduto({ unidadeId, produto, fornecedores, professores, onFechar, 
   const set = (k: keyof typeof f, v: string | boolean) => setF(x => ({ ...x, [k]: v }))
 
   async function salvar() {
-    if (!f.nome.trim()) return alert('Informe o nome do produto.')
+    if (!f.nome.trim()) return avisar('Informe o nome do produto.')
     const preco = numero(f.preco_aluno)
-    if (!(preco >= 0)) return alert('Informe o preço para o aluno.')
+    if (!(preco >= 0)) return avisar('Informe o preço para o aluno.')
     const dados = {
       nome: f.nome.trim(), categoria: f.categoria.trim() || null, fornecedor_id: f.fornecedor_id || null,
       custo: numero(f.custo) >= 0 ? numero(f.custo) : 0, preco_aluno: preco,
@@ -255,7 +256,7 @@ function FormProduto({ unidadeId, produto, fornecedores, professores, onFechar, 
       ? await supabase.from('estoque_produtos').update(dados).eq('id', produto.id)
       : await supabase.from('estoque_produtos').insert({ ...dados, unidade_id: unidadeId })
     setSalvando(false)
-    if (error) return alert(error.code === '23505' ? 'Já existe um produto com este nome nesta unidade.' : 'Erro: ' + error.message)
+    if (error) return avisar(error.code === '23505' ? 'Já existe um produto com este nome nesta unidade.' : 'Erro: ' + error.message)
     await registrarLog(produto ? 'Produto de estoque alterado' : 'Produto de estoque criado', 'estoque_produtos', produto?.id, dados.nome)
     onSalvo()
   }
@@ -324,17 +325,17 @@ function FormCompra({ produtos, inicial, fornecedores, bancos, onFechar, onSalvo
   }
 
   async function salvar() {
-    if (!produtoId) return alert('Escolha o produto.')
+    if (!produtoId) return avisar('Escolha o produto.')
     const q = parseInt(qtd), c = numero(custo)
     const erros = validarCompra({ quantidade: q, custo_unitario: c })
-    if (erros.length) return alert(erros.join('\n'))
+    if (erros.length) return avisar(erros.join('\n'))
     setSalvando(true)
     const { error } = await supabase.rpc('estoque_comprar', {
       p_produto: produtoId, p_quantidade: q, p_custo: c, p_fornecedor: fornecedor || null, p_data: data,
       p_lancar: lancar, p_forma: forma, p_banco: banco || null,
     })
     setSalvando(false)
-    if (error) return alert('Erro: ' + error.message)
+    if (error) return avisar('Erro: ' + error.message)
     await registrarLog('Compra de estoque', 'estoque_compras', undefined, `${q} x ${produtos.find(x => x.id === produtoId)?.nome}`)
     onSalvo()
   }

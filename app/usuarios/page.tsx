@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { ShieldCheck } from 'lucide-react'
+import { avisar } from '@/lib/avisos-ui'
 
 type Unidade = { id: string; codigo: string; nome: string }
 type Usuario = { id: string; email: string; ultimoLogin: string | null; administrador: boolean; unidadeIds: string[] }
@@ -41,7 +42,7 @@ export default function Usuarios() {
 
   async function alternarUnidade(u: Usuario, unidadeId: string) {
     const novas = u.unidadeIds.includes(unidadeId) ? u.unidadeIds.filter(x => x !== unidadeId) : [...u.unidadeIds, unidadeId]
-    if (novas.length === 0) return alert('O usuário precisa ter pelo menos uma unidade.')
+    if (novas.length === 0) return avisar('O usuário precisa ter pelo menos uma unidade.')
     setSalvandoId(u.id)
     const res = await fetch('/api/usuarios', {
       method: 'POST',
@@ -50,7 +51,7 @@ export default function Usuarios() {
     })
     const data = await res.json()
     setSalvandoId(null)
-    if (!res.ok) return alert(data.error ?? 'Não consegui salvar.')
+    if (!res.ok) return avisar(data.error ?? 'Não consegui salvar.')
     setUsuarios(lista => lista.map(x => (x.id === u.id ? { ...x, unidadeIds: novas } : x)))
   }
 
@@ -63,7 +64,7 @@ export default function Usuarios() {
     })
     const data = await res.json()
     setCriando(false)
-    if (!res.ok) return alert(data.error ?? 'Não consegui criar o login.')
+    if (!res.ok) return avisar(data.error ?? 'Não consegui criar o login.')
     setEmail('')
     setSenha('')
     setNovasUnidades([])
@@ -80,7 +81,7 @@ export default function Usuarios() {
     })
     const data = await res.json()
     setSalvandoId(null)
-    if (!res.ok) return alert(data.error ?? 'Não consegui salvar.')
+    if (!res.ok) return avisar(data.error ?? 'Não consegui salvar.')
     setUsuarios(lista => lista.map(x => (x.id === u.id ? { ...x, administrador: !u.administrador } : x)))
   }
 
