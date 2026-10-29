@@ -15,6 +15,7 @@ export type FormAluno = {
   data_vencimento: string
   observacao: string
   status: string
+  motivo_inativacao_id: string // '' = sem motivo; só vale com status Inativo
   tem_responsavel: boolean // só da tela: marca que o aluno tem responsável
   responsavel_nome: string
   responsavel_cpf: string

@@ -126,3 +126,35 @@ export function faturamentoProfessores(movs: MovProfessorGrafico[], janela: Jane
   const porMes: PontoProfessorMes[] = meses.map(mes => ({ mes, rotulo: rotuloMes(mes), total: (totalMes.get(mes) ?? 0) / 100, alunos: alunosMes.get(mes)?.size ?? 0 }))
   return { ranking, porMes }
 }
+
+export type FatiaInativacao = { name: string; value: number; pct: number }
+
+const fatias = (por: Map<string, number>): FatiaInativacao[] => {
+  const total = [...por.values()].reduce((t, v) => t + v, 0)
+  return [...por.entries()]
+    .map(([name, value]) => ({ name, value, pct: total ? value / total : 0 }))
+    .sort((a, b) => b.value - a.value || a.name.localeCompare(b.name, 'pt-BR'))
+}
+
+/** Inativações da janela somadas por motivo (maiores primeiro). Sem motivo cadastrado entra em "Sem motivo informado". */
+export function inativacoesPorMotivo(eventos: { data: string; motivo: string | null }[], janela: Janela, semMotivo = 'Sem motivo informado'): FatiaInativacao[] {
+  const por = new Map<string, number>()
+  for (const e of eventos) {
+    if (e.data < janela.inicio || e.data > janela.fim) continue
+    const nome = e.motivo || semMotivo
+    por.set(nome, (por.get(nome) ?? 0) + 1)
+  }
+  return fatias(por)
+}
+
+/** Inativações da janela por professor; `rotulos` diz, para cada aluno, o professor (ou a modalidade, ex.: Clubinho) de cada matrícula dele.
+ *  Aluno com mais de um professor conta em cada um (uma vez por rótulo). */
+export function inativacoesPorProfessor(eventos: { data: string; aluno_id: string }[], janela: Janela, rotulos: Map<string, string[]>, semProfessor = 'Sem professor'): FatiaInativacao[] {
+  const por = new Map<string, number>()
+  for (const e of eventos) {
+    if (e.data < janela.inicio || e.data > janela.fim) continue
+    const lista = [...new Set(rotulos.get(e.aluno_id) ?? [])]
+    for (const r of lista.length ? lista : [semProfessor]) por.set(r, (por.get(r) ?? 0) + 1)
+  }
+  return fatias(por)
+}

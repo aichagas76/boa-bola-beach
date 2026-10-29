@@ -9,7 +9,7 @@ import {
 } from 'recharts'
 import type { EstadoPeriodo } from '@/components/dashboard/FiltroPeriodo'
 import type { FaixaAtraso, FatiaStatus, LinhaAlunos, LinhaFinanceira } from '@/lib/painel'
-import type { DespesaCat, PontoMensal, faturamentoProfessores } from '@/lib/painel-graficos'
+import type { DespesaCat, FatiaInativacao, PontoMensal, faturamentoProfessores } from '@/lib/painel-graficos'
 import type { LinhaMes, LinhaModalidade, alunosPorModalidade } from '@/lib/relatorios'
 import {
   ALTURA, COR, COR_STATUS, Grade, Grafico, MARGEM, PALETA_CATEGORIAS, brl, brlCurto, corEsporte, eixoX, eixoY, legenda, pct, tip,
@@ -113,11 +113,13 @@ export function GraficosFinanceiro({ financeira, temAnterior, lucro, totaisPerio
   )
 }
 
-export function GraficosAlunos({ loading, serieA, novosMes, inativacoesMes, inativosSemData }: {
+export function GraficosAlunos({ loading, serieA, novosMes, inativacoesMes, motivosInativ, professoresInativ, inativosSemData }: {
   loading: boolean
   serieA: LinhaAlunos[]
   novosMes: { rotulo: string; novos: number; reativados: number }[]
   inativacoesMes: PontoMensal[]
+  motivosInativ: FatiaInativacao[]
+  professoresInativ: FatiaInativacao[]
   inativosSemData: number
 }) {
   return (
@@ -159,6 +161,43 @@ export function GraficosAlunos({ loading, serieA, novosMes, inativacoesMes, inat
             <Legend {...legenda} />
             <Bar dataKey="registrada" stackId="i" name="Data registrada" fill={COR.vencido} />
             <Bar dataKey="estimada" stackId="i" name="Data estimada" fill="#FCA5A5" radius={[4, 4, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      </Grafico>
+      <Grafico titulo="Motivos das inativações" nota="Inativações do período, pelo motivo escolhido ao inativar o aluno"
+        carregando={loading} vazio={!loading && motivosInativ.length === 0} mensagemVazio="Nenhuma inativação neste período">
+        <div className="flex flex-col sm:flex-row items-center gap-4">
+          <div className="w-full sm:w-1/2">
+            <ResponsiveContainer width="100%" height={ALTURA}>
+              <PieChart>
+                <Pie data={motivosInativ} dataKey="value" nameKey="name" innerRadius={50} outerRadius={90} paddingAngle={2}>
+                  {motivosInativ.map((d, i) => <Cell key={d.name} fill={d.name === 'Sem motivo informado' ? COR.cancelado : PALETA_CATEGORIAS[i % PALETA_CATEGORIAS.length]} />)}
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+          <ul className="w-full sm:w-1/2 space-y-1.5 text-sm">
+            {motivosInativ.map((d, i) => (
+              <li key={d.name} className="flex items-center justify-between gap-2">
+                <span className="inline-flex items-center gap-2 min-w-0"><span className="h-3 w-3 shrink-0 rounded-full" style={{ background: d.name === 'Sem motivo informado' ? COR.cancelado : PALETA_CATEGORIAS[i % PALETA_CATEGORIAS.length] }} /><span className="truncate">{d.name}</span></span>
+                <span className="shrink-0 text-gray-700">{d.value} · {pct(d.pct)}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </Grafico>
+      <Grafico titulo="Inativações por professor" nota="Professor das matrículas do aluno (Clubinho aparece como modalidade). Aluno com mais de um professor conta em cada um."
+        carregando={loading} vazio={!loading && professoresInativ.length === 0} mensagemVazio="Nenhuma inativação neste período" altura={Math.max(160, professoresInativ.length * 34 + 30)}>
+        <ResponsiveContainer width="100%" height={Math.max(160, professoresInativ.length * 34 + 30)}>
+          <BarChart data={professoresInativ} layout="vertical" margin={{ top: 4, right: 40, left: 0, bottom: 0 }} barSize={18}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#eee" horizontal={false} />
+            <XAxis type="number" hide />
+            <YAxis type="category" dataKey="name" width={130} tick={{ fontSize: 12 }} tickLine={false} axisLine={false} interval={0} />
+            <Tooltip cursor={{ fill: 'rgba(0,0,0,0.04)' }} />
+            <Bar dataKey="value" name="Inativações" fill={COR.vencido} radius={[0, 4, 4, 0]}>
+              <LabelList dataKey="value" position="right" style={{ fontSize: 12, fill: '#374151' }} />
+            </Bar>
           </BarChart>
         </ResponsiveContainer>
       </Grafico>

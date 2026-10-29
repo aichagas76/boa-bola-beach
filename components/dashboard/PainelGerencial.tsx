@@ -8,7 +8,7 @@ import { buscarTudo } from '@/lib/buscar-tudo'
 import { useUnidade } from '@/components/layout/UnidadeProvider'
 import dynamic from 'next/dynamic'
 import { brl, pct } from '@/components/dashboard/painel-ui'
-import { despesasPorCategoria, faturamentoProfessores, mesesEntre, serieMensal, type Evento } from '@/lib/painel-graficos'
+import { despesasPorCategoria, faturamentoProfessores, inativacoesPorMotivo, inativacoesPorProfessor, mesesEntre, serieMensal, type Evento } from '@/lib/painel-graficos'
 import { FiltroMeses, FiltroPeriodo, PRESETS, TemaRecolhivel, useJanela, usePeriodo } from '@/components/dashboard/FiltroPeriodo'
 import type { MovFluxo } from '@/lib/fluxo-caixa'
 import {
@@ -65,7 +65,7 @@ function Aux({ children }: { children: React.ReactNode }) {
 
 
 type LinhaAluno = { id: string; status: string | null; data_cadastro: string | null; data_inativacao?: string | null; data_vencimento: string | null; unidade_id: string | null }
-type LinhaMat = { aluno_id: string; tipo: string; valor: number | null; unidade_id: string | null; acesso_duas_unidades: boolean | null; esporte_id: string | null; esportes: { nome: string } | null }
+type LinhaMat = { aluno_id: string; tipo: string; valor: number | null; unidade_id: string | null; acesso_duas_unidades: boolean | null; esporte_id: string | null; professor_nome: string | null; esportes: { nome: string } | null }
 type LinhaMov = {
   id: string; tipo: string; status: string | null; valor: number; data: string; data_pagamento: string | null; data_vencimento: string | null
   aluno_ref_id: string | null; professor_id: string | null; professores: { nome: string } | null; esportes: { nome: string } | null
@@ -111,6 +111,9 @@ export default function PainelGerencial() {
   const [pags, setPags] = useState<PagP[]>([])
   // Quando cada aluno foi inativado (registrada ou estimada), para a base de alunos ativos
   const [saidas, setSaidas] = useState<Record<string, string>>({})
+  // Cada inativação registrada, com o motivo escolhido, e os nomes dos motivos
+  const [inativHist, setInativHist] = useState<{ aluno_id: string; data: string; motivo_id: string | null }[]>([])
+  const [motivos, setMotivos] = useState<Record<string, string>>({})
   // Reativações (inativo -> ativo) registradas pelo sistema
   const [reativacoes, setReativacoes] = useState<{ aluno_id: string; data: string }[]>([])
   const [esporteAlu, setEsporteAlu] = useState('')
@@ -126,9 +129,9 @@ export default function PainelGerencial() {
 
       // data_inativacao só existe depois da atualização do banco: se faltar, o painel segue sem ela
       let rastreia = true
-      const [ra0, rm, rf, rp, rh, rr] = await Promise.all([
+      const [ra0, rm, rf, rp, rh, rmot, rr] = await Promise.all([
         buscarTudo((de, ate) => supabase.from('alunos').select('id, status, data_cadastro, data_inativacao, data_vencimento, unidade_id').order('id').range(de, ate)),
-        buscarTudo((de, ate) => supabase.from('matriculas').select('aluno_id, tipo, valor, unidade_id, acesso_duas_unidades, esporte_id, esportes(nome)').order('id').range(de, ate)),
+        buscarTudo((de, ate) => supabase.from('matriculas').select('aluno_id, tipo, valor, unidade_id, acesso_duas_unidades, esporte_id, professor_nome, esportes(nome)').order('id').range(de, ate)),
         buscarTudo((de, ate) => supabase
           .from('movimentacoes')
           .select('id, tipo, status, valor, data, data_pagamento, data_vencimento, aluno_ref_id')
@@ -137,7 +140,8 @@ export default function PainelGerencial() {
           .order('id').range(de, ate)),
         buscarTudo((de, ate) => supabase.from('pagamentos').select('aluno_id, valor, status, data_vencimento').neq('status', 'Pago').order('id').range(de, ate)),
         // Se a tabela do histórico ainda não existir no banco, o gráfico segue só com as datas registradas
-        buscarTudo((de, ate) => supabase.from('alunos_status_historico').select('aluno_id, data').eq('para_status', 'Inativo').order('data').order('id').range(de, ate)),
+        buscarTudo((de, ate) => supabase.from('alunos_status_historico').select('aluno_id, data, motivo_id').eq('para_status', 'Inativo').order('data').order('id').range(de, ate)),
+        supabase.from('motivos_inativacao').select('id, nome'),
         buscarTudo((de, ate) => supabase.from('alunos_status_historico').select('aluno_id, data').eq('de_status', 'Inativo').eq('para_status', 'Ativo').order('data').order('id').range(de, ate)),
       ])
       let ra = ra0
@@ -159,7 +163,10 @@ export default function PainelGerencial() {
       })))
       setPags((rp.data ?? []) as PagP[])
       setReativacoes(rr.error ? [] : ((rr.data ?? []) as unknown as { aluno_id: string; data: string }[]))
-      setSaidas(rh.error ? {} : Object.fromEntries(((rh.data ?? []) as unknown as { aluno_id: string; data: string }[]).map(x => [x.aluno_id, x.data])))
+      const hist = rh.error ? [] : ((rh.data ?? []) as unknown as { aluno_id: string; data: string; motivo_id: string | null }[])
+      setSaidas(Object.fromEntries(hist.map(x => [x.aluno_id, x.data])))
+      setInativHist(hist)
+      setMotivos(Object.fromEntries(((rmot.data ?? []) as { id: string; nome: string }[]).map(x => [x.id, x.nome])))
       setLoading(false)
     }
     carregar()
@@ -278,6 +285,23 @@ export default function PainelGerencial() {
     }
     return serieMensal(eventos, jAlu.janela, ['registrada', 'estimada'])
   }, [abAlu, alunosP, dados.matsU, esporteAlu, saidas, jAlu.janela])
+  // Inativações do período por motivo e por professor (ou modalidade, quando não há professor, como no Clubinho)
+  const { motivosInativ, professoresInativ } = useMemo(() => {
+    if (!abAlu) return { motivosInativ: [], professoresInativ: [] }
+    const doEsporte = esporteAlu ? new Set(dados.matsU.filter(m => m.esporte_id === esporteAlu).map(m => m.aluno_id)) : null
+    const ids = new Set(alunosP.map(a => a.id))
+    const eventos = inativHist.filter(h => ids.has(h.aluno_id) && (!doEsporte || doEsporte.has(h.aluno_id)))
+    const rotulos = new Map<string, string[]>()
+    for (const m of dados.matsF) {
+      if (esporteAlu && m.esporte_id !== esporteAlu) continue
+      const r = m.tipo === 'Clubinho' ? 'Clubinho' : (m.professor_nome?.trim() || `Sem professor (${m.tipo === 'Aula' ? 'Aulas' : m.tipo})`)
+      rotulos.set(m.aluno_id, [...(rotulos.get(m.aluno_id) ?? []), r])
+    }
+    return {
+      motivosInativ: inativacoesPorMotivo(eventos.map(h => ({ data: h.data, motivo: h.motivo_id ? motivos[h.motivo_id] ?? null : null })), jAlu.janela),
+      professoresInativ: inativacoesPorProfessor(eventos, jAlu.janela, rotulos),
+    }
+  }, [abAlu, alunosP, inativHist, motivos, dados.matsU, dados.matsF, esporteAlu, jAlu.janela])
   // Novos alunos do mês: cadastros novos (nunca existiram) e reativados (voltaram de inativo)
   const novosMes = useMemo(() => {
     if (!abAlu) return []
@@ -471,7 +495,7 @@ export default function PainelGerencial() {
           </div>
         </div>
       }>
-      <GraficosAlunos loading={loading} serieA={serieA} novosMes={novosMes} inativacoesMes={inativacoesMes} inativosSemData={inativosSemData} />
+      <GraficosAlunos loading={loading} serieA={serieA} novosMes={novosMes} inativacoesMes={inativacoesMes} motivosInativ={motivosInativ} professoresInativ={professoresInativ} inativosSemData={inativosSemData} />
       </TemaRecolhivel>
 
       <TemaRecolhivel titulo="Vendas de produtos" subtitulo="Estoque: quanto foi vendido por mês.">

@@ -30,6 +30,7 @@ const cadastrosItems: SubItem[] = [
   { href: '/contas', label: 'Contas', icon: Banknote },
   { href: '/bancos', label: 'Bancos', icon: Landmark },
   { href: '/modalidades', label: 'Modalidades', icon: ListChecks },
+  { href: '/motivos-inativacao', label: 'Motivos de inativação', icon: ListChecks },
   { href: '/usuarios', label: 'Usuários', icon: UserCog },
   { href: '/professores', label: 'Professores', icon: Users },
 ]

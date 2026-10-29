@@ -37,11 +37,14 @@ export default function EditarAluno() {
     data_vencimento: '',
     observacao: '',
     status: 'Ativo',
+    motivo_inativacao_id: '',
     tem_responsavel: false,
     responsavel_nome: '',
     responsavel_cpf: '',
     responsavel_celular: '',
   })
+  const [statusOriginal, setStatusOriginal] = useState('Ativo')
+  const [motivos, setMotivos] = useState<{ id: string; nome: string }[]>([])
   const [professores, setProfessores] = useState<ProfessorOpcao[]>([])
   const [estados, setEstados] = useState<EstadoEsporte[]>([])
   const [modalidadesPorEsporte, setModalidadesPorEsporte] = useState<Record<string, string[]>>({})
@@ -63,6 +66,7 @@ export default function EditarAluno() {
           data_vencimento: a.data_vencimento ?? '',
           observacao: a.observacao ?? '',
           status: a.status ?? 'Ativo',
+          motivo_inativacao_id: a.motivo_inativacao_id ?? '',
           tem_responsavel: !!a.responsavel_nome,
           responsavel_nome: a.responsavel_nome ?? '',
           responsavel_cpf: a.responsavel_cpf ?? '',
@@ -71,6 +75,9 @@ export default function EditarAluno() {
       }
 
       setProfessores(await carregarProfessoresAtivos(supabase))
+      setStatusOriginal(a?.status ?? 'Ativo')
+      const { data: mot } = await supabase.from('motivos_inativacao').select('id, nome, ativo').order('nome')
+      setMotivos((mot ?? []).filter(x => x.ativo || x.id === a?.motivo_inativacao_id))
 
       const { esportes, unidades, modalidades: ativas, modalidadesPorEsporte: porEsporte } = await carregarCatalogo(supabase)
       setModalidadesPorEsporte(porEsporte)
@@ -86,16 +93,20 @@ export default function EditarAluno() {
   }, [id])
 
   const erros = validarDadosAluno(dadosParaValidar(form), { nomeJaCadastrado: nomeDuplicado })
+  // Inativar exige o motivo (quem já estava inativo antes do cadastro de motivos pode seguir sem)
+  const inativando = form.status === 'Inativo' && statusOriginal !== 'Inativo'
+  const faltaMotivo = inativando && !form.motivo_inativacao_id
 
   async function salvar() {
     setTentou(true)
+    if (faltaMotivo) return avisar('Escolha o motivo da inativação do aluno.')
     const duplicado = await nomeJaCadastrado(form.nome, id)
     setNomeDuplicado(duplicado)
     if (Object.keys(validarDadosAluno(dadosParaValidar(form), { nomeJaCadastrado: duplicado })).length > 0) return
 
     setSaving(true)
 
-    const { error } = await supabase.from('alunos').update(paraBanco(form)).eq('id', id)
+    const { error } = await supabase.from('alunos').update({ ...paraBanco(form), motivo_inativacao_id: form.status === 'Inativo' ? form.motivo_inativacao_id || null : null }).eq('id', id)
     if (error) {
       avisar(error.code === '23505' ? 'Já existe um aluno com este nome.' : 'Erro ao salvar aluno: ' + error.message)
       setSaving(false)
@@ -128,6 +139,19 @@ export default function EditarAluno() {
         </div>
         <ChaveStatus status={form.status} onChange={status => setForm({ ...form, status })} />
       </div>
+
+      {form.status === 'Inativo' && (
+        <div className={`mb-4 rounded-xl border bg-white p-4 ${tentou && faltaMotivo ? 'border-red-300' : 'border-gray-200'}`}>
+          <label className="text-sm text-gray-700 block mb-1">Motivo da inativação{inativando ? ' *' : ''}</label>
+          <select value={form.motivo_inativacao_id} onChange={e => setForm({ ...form, motivo_inativacao_id: e.target.value })}
+            className="w-full max-w-sm h-10 border border-gray-200 rounded-lg px-3 text-sm bg-white">
+            <option value="">Selecione o motivo...</option>
+            {motivos.map(m => <option key={m.id} value={m.id}>{m.nome}</option>)}
+          </select>
+          {tentou && faltaMotivo && <div className="text-xs text-red-600 mt-1">Escolha o motivo para inativar o aluno.</div>}
+          <div className="text-xs text-gray-500 mt-1">Os motivos são cadastrados em Cadastros → Motivos de inativação.</div>
+        </div>
+      )}
 
       <DadosPessoais form={form} onChange={setForm} erros={erros} mostrarErros={tentou} alunoId={id} onNomeDuplicado={setNomeDuplicado} />
 

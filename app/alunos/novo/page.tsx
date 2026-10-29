@@ -37,6 +37,7 @@ export default function NovoAluno() {
     data_vencimento: '',
     observacao: '',
     status: 'Ativo',
+    motivo_inativacao_id: '',
     tem_responsavel: false,
     responsavel_nome: '',
     responsavel_cpf: '',
@@ -65,7 +66,7 @@ export default function NovoAluno() {
 
     const { data: aluno, error } = await supabase
       .from('alunos')
-      .insert({ ...paraBanco(form), unidade_id: unidadeId })
+      .insert({ ...paraBanco(form), motivo_inativacao_id: null, unidade_id: unidadeId })
       .select()
       .single()
 
