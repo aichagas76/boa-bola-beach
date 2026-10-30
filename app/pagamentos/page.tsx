@@ -15,7 +15,7 @@ import {
   categoriasDeMensalidade, competenciaCurta, filtrarPagamentos, foiRecebida, intervaloDoPeriodo, normaliza, resumoPagamentos, tipoDaEntrada,
   type EntradaAluno, type TipoPeriodo,
 } from '@/lib/pagamentos-aluno'
-import { htmlDoRecibo, montarRecibo } from '@/lib/recibo'
+import { abrirRecibo } from '@/lib/recibo-ui'
 
 type Linha = EntradaAluno & { descricao: string | null; forma_pagamento: string | null; alunos: { nome: string } | null; professores: { nome: string } | null }
 type Bruto = Omit<Linha, 'categoria'> & { categorias_financeiro: { categoria: string | null } | null }
@@ -108,14 +108,10 @@ export default function HistoricoFinanceiroAluno() {
 
   // Recibo de quem pagou em dinheiro: abre uma página com o logo, pronta para imprimir ou salvar em PDF
   function gerarRecibo(m: Linha) {
-    const recibo = montarRecibo({
+    abrirRecibo({
       id: m.id, quem: quem(m), valor: Number(m.valor), categoria: m.categoria, produto: tipoDaEntrada(m.categoria) === 'produto',
       descricao: m.descricao, competencia: m.data_vencimento ?? m.data, dataPagamento: m.data_pagamento ?? m.data, unidade: unidade?.nome ?? 'Boa Bola', forma: m.forma_pagamento ?? 'Dinheiro',
     })
-    const janela = window.open('', '_blank', 'width=900,height=700')
-    if (!janela) { avisar('O navegador bloqueou a janela do recibo. Libere os pop-ups deste site e clique de novo.'); return }
-    janela.document.write(htmlDoRecibo(recibo, unidade?.nome ?? 'Boa Bola', `${window.location.origin}/BB%20logo.jpg`))
-    janela.document.close()
   }
 
   async function darBaixa(m: Linha) {
