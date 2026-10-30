@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { Check, Trash2 } from 'lucide-react'
+import { Check, Receipt, Trash2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useUnidade } from '@/components/layout/UnidadeProvider'
 import { buscarTudo } from '@/lib/buscar-tudo'
@@ -12,11 +12,12 @@ import { Modal } from '@/components/ui/modal'
 import { avisar } from '@/lib/avisos-ui'
 import { BotaoImprimir, CabecalhoImpressao } from '@/components/relatorios/CabecalhoImpressao'
 import {
-  categoriasDeMensalidade, competenciaCurta, filtrarPagamentos, foiRecebida, intervaloDoPeriodo, resumoPagamentos, tipoDaEntrada,
+  categoriasDeMensalidade, competenciaCurta, filtrarPagamentos, foiRecebida, intervaloDoPeriodo, normaliza, resumoPagamentos, tipoDaEntrada,
   type EntradaAluno, type TipoPeriodo,
 } from '@/lib/pagamentos-aluno'
+import { htmlDoRecibo, montarRecibo } from '@/lib/recibo'
 
-type Linha = EntradaAluno & { forma_pagamento: string | null; alunos: { nome: string } | null; professores: { nome: string } | null }
+type Linha = EntradaAluno & { descricao: string | null; forma_pagamento: string | null; alunos: { nome: string } | null; professores: { nome: string } | null }
 type Bruto = Omit<Linha, 'categoria'> & { categorias_financeiro: { categoria: string | null } | null }
 
 const PERIODOS: { id: TipoPeriodo; nome: string }[] = [
@@ -65,7 +66,7 @@ export default function HistoricoFinanceiroAluno() {
     if (!unidadeId) return
     setLoading(true)
     setErro(false)
-    const campos = 'id, aluno_ref_id, status, valor, data, data_vencimento, data_pagamento, forma_pagamento'
+    const campos = 'id, aluno_ref_id, status, valor, data, data_vencimento, data_pagamento, forma_pagamento, descricao'
     const [comAluno, semAluno] = await Promise.all([
       // O que é de aluno: mensalidades e vendas ligadas a ele
       buscarTudo((a, b) => supabase.from('movimentacoes')
@@ -104,6 +105,18 @@ export default function HistoricoFinanceiroAluno() {
     : intervalo.inicio === intervalo.fim ? dataBr(intervalo.inicio) : `${dataBr(intervalo.inicio)} a ${dataBr(intervalo.fim)}`
   const rotuloTipo = tipo === 'todos' ? 'Todos os tipos' : tipo === 'produto' ? 'Venda de produtos' : categoria || 'Mensalidades'
   const quem = (m: Linha) => m.alunos?.nome ?? (m.professores?.nome ? `${m.professores.nome} (professor)` : 'Venda de balcão')
+
+  // Recibo de quem pagou em dinheiro: abre uma página com o logo, pronta para imprimir ou salvar em PDF
+  function gerarRecibo(m: Linha) {
+    const recibo = montarRecibo({
+      id: m.id, quem: quem(m), valor: Number(m.valor), categoria: m.categoria, produto: tipoDaEntrada(m.categoria) === 'produto',
+      descricao: m.descricao, competencia: m.data_vencimento ?? m.data, dataPagamento: m.data_pagamento ?? m.data, unidade: unidade?.nome ?? 'Boa Bola', forma: m.forma_pagamento ?? 'Dinheiro',
+    })
+    const janela = window.open('', '_blank', 'width=900,height=700')
+    if (!janela) { avisar('O navegador bloqueou a janela do recibo. Libere os pop-ups deste site e clique de novo.'); return }
+    janela.document.write(htmlDoRecibo(recibo, unidade?.nome ?? 'Boa Bola', `${window.location.origin}/BB%20logo.jpg`))
+    janela.document.close()
+  }
 
   async function darBaixa(m: Linha) {
     setBaixandoId(m.id)
@@ -251,6 +264,10 @@ export default function HistoricoFinanceiroAluno() {
                     <td className="px-4 py-2.5 text-gray-600">{m.forma_pagamento || '—'}</td>
                     <td className="px-4 py-2.5 print:hidden">
                       <div className="flex justify-end gap-1.5">
+                        {foiRecebida(m) && normaliza(m.forma_pagamento) === 'dinheiro' && (
+                          <button onClick={() => gerarRecibo(m)} title="Gerar recibo (pago em dinheiro)" aria-label="Gerar recibo"
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 text-blue-700 hover:bg-blue-50"><Receipt size={16} /></button>
+                        )}
                         {m.status === 'Não recebido' && (
                           <button onClick={() => darBaixa(m)} disabled={baixandoId === m.id} title="Dar baixa" aria-label="Dar baixa"
                             className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-[#7DC421] text-white hover:bg-[#6ab01a] disabled:opacity-50"><Check size={16} /></button>
